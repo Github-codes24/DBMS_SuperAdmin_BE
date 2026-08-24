@@ -38,14 +38,14 @@ const seedDatabase = async () => {
     const hashedPassword = await bcrypt.hash('password123', salt);
 
     const vendor = await Vendor.create({
-      vendorId: 'rajesh@lts.com',
-      email: 'rajesh@lts.com',
-      fullName: 'Rajesh Kumar',
+      vendorId: 'arham@lts.com',
+      email: 'arham@lts.com',
+      fullName: 'Mohd Arham',
       phone: '+91 98765 43210',
       designation: 'Senior Vendor & Regional Store Manager',
       regionalJurisdiction: 'All India Vendor Operations',
       password: hashedPassword,
-      storeName: 'Rajesh Fresh Mart',
+      storeName: 'Ar Fresh Mart',
       storeStatus: 'Active & Verified',
       twoFactorAuth: true,
       emailAlerts: true,
