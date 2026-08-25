@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { Role, PermissionMatrix } from './roleSchema.js';
+import { createAuditLog } from '../../utils/auditLogger.js';
 
 // Default 6 Modules Definition matching UI Screenshot
 export const DEFAULT_MODULES = [
@@ -166,6 +167,16 @@ export const createRole = async (req, res) => {
     });
 
     await PermissionMatrix.insertMany(matrixEntries);
+
+    // Automatic Audit Log Recording
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Created Custom Role',
+      record: newRole.roleId,
+      module: 'Roles & Permissions',
+    });
 
     res.status(201).json({
       message: 'New role created successfully',
