@@ -1,0 +1,319 @@
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+
+// Import SuperAdmin Panel Schemas
+import SuperAdmin from '../src/SuperadminPanel/Authentication/authSchema.js';
+import User from '../src/SuperadminPanel/UserManagement/userSchema.js';
+import { Role, PermissionMatrix } from '../src/SuperadminPanel/RolesAndPermissions/roleSchema.js';
+import AdminFeatureControl from '../src/SuperadminPanel/FeatureControl/featureControlSchema.js';
+import SuperAdminCustomer from '../src/SuperadminPanel/CustomerDatabase/customerSchema.js';
+
+dotenv.config();
+
+export const seedSuperAdmin = async () => {
+  try {
+    const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/lts_dbms';
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(mongoUri);
+      console.log('MongoDB Connected for Super Admin Seeding...');
+    }
+
+    // 1. Clear all Super Admin Panel data
+    await SuperAdmin.deleteMany({});
+    await User.deleteMany({});
+    await Role.deleteMany({});
+    await PermissionMatrix.deleteMany({});
+    await AdminFeatureControl.deleteMany({});
+    await SuperAdminCustomer.deleteMany({});
+    console.log('Existing Super Admin Panel data cleared.');
+
+    // 2. Seed Initial Master SuperAdmin Account
+    const salt = await bcrypt.genSalt(10);
+    const superAdminPassword = await bcrypt.hash('admin123', salt);
+
+    const superAdminUser = await SuperAdmin.create({
+      adminId: 'ADMIN-001',
+      email: 'admin@lts.com',
+      fullName: 'Super Admin',
+      password: superAdminPassword,
+      role: 'SuperAdmin',
+      status: 'Active',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    });
+    console.log('Master SuperAdmin Account seeded successfully.');
+
+    // 3. Seed System Roles (Super Admin, Admin, Telecaller)
+    const superAdminRole = await Role.create({
+      roleId: 'ROLE-001',
+      title: 'Super Admin',
+      description: 'Full system control with master access to all modules, system settings, and role permissions.',
+      isMasterRole: true,
+      status: 'ACTIVE',
+      createdBy: superAdminUser._id,
+    });
+
+    const adminRole = await Role.create({
+      roleId: 'ROLE-002',
+      title: 'Admin',
+      description: 'Administrator role managing day-to-day operations and team activities.',
+      isMasterRole: false,
+      status: 'ACTIVE',
+      createdBy: superAdminUser._id,
+    });
+
+    const telecallerRole = await Role.create({
+      roleId: 'ROLE-003',
+      title: 'Telecaller',
+      description: 'Front-line agent handling customer interactions, queries, and call logs.',
+      isMasterRole: false,
+      status: 'ACTIVE',
+      createdBy: superAdminUser._id,
+    });
+
+    // Default 6 Modules Definition
+    const defaultModulesList = [
+      { moduleKey: 'CUSTOMER_DATABASE', moduleName: 'Customer Database', moduleDescription: 'Manage customer profiles, history, and status.' },
+      { moduleKey: 'VENDOR_DATABASE', moduleName: 'Vendor Database', moduleDescription: 'Access and approve vendor profiles & documentation.' },
+      { moduleKey: 'CUSTOMER_VENDOR_QUERIES', moduleName: 'Customer & Vendor Queries', moduleDescription: 'Handle customer and vendor inquiries or tickets.' },
+      { moduleKey: 'ANALYTICS_REPORTS', moduleName: 'Analytics & Reports', moduleDescription: 'Generate and download business performance reports.' },
+      { moduleKey: 'SYSTEM_AUDIT_LOGS', moduleName: 'System Audit Logs', moduleDescription: 'View system security events and user activity trails.' },
+      { moduleKey: 'USER_MANAGEMENT', moduleName: 'User Management', moduleDescription: 'Create, edit, or disable team accounts and roles.' },
+    ];
+
+    // 4. Seed Permission Matrices for Super Admin (24/24 active)
+    const superAdminMatrices = defaultModulesList.map((m) => ({
+      roleId: superAdminRole._id,
+      roleTitle: superAdminRole.title,
+      moduleKey: m.moduleKey,
+      moduleName: m.moduleName,
+      moduleDescription: m.moduleDescription,
+      fullAccess: true,
+      viewAccess: true,
+      editAccess: true,
+      exportAccess: true,
+      deleteAccess: true,
+    }));
+    await PermissionMatrix.insertMany(superAdminMatrices);
+
+    // Seed Admin Matrices (18/24 active)
+    const adminMatrices = defaultModulesList.map((m) => ({
+      roleId: adminRole._id,
+      roleTitle: adminRole.title,
+      moduleKey: m.moduleKey,
+      moduleName: m.moduleName,
+      moduleDescription: m.moduleDescription,
+      fullAccess: m.moduleKey !== 'SYSTEM_AUDIT_LOGS',
+      viewAccess: true,
+      editAccess: m.moduleKey !== 'SYSTEM_AUDIT_LOGS',
+      exportAccess: true,
+      deleteAccess: m.moduleKey === 'CUSTOMER_DATABASE' || m.moduleKey === 'USER_MANAGEMENT',
+    }));
+    await PermissionMatrix.insertMany(adminMatrices);
+
+    // Seed Telecaller Matrices (8/24 active)
+    const telecallerMatrices = defaultModulesList.map((m) => ({
+      roleId: telecallerRole._id,
+      roleTitle: telecallerRole.title,
+      moduleKey: m.moduleKey,
+      moduleName: m.moduleName,
+      moduleDescription: m.moduleDescription,
+      fullAccess: false,
+      viewAccess: m.moduleKey === 'CUSTOMER_DATABASE' || m.moduleKey === 'CUSTOMER_VENDOR_QUERIES',
+      editAccess: m.moduleKey === 'CUSTOMER_VENDOR_QUERIES',
+      exportAccess: false,
+      deleteAccess: false,
+    }));
+    await PermissionMatrix.insertMany(telecallerMatrices);
+    console.log('System Roles & Permission Matrices seeded successfully.');
+
+    // 5. Seed Active Admin Users for Feature Control
+    const adminPasswordHash = await bcrypt.hash('admin123', salt);
+
+    const adminUser1 = await User.create({
+      userId: 'ADM001',
+      fullName: 'Rahul Sharma',
+      email: 'rahul.sharma@lts.com',
+      phone: '9876500001',
+      password: adminPasswordHash,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      createdBy: superAdminUser._id,
+    });
+
+    const adminUser2 = await User.create({
+      userId: 'ADM002',
+      fullName: 'Neha Singh',
+      email: 'neha.singh@lts.com',
+      phone: '9876500002',
+      password: adminPasswordHash,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      createdBy: superAdminUser._id,
+    });
+
+    const adminUser3 = await User.create({
+      userId: 'ADM003',
+      fullName: 'Vikram Mehta',
+      email: 'vikram.mehta@lts.com',
+      phone: '9876500003',
+      password: adminPasswordHash,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      createdBy: superAdminUser._id,
+    });
+
+    // Seed Admin Feature Controls (ADM001 matching UI: 4/6 Active)
+    await AdminFeatureControl.create({
+      user: adminUser1._id,
+      userId: adminUser1.userId,
+      customerManagement: true,
+      vendorManagement: true,
+      reports: false,
+      exportData: true,
+      bulkUpload: false,
+      telecallerAssignment: true,
+      updatedBy: superAdminUser._id,
+    });
+
+    await AdminFeatureControl.create({
+      user: adminUser2._id,
+      userId: adminUser2.userId,
+      customerManagement: true,
+      vendorManagement: true,
+      reports: true,
+      exportData: true,
+      bulkUpload: false,
+      telecallerAssignment: false,
+      updatedBy: superAdminUser._id,
+    });
+
+    await AdminFeatureControl.create({
+      user: adminUser3._id,
+      userId: adminUser3.userId,
+      customerManagement: true,
+      vendorManagement: false,
+      reports: true,
+      exportData: false,
+      bulkUpload: true,
+      telecallerAssignment: true,
+      updatedBy: superAdminUser._id,
+    });
+    console.log('Active Admin Users & Feature Controls seeded successfully.');
+
+    // 6. Seed SuperAdmin Customer Directory (CUST001 to CUST007 matching UI)
+    await SuperAdminCustomer.insertMany([
+      {
+        customerId: 'CUST001',
+        srNo: '01',
+        name: 'Rahul Sharma',
+        companyName: 'ABC Traders Pvt Ltd',
+        state: 'Maharashtra',
+        city: 'Mumbai',
+        pincode: '400001',
+        registrationDate: new Date('2026-01-15'),
+        status: 'Active',
+        assignedTelecaller: 'TC001',
+        createdBy: superAdminUser._id,
+      },
+      {
+        customerId: 'CUST002',
+        srNo: '02',
+        name: 'Priya Verma',
+        companyName: 'XYZ Stores & Logistics',
+        state: 'Delhi',
+        city: 'New Delhi',
+        pincode: '110001',
+        registrationDate: new Date('2026-02-10'),
+        status: 'Active',
+        assignedTelecaller: 'TC002',
+        createdBy: superAdminUser._id,
+      },
+      {
+        customerId: 'CUST003',
+        srNo: '03',
+        name: 'Amit Patel',
+        companyName: 'Metro Retail Mart',
+        state: 'Karnataka',
+        city: 'Bengaluru',
+        pincode: '560001',
+        registrationDate: new Date('2026-03-05'),
+        status: 'Pending',
+        assignedTelecaller: 'TC003',
+        createdBy: superAdminUser._id,
+      },
+      {
+        customerId: 'CUST004',
+        srNo: '04',
+        name: 'Neha Singh',
+        companyName: 'Apex Enterprises',
+        state: 'Gujarat',
+        city: 'Ahmedabad',
+        pincode: '380001',
+        registrationDate: new Date('2026-04-12'),
+        status: 'Active',
+        assignedTelecaller: 'TC004',
+        createdBy: superAdminUser._id,
+      },
+      {
+        customerId: 'CUST005',
+        srNo: '05',
+        name: 'Vikram Mehta',
+        companyName: 'Sunrise Super Mart',
+        state: 'Rajasthan',
+        city: 'Jaipur',
+        pincode: '302001',
+        registrationDate: new Date('2026-05-20'),
+        status: 'Pending',
+        assignedTelecaller: 'TC005',
+        createdBy: superAdminUser._id,
+      },
+      {
+        customerId: 'CUST006',
+        srNo: '06',
+        name: 'Suresh Raina',
+        companyName: 'Raina Electricals',
+        state: 'Uttar Pradesh',
+        city: 'Lucknow',
+        pincode: '226001',
+        registrationDate: new Date('2026-06-10'),
+        status: 'Active',
+        assignedTelecaller: 'TC014',
+        createdBy: superAdminUser._id,
+      },
+      {
+        customerId: 'CUST007',
+        srNo: '07',
+        name: 'Kavita Menon',
+        companyName: 'Menon General Stores',
+        state: 'Kerala',
+        city: 'Kochi',
+        pincode: '682001',
+        registrationDate: new Date('2026-07-02'),
+        status: 'Active',
+        assignedTelecaller: 'TC021',
+        createdBy: superAdminUser._id,
+      },
+    ]);
+    console.log('Customer Directory seeded successfully.');
+
+    console.log('✨ Super Admin Seeding Completed Successfully! ✨');
+    return superAdminUser;
+  } catch (error) {
+    console.error('Error seeding Super Admin database:', error);
+    throw error;
+  }
+};
+
+// Standalone execution support
+if (process.argv[1]?.includes('superAdminSeed.js')) {
+  seedSuperAdmin()
+    .then(() => {
+      mongoose.connection.close();
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

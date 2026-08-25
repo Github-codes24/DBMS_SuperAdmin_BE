@@ -2,7 +2,10 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 
-// Import Schemas
+// Import Dedicated Seeds
+import { seedSuperAdmin } from './seeds/superAdminSeed.js';
+
+// Import Vendor Panel Schemas
 import Vendor from './src/VendorPanel/Authentication/authSchema.js';
 import Product from './src/VendorPanel/MyProducts/productSchema.js';
 import Order from './src/VendorPanel/Orders/orderSchema.js';
@@ -18,9 +21,12 @@ const seedDatabase = async () => {
   try {
     const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/lts_dbms';
     await mongoose.connect(mongoUri);
-    console.log('MongoDB Connected for Seeding...');
+    console.log('MongoDB Connected for Master Seeding...');
 
-    // Clear all existing data
+    // 1. Seed Super Admin Panel Data
+    await seedSuperAdmin();
+
+    // 2. Clear Vendor Panel Data
     await Vendor.deleteMany({});
     await Product.deleteMany({});
     await Order.deleteMany({});
@@ -31,11 +37,10 @@ const seedDatabase = async () => {
     await State.deleteMany({});
     await Category.deleteMany({});
     await Subcategory.deleteMany({});
-    console.log('Existing data cleared.');
+    console.log('Existing Vendor Panel data cleared.');
 
-    // 1. Seed Vendor
+    // 3. Seed Vendor Panel Data
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash('password123', salt);
 
     const vendor = await Vendor.create({
       vendorId: 'arham@lts.com',
@@ -61,8 +66,17 @@ const seedDatabase = async () => {
       { name: 'Tamil Nadu', vendorCount: 1175749 },
       { name: 'Gujarat', vendorCount: 1014905 },
       { name: 'Karnataka', vendorCount: 914058 },
+      { name: 'Rajasthan', vendorCount: 737685 },
+      { name: 'West Bengal', vendorCount: 654210 },
+      { name: 'Madhya Pradesh', vendorCount: 589400 },
+      { name: 'Telangana', vendorCount: 521090 },
+      { name: 'Kerala', vendorCount: 489120 },
+      { name: 'Punjab', vendorCount: 412500 },
+      { name: 'Haryana', vendorCount: 389100 },
+      { name: 'Bihar', vendorCount: 310450 },
+      { name: 'Odisha', vendorCount: 285100 },
     ]);
-    console.log('States seeded.');
+    console.log('States seeded (14 Total).');
 
     // 3. Seed Categories
     await Category.insertMany([
@@ -71,17 +85,26 @@ const seedDatabase = async () => {
       { name: 'Medical & Pharma', vendorCount: 3910550 },
       { name: 'Home Products & Kitchenware', vendorCount: 3420900 },
       { name: 'Hardware & Tools', vendorCount: 2890120 },
+      { name: 'Fashion & Apparel', vendorCount: 2410800 },
+      { name: 'Automotive & Spares', vendorCount: 1950300 },
+      { name: 'Services & Logistics', vendorCount: 1520100 },
     ]);
     console.log('Categories seeded.');
 
     // 4. Seed Subcategories
     await Subcategory.insertMany([
+      { name: 'Home Appliances', parentCategory: 'Electronics & IT', vendorCount: 4207936 },
+      { name: 'Architecture', parentCategory: 'Services & Logistics', vendorCount: 1190209 },
+      { name: 'Medical Sector', parentCategory: 'Medical & Pharma', vendorCount: 964467 },
+      { name: 'Grocery', parentCategory: 'Grocery & FMCG', vendorCount: 872028 },
+      { name: 'Education', parentCategory: 'Services & Logistics', vendorCount: 843749 },
+      { name: 'Fashion Accessories', parentCategory: 'Fashion & Apparel', vendorCount: 834068 },
       { name: 'Supermarkets & Kirana', parentCategory: 'Grocery & FMCG', vendorCount: 510200 },
       { name: 'FMCG Wholesalers & Distributors', parentCategory: 'Grocery & FMCG', vendorCount: 320000 },
       { name: 'Dairy, Bakery & Frozen Foods', parentCategory: 'Grocery & FMCG', vendorCount: 210500 },
       { name: 'Organic & Health Foods', parentCategory: 'Grocery & FMCG', vendorCount: 150300 },
     ]);
-    console.log('Subcategories seeded.');
+    console.log('Subcategories seeded (9 Total).');
 
     // 5. Seed Products
     await Product.insertMany([

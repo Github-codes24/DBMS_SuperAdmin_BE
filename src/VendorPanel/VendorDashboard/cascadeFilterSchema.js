@@ -35,8 +35,12 @@ const subcategorySchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  category: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
+  },
   parentCategory: {
-    type: String, // String matching parent category name
+    type: String, // String matching parent category name for easy display
     required: true,
   },
   vendorCount: {
