@@ -1,7 +1,42 @@
+import XLSX from 'xlsx';
+
 /**
  * Reusable Excel / CSV Helper Utilities for LTS-DBMS
- * Supports Duplicate Filtering, CSV Export Generation, and Printable PDF/HTML Report Generation
+ * Supports Excel file buffer parsing, Duplicate Filtering, CSV Export Generation, and Printable PDF/HTML Report Generation
  */
+
+/**
+ * Parses uploaded Excel (.xlsx, .xls, .csv, .ods) buffer into an array of JSON objects
+ * @param {Buffer} buffer - File buffer from req.file.buffer
+ * @returns {Array<Object>} - Array of row objects with clean headers
+ */
+export const parseExcelOrCsvBuffer = (buffer) => {
+  if (!buffer || buffer.length === 0) return [];
+  try {
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true, dateNF: 'yyyy-mm-dd' });
+    if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) return [];
+
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+
+    // Convert sheet to JSON array of objects
+    const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
+
+    // Sanitize and trim column header keys for exact matching
+    return rawRows.map((row) => {
+      const cleanRow = {};
+      Object.keys(row).forEach((key) => {
+        if (key && key.trim()) {
+          cleanRow[key.trim()] = row[key];
+        }
+      });
+      return cleanRow;
+    });
+  } catch (err) {
+    console.error('Error parsing Excel/CSV file buffer:', err.message);
+    return [];
+  }
+};
 
 /**
  * Filters out duplicate records from incoming import payload against existing DB keys and payload duplicates.

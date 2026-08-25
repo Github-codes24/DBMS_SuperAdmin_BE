@@ -1,11 +1,12 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import SuperAdmin from './authSchema.js';
+import { createAuditLog } from '../../utils/auditLogger.js';
 
-// Helper to generate Access Token (short-lived - 15 minutes)
+// Helper to generate Access Token (24 Hours for stable testing & development)
 const generateAccessToken = (id) => {
   return jwt.sign({ id, role: 'SuperAdmin' }, process.env.JWT_SECRET || 'fallback_secret', {
-    expiresIn: '15m',
+    expiresIn: '24h',
   });
 };
 
@@ -66,8 +67,18 @@ export const loginSuperAdmin = async (req, res) => {
     admin.refreshToken = refreshToken;
     await admin.save();
 
+    // Automatic Audit Log Recording
+    await createAuditLog({
+      user: admin.adminId || 'SUPER',
+      userName: admin.fullName || 'Super Admin',
+      userRole: admin.role || 'SUPER_ADMIN',
+      action: 'User Login',
+      record: 'SUPER_ADMIN_PANEL',
+      module: 'Authentication',
+    });
+
     // Tokens handled through HTTP-only cookies
-    res.cookie('accessToken', accessToken, getCookieOptions(15 * 60 * 1000));
+    res.cookie('accessToken', accessToken, getCookieOptions(24 * 60 * 60 * 1000));
     res.cookie('refreshToken', refreshToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
 
     res.json({
@@ -262,7 +273,7 @@ export const refreshAccessToken = async (req, res) => {
     admin.refreshToken = newRefreshToken;
     await admin.save();
 
-    res.cookie('accessToken', newAccessToken, getCookieOptions(15 * 60 * 1000));
+    res.cookie('accessToken', newAccessToken, getCookieOptions(24 * 60 * 60 * 1000));
     res.cookie('refreshToken', newRefreshToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
 
     res.json({

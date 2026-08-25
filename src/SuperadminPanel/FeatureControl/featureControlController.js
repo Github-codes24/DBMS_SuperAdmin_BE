@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import User from '../UserManagement/userSchema.js';
 import AdminFeatureControl from './featureControlSchema.js';
+import { createAuditLog } from '../../utils/auditLogger.js';
 
 // List of the 6 granular features supported
 export const FEATURE_KEYS = [
@@ -184,6 +185,16 @@ export const updateAdminFeatureControl = async (req, res) => {
 
     featureDoc.updatedBy = req.superAdmin._id;
     await featureDoc.save();
+
+    // Automatic Audit Log Recording
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Updated Feature Settings',
+      record: adminUser.userId || adminUser._id.toString(),
+      module: 'Feature Control',
+    });
 
     const activeCount = calculateActiveCount(featureDoc);
 

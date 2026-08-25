@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import User from './userSchema.js';
+import { createAuditLog } from '../../utils/auditLogger.js';
 
 // Regex patterns for validation
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -399,6 +400,17 @@ export const updateUser = async (req, res) => {
     user.updatedBy = req.superAdmin._id;
 
     await user.save();
+
+    // Automatic Audit Log Recording
+    const actionName = status === 'BLOCKED' || status === 'INACTIVE' ? 'Disabled Admin' : 'Updated Admin';
+    await createAuditLog({
+      user: 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: actionName,
+      record: user.userId || user._id.toString(),
+      module: 'User Management',
+    });
 
     const updatedUserResponse = user.toObject();
     delete updatedUserResponse.password;

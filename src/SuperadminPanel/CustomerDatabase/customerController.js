@@ -1,25 +1,28 @@
 import mongoose from 'mongoose';
 import Customer from './customerSchema.js';
 import {
+  parseExcelOrCsvBuffer,
   filterUniqueRecords,
   generateCSVData,
   generateHTMLPDFReport,
 } from '../../utils/excelCsvHandler.js';
+import { createAuditLog } from '../../utils/auditLogger.js';
 
-// Helper to generate auto-increment Customer ID (CUST001, CUST002...)
+// Helper to generate auto-increment Customer ID (CUST001, CUST002...) safely
 const generateCustomerId = async () => {
-  const lastCustomer = await Customer.findOne({ customerId: /^CUST/ })
-    .sort({ createdAt: -1 })
-    .exec();
+  const existingCustomers = await Customer.find({ customerId: /^CUST/i }).select('customerId');
 
-  let nextNumber = 1;
-  if (lastCustomer && lastCustomer.customerId) {
-    const numericPart = parseInt(lastCustomer.customerId.replace('CUST', ''), 10);
-    if (!isNaN(numericPart)) {
-      nextNumber = numericPart + 1;
+  let maxNum = 0;
+  existingCustomers.forEach((c) => {
+    if (c.customerId) {
+      const num = parseInt(c.customerId.replace(/^CUST/i, ''), 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
     }
-  }
+  });
 
+  const nextNumber = maxNum + 1;
   return `CUST${nextNumber.toString().padStart(3, '0')}`;
 };
 
@@ -206,6 +209,16 @@ export const updateCustomer = async (req, res) => {
     customer.updatedBy = req.superAdmin._id;
     await customer.save();
 
+    // Automatic Audit Log Recording
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Updated Customer',
+      record: customer.customerId,
+      module: 'Customer Database',
+    });
+
     res.json({
       message: 'Customer record updated successfully',
       customer,
@@ -216,16 +229,22 @@ export const updateCustomer = async (req, res) => {
 };
 
 
-// BULK IMPORT CUSTOMERS (REUSABLE UTILITY INTEGRATION)
-// @desc    Bulk Import Customers from Excel / CSV Data (50MB Limit & Duplicate Check)
+// BULK IMPORT CUSTOMERS (DIRECT EXCEL/CSV FILE UPLOAD OR JSON PAYLOAD)
+// @desc    Bulk Import Customers from Excel / CSV Data (.xlsx, .csv, 50MB Limit & Duplicate Check)
 // @route   POST /api/v1/superadmin/customers/import
 // @access  Private (SuperAdmin)
 export const importCustomers = async (req, res) => {
-  const { customers } = req.body; // Array of parsed records from Excel/CSV
-
   try {
+    let customers = req.body?.customers;
+
+    // Direct Binary Excel / CSV file upload via multer (req.file or req.files)
+    const uploadedFile = req.file || (Array.isArray(req.files) && req.files.length > 0 ? req.files[0] : null);
+    if (uploadedFile && uploadedFile.buffer) {
+      customers = parseExcelOrCsvBuffer(uploadedFile.buffer);
+    }
+
     if (!Array.isArray(customers) || customers.length === 0) {
-      return res.status(400).json({ message: 'Please provide a non-empty array of customer records to import' });
+      return res.status(400).json({ message: 'Please attach a valid Excel/CSV file (.xlsx, .xls, .csv) or provide a non-empty array of customer records' });
     }
 
     // Fetch existing customer keys for duplicate checking
@@ -239,51 +258,62 @@ export const importCustomers = async (req, res) => {
       customers,
       existingKeysSet,
       (item) => {
-        const name = (item.name || item.CustomerName || '').toString().trim();
-        const companyName = (item.companyName || item.CompanyName || '').toString().trim();
+        const name = (item.name || item.CustomerName || item['Customer Name'] || item.Name || '').toString().trim();
+        const companyName = (item.companyName || item.CompanyName || item['Company Name'] || item.Company || '').toString().trim();
         if (!name || !companyName) return null;
         return `${name}_${companyName}`;
       }
     );
 
     if (uniqueRecords.length === 0) {
-      return res.status(400).json({
-        message: 'No new unique records found to import. All entries in the file already exist in the database.',
+      return res.status(200).json({
+        message: `All ${customers.length} records in the uploaded file already exist in the database. 0 new records were imported.`,
         importedCount: 0,
         skippedDuplicatesCount: customers.length,
       });
     }
 
-    // Determine starting numeric part for custom CUSTxxx ID generation
-    const currentLastCustomer = await Customer.findOne({ customerId: /^CUST/ })
-      .sort({ createdAt: -1 })
-      .exec();
+    // Determine starting numeric part for custom CUSTxxx ID generation safely
+    const existingCustomers = await Customer.find({ customerId: /^CUST/i }).select('customerId');
 
-    let startNum = 1;
-    if (currentLastCustomer && currentLastCustomer.customerId) {
-      const numericPart = parseInt(currentLastCustomer.customerId.replace('CUST', ''), 10);
-      if (!isNaN(numericPart)) {
-        startNum = numericPart + 1;
+    let maxNum = 0;
+    existingCustomers.forEach((c) => {
+      if (c.customerId) {
+        const num = parseInt(c.customerId.replace(/^CUST/i, ''), 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
       }
-    }
+    });
+
+    const startNum = maxNum + 1;
 
     const totalExisting = await Customer.countDocuments({ isDeleted: false });
 
     const newCustomerEntries = uniqueRecords.map((c, index) => {
       const customerId = `CUST${(startNum + index).toString().padStart(3, '0')}`;
-      const srNo = c.srNo || (totalExisting + index + 1).toString().padStart(2, '0');
+      const srNo = c.srNo || c['Sr No'] || c['SR. NO.'] || (totalExisting + index + 1).toString().padStart(2, '0');
+      const name = (c.name || c.CustomerName || c['Customer Name'] || c.Name || 'Unnamed Customer').toString().trim();
+      const companyName = (c.companyName || c.CompanyName || c['Company Name'] || c.Company || 'Independent').toString().trim();
+      const state = (c.state || c.State || '').toString().trim();
+      const city = (c.city || c.City || '').toString().trim();
+      const pincode = (c.pincode || c.Pincode || c['Pin Code'] || c.PinCode || c.Zip || '').toString().trim();
+      const rawRegDate = c.registrationDate || c.RegistrationDate || c['Registration Date'] || c['Reg Date'];
+      const registrationDate = rawRegDate ? new Date(rawRegDate) : new Date();
+      const status = normalizeStatus(c.status || c.Status);
+      const assignedTelecaller = (c.assignedTelecaller || c.Telecaller || c['Assigned Telecaller'] || c.TC || '').toString().trim();
 
       return {
         customerId,
         srNo,
-        name: (c.name || c.CustomerName || 'Unnamed Customer').toString().trim(),
-        companyName: (c.companyName || c.CompanyName || 'Independent').toString().trim(),
-        state: (c.state || c.State || '').toString().trim(),
-        city: (c.city || c.City || '').toString().trim(),
-        pincode: (c.pincode || c.Pincode || '').toString().trim(),
-        registrationDate: c.registrationDate || c.RegistrationDate ? new Date(c.registrationDate || c.RegistrationDate) : new Date(),
-        status: normalizeStatus(c.status || c.Status),
-        assignedTelecaller: (c.assignedTelecaller || c.Telecaller || '').toString().trim(),
+        name,
+        companyName,
+        state,
+        city,
+        pincode,
+        registrationDate,
+        status,
+        assignedTelecaller,
         createdBy: req.superAdmin._id,
       };
     });
@@ -329,6 +359,16 @@ export const exportCustomersCSV = async (req, res) => {
 
     // Use reusable generateCSVData utility
     const csvContent = generateCSVData(headers, rowsData);
+
+    // Automatic Audit Log Recording
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Exported CSV',
+      record: 'CUST_LIST',
+      module: 'Customer Database',
+    });
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="Customer_Database.csv"');

@@ -23,6 +23,10 @@ import superAdminUserRoutes from './src/SuperadminPanel/UserManagement/userRoute
 import superAdminRoleRoutes from './src/SuperadminPanel/RolesAndPermissions/roleRoutes.js';
 import superAdminFeatureControlRoutes from './src/SuperadminPanel/FeatureControl/featureControlRoutes.js';
 import superAdminCustomerRoutes from './src/SuperadminPanel/CustomerDatabase/customerRoutes.js';
+import superAdminVendorRoutes from './src/SuperadminPanel/VendorDatabase/vendorDatabaseRoutes.js';
+import superAdminTelecallerRoutes from './src/SuperadminPanel/TelecallerManagement/telecallerRoutes.js';
+import superAdminAuditLogRoutes from './src/SuperadminPanel/AuditLogs/auditLogRoutes.js';
+import superAdminDataManagementRoutes from './src/SuperadminPanel/DataManagement/dataManagementRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -56,6 +60,10 @@ app.use('/api/v1/users', superAdminUserRoutes);
 app.use('/api/v1/roles', superAdminRoleRoutes);
 app.use('/api/v1/feature-control', superAdminFeatureControlRoutes);
 app.use('/api/v1/superadmin/customers', superAdminCustomerRoutes);
+app.use('/api/v1/superadmin/vendors', superAdminVendorRoutes);
+app.use('/api/v1/superadmin/telecallers', superAdminTelecallerRoutes);
+app.use('/api/v1/superadmin/audit-logs', superAdminAuditLogRoutes);
+app.use('/api/v1/superadmin/data-management', superAdminDataManagementRoutes);
 app.use('/api/v1/superadmin/dashboard', superAdminDashboardRoutes);
 
 
