@@ -1,9 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
 
-// Route Imports
+//Existing VendorPanel Route Imports
 import authRoutes from './src/VendorPanel/Authentication/authRoutes.js';
 import dashboardRoutes from './src/VendorPanel/VendorDashboard/vendorDashboardRoutes.js';
 import productRoutes from './src/VendorPanel/MyProducts/productRoutes.js';
@@ -27,6 +29,13 @@ import superAdminVendorRoutes from './src/SuperadminPanel/VendorDatabase/vendorD
 import superAdminTelecallerRoutes from './src/SuperadminPanel/TelecallerManagement/telecallerRoutes.js';
 import superAdminAuditLogRoutes from './src/SuperadminPanel/AuditLogs/auditLogRoutes.js';
 import superAdminDataManagementRoutes from './src/SuperadminPanel/DataManagement/dataManagementRoutes.js';
+//Telecaller CRM Route Imports 
+import telecallerAuthRoutes from './src/Telecaller/routes/auth.routes.js';
+import telecallerVendorRoutes from './src/Telecaller/routes/vendor.routes.js';
+import telecallerProfileRoutes from './src/Telecaller/routes/profile.routes.js';
+import telecallerReportRoutes from './src/Telecaller/routes/report.routes.js';
+import telecallerPaymentRoutes from './src/Telecaller/routes/payment.routes.js';
+import telecallerFollowupRoutes from './src/Telecaller/routes/followup.routes.js';
 
 // Load environment variables
 dotenv.config();
@@ -36,12 +45,19 @@ connectDB();
 
 const app = express();
 
-// Middlewares (50MB Payload Limit for Bulk Import)
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// ESM __dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Register API Routes
+//middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Static file serving for uploaded vendor images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ── Existing VendorPanel API Routes ──────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/products', productRoutes);
@@ -65,17 +81,28 @@ app.use('/api/v1/superadmin/telecallers', superAdminTelecallerRoutes);
 app.use('/api/v1/superadmin/audit-logs', superAdminAuditLogRoutes);
 app.use('/api/v1/superadmin/data-management', superAdminDataManagementRoutes);
 app.use('/api/v1/superadmin/dashboard', superAdminDashboardRoutes);
+// ── Telecaller CRM API Routes ─────────────────────────────────────────────────
+app.use('/api/telecaller/auth',    telecallerAuthRoutes);
+app.use('/api/telecaller/vendors',  telecallerVendorRoutes);
+app.use('/api/telecaller/profile',  telecallerProfileRoutes);
+app.use('/api/telecaller/report',   telecallerReportRoutes);
+app.use('/api/telecaller/payment',  telecallerPaymentRoutes);
+app.use('/api/telecaller/followup', telecallerFollowupRoutes);
 
 
-// Root Route
+// Root Route 
 app.get('/', (req, res) => {
   res.json({ message: 'LTS-DBMS API is running...' });
 });
 
-// Error handling middleware
+//Global Error Handler 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Internal Server Error', error: err.message });
+  console.error('[GlobalError]', err.stack);
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || 'Internal Server Error',
+  });
 });
 
 const PORT = process.env.PORT || 5000;
