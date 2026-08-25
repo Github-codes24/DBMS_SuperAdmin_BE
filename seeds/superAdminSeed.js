@@ -8,6 +8,9 @@ import User from '../src/SuperadminPanel/UserManagement/userSchema.js';
 import { Role, PermissionMatrix } from '../src/SuperadminPanel/RolesAndPermissions/roleSchema.js';
 import AdminFeatureControl from '../src/SuperadminPanel/FeatureControl/featureControlSchema.js';
 import SuperAdminCustomer from '../src/SuperadminPanel/CustomerDatabase/customerSchema.js';
+import SuperAdminVendor from '../src/SuperadminPanel/VendorDatabase/vendorDatabaseSchema.js';
+import SuperAdminTelecaller from '../src/SuperadminPanel/TelecallerManagement/telecallerSchema.js';
+import SuperAdminAuditLog from '../src/SuperadminPanel/AuditLogs/auditLogSchema.js';
 
 dotenv.config();
 
@@ -26,6 +29,9 @@ export const seedSuperAdmin = async () => {
     await PermissionMatrix.deleteMany({});
     await AdminFeatureControl.deleteMany({});
     await SuperAdminCustomer.deleteMany({});
+    await SuperAdminVendor.deleteMany({});
+    await SuperAdminTelecaller.deleteMany({});
+    await SuperAdminAuditLog.deleteMany({});
     console.log('Existing Super Admin Panel data cleared.');
 
     // 2. Seed Initial Master SuperAdmin Account
@@ -296,6 +302,230 @@ export const seedSuperAdmin = async () => {
       },
     ]);
     console.log('Customer Directory seeded successfully.');
+
+    // 7. Seed SuperAdmin Vendor Directory (Matching Data Management UI Mockups)
+    await SuperAdminVendor.insertMany([
+      {
+        vendorId: 'VEN001',
+        transNo: 'TRX90101',
+        srNo: '01',
+        vendorName: 'ABC Traders Pvt Ltd',
+        ownerName: 'Rajesh Patel',
+        category: 'Grocery & FMCG',
+        gstin: '27AAAAA0000A1Z5',
+        verificationDateTime: new Date('2026-07-30T10:30:00'),
+        contactNo: '+91 98920 11223',
+        email: 'contact@abctraders.com',
+        state: 'Maharashtra',
+        city: 'Nagpur',
+        pincode: '440001',
+        completeAddress: 'Shop #12, Commercial Hub, Central Ave, Wardha Road',
+        status: 'Active',
+        createdBy: superAdminUser._id,
+      },
+      {
+        vendorId: 'VEN002',
+        transNo: 'TRX90102',
+        srNo: '02',
+        vendorName: 'Metro Supplies & Logistics',
+        ownerName: 'Sanjay Deshmukh',
+        category: 'Medical & Pharma',
+        gstin: '27BBBBB0000B1Z6',
+        verificationDateTime: new Date('2026-07-30T14:15:00'),
+        contactNo: '+91 98771 22334',
+        email: 'sales@metrosupplies.com',
+        state: 'Maharashtra',
+        city: 'Nagpur',
+        pincode: '440002',
+        completeAddress: 'Building 4, MIDC Industrial Area, Hingna Road',
+        status: 'Active',
+        createdBy: superAdminUser._id,
+      },
+      {
+        vendorId: 'VEN005',
+        transNo: 'TRX90105',
+        srNo: '03',
+        vendorName: 'Delhi Retail World',
+        ownerName: 'Rajesh Gupta',
+        category: 'Home Products',
+        gstin: '07CCCCC0000C1Z7',
+        verificationDateTime: new Date('2026-07-31T13:10:00'),
+        contactNo: '+91 98556 77889',
+        email: 'info@delhiretail.com',
+        state: 'Delhi',
+        city: 'Delhi',
+        pincode: '110001',
+        completeAddress: 'Plot #88, Inner Circle, Connaught Place',
+        status: 'Active',
+        createdBy: superAdminUser._id,
+      },
+      {
+        vendorId: 'VEN003',
+        transNo: 'TRX90103',
+        srNo: '03',
+        vendorName: 'Global Electronics',
+        category: 'Electronics & IT',
+        verificationDateTime: new Date('2026-07-31T09:45:00'),
+        contactNo: '+91 98440 55667',
+        state: 'Karnataka',
+        city: 'Bengaluru',
+        status: 'Active',
+        createdBy: superAdminUser._id,
+      },
+      {
+        vendorId: 'VEN004',
+        transNo: 'TRX90104',
+        srNo: '04',
+        vendorName: 'Apex Hardware',
+        category: 'Hardware & Tools',
+        verificationDateTime: new Date('2026-07-31T11:20:00'),
+        contactNo: '+91 98770 88990',
+        state: 'Gujarat',
+        city: 'Ahmedabad',
+        status: 'Active',
+        createdBy: superAdminUser._id,
+      },
+      {
+        vendorId: 'VEN008',
+        transNo: 'TRX90108',
+        srNo: '05',
+        vendorName: 'Royal Furnishings',
+        category: 'Home Products',
+        verificationDateTime: new Date('2026-07-31T13:10:00'),
+        contactNo: '+91 98221 33445',
+        state: 'Rajasthan',
+        city: 'Jaipur',
+        status: 'Pending',
+        createdBy: superAdminUser._id,
+      },
+      {
+        vendorId: 'VEN006',
+        transNo: 'TRX90106',
+        srNo: '06',
+        vendorName: 'Zenith Electricals',
+        category: 'Electronics',
+        verificationDateTime: new Date('2026-07-31T15:30:00'),
+        contactNo: '+91 98220 77889',
+        state: 'Maharashtra',
+        city: 'Pune',
+        status: 'Active',
+        createdBy: superAdminUser._id,
+      },
+      {
+        vendorId: 'VEN007',
+        transNo: 'TRX90107',
+        srNo: '07',
+        vendorName: 'Sunrise Foods',
+        category: 'Grocery',
+        verificationDateTime: new Date('2026-08-01T11:00:00'),
+        contactNo: '+91 98331 44556',
+        state: 'Gujarat',
+        city: 'Surat',
+        status: 'Pending',
+        createdBy: superAdminUser._id,
+      },
+    ]);
+    console.log('Vendor Directory seeded successfully.');
+
+    // 8. Seed SuperAdmin Telecaller Directory (Matching UI Mockups TC014, TC021, TC031, TC042)
+    const tcDefaultSalt = await bcrypt.genSalt(10);
+    const tcDefaultPassword = await bcrypt.hash('Telecaller@123', tcDefaultSalt);
+
+    await SuperAdminTelecaller.insertMany([
+      {
+        userId: 'TC014',
+        fullName: 'Amit Verma',
+        mobileNumber: '+91 98765 43210',
+        email: 'amit.verma@lts.com',
+        password: tcDefaultPassword,
+        assignedRegion: 'North Region',
+        status: 'Active',
+        createdBy: superAdminUser._id,
+      },
+      {
+        userId: 'TC021',
+        fullName: 'Neha Joshi',
+        mobileNumber: '+91 97654 32109',
+        email: 'neha.joshi@lts.com',
+        password: tcDefaultPassword,
+        assignedRegion: 'West Region',
+        status: 'Active',
+        createdBy: superAdminUser._id,
+      },
+      {
+        userId: 'TC031',
+        fullName: 'Ravi Singh',
+        mobileNumber: '+91 98123 45678',
+        email: 'ravi.singh@lts.com',
+        password: tcDefaultPassword,
+        assignedRegion: 'East Region',
+        status: 'Disabled',
+        createdBy: superAdminUser._id,
+      },
+      {
+        userId: 'TC042',
+        fullName: 'Priya Patel',
+        mobileNumber: '+91 94321 09876',
+        email: 'priya.patel@lts.com',
+        password: tcDefaultPassword,
+        assignedRegion: 'South Region',
+        status: 'Active',
+        createdBy: superAdminUser._id,
+      },
+    ]);
+    console.log('Telecaller Directory seeded successfully.');
+
+    // 9. Seed Audit Logs (Matching UI Mockups: 10:21 ADM001, 10:31 ADM002, 10:35 SUPER, 11:05 ADM001, 11:42 SUPER)
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    await SuperAdminAuditLog.insertMany([
+      {
+        user: 'ADM001',
+        userName: 'Rahul Sharma',
+        userRole: 'ADMIN',
+        action: 'Updated Customer',
+        record: 'CUST1023',
+        module: 'Customer Database',
+        timestamp: new Date(`${todayStr}T10:21:00`),
+      },
+      {
+        user: 'ADM002',
+        userName: 'Neha Singh',
+        userRole: 'ADMIN',
+        action: 'Updated Vendor',
+        record: 'VEN0092',
+        module: 'Vendor Database',
+        timestamp: new Date(`${todayStr}T10:31:00`),
+      },
+      {
+        user: 'SUPER',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Disabled Admin',
+        record: 'ADM003',
+        module: 'User Management',
+        timestamp: new Date(`${todayStr}T10:35:00`),
+      },
+      {
+        user: 'ADM001',
+        userName: 'Rahul Sharma',
+        userRole: 'ADMIN',
+        action: 'Exported CSV',
+        record: 'CUST_LIST',
+        module: 'Customer Database',
+        timestamp: new Date(`${todayStr}T11:05:00`),
+      },
+      {
+        user: 'SUPER',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Changed Password',
+        record: 'TC031',
+        module: 'Telecaller Management',
+        timestamp: new Date(`${todayStr}T11:42:00`),
+      },
+    ]);
+    console.log('Audit Logs seeded successfully.');
 
     console.log('✨ Super Admin Seeding Completed Successfully! ✨');
     return superAdminUser;
