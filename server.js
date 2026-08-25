@@ -25,6 +25,16 @@ import telecallerReportRoutes from './src/Telecaller/routes/report.routes.js';
 import telecallerPaymentRoutes from './src/Telecaller/routes/payment.routes.js';
 import telecallerFollowupRoutes from './src/Telecaller/routes/followup.routes.js';
 
+
+
+// SUPER ADMIN PANEL ROUTE IMPORTS
+import superAdminAuthRoutes from './src/SuperadminPanel/Authentication/authRoutes.js';
+import superAdminDashboardRoutes from './src/SuperadminPanel/Dashboard/superAdminDashboardRoutes.js';
+import superAdminUserRoutes from './src/SuperadminPanel/UserManagement/userRoutes.js';
+import superAdminRoleRoutes from './src/SuperadminPanel/RolesAndPermissions/roleRoutes.js';
+import superAdminFeatureControlRoutes from './src/SuperadminPanel/FeatureControl/featureControlRoutes.js';
+import superAdminCustomerRoutes from './src/SuperadminPanel/CustomerDatabase/customerRoutes.js';
+
 // Load environment variables
 dotenv.config();
 
@@ -56,6 +66,17 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/tickets', supportRoutes);
+
+
+
+
+// SUPER ADMIN PANEL API ROUTES
+app.use('/api/v1/auth', superAdminAuthRoutes);
+app.use('/api/v1/users', superAdminUserRoutes);
+app.use('/api/v1/roles', superAdminRoleRoutes);
+app.use('/api/v1/feature-control', superAdminFeatureControlRoutes);
+app.use('/api/v1/superadmin/customers', superAdminCustomerRoutes);
+app.use('/api/v1/superadmin/dashboard', superAdminDashboardRoutes);
 
 // ── Telecaller CRM API Routes ─────────────────────────────────────────────────
 app.use('/api/telecaller/auth',    telecallerAuthRoutes);
