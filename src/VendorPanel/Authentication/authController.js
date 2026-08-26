@@ -11,18 +11,19 @@ const generateToken = (id) => {
 // @route   POST /api/auth/login
 // @access  Public
 export const loginVendor = async (req, res) => {
-  const { loginId, password } = req.body; // loginId can be email or vendorId
+  const { loginId, email, password } = req.body;
+  const identifier = loginId || email;
 
   try {
-    if (!loginId || !password) {
+    if (!identifier || !password) {
       return res.status(400).json({ message: 'Please provide Email/Vendor ID and Password' });
     }
 
     // Find vendor by email OR vendorId (case-insensitive)
     const vendor = await Vendor.findOne({
       $or: [
-        { email: loginId.toLowerCase() },
-        { vendorId: loginId.trim() }
+        { email: identifier.toLowerCase() },
+        { vendorId: identifier.trim() }
       ]
     });
 
@@ -66,3 +67,4 @@ export const getVendorProfile = async (req, res) => {
 export const logoutVendor = async (req, res) => {
   res.json({ message: 'Logged out successfully' });
 };
+
