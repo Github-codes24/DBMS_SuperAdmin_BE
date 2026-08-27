@@ -23,9 +23,13 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-async-handler": "^1.2.0",
+    "express-validator": "^7.3.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.9.3",
     "multer": "^2.2.0",
+    "pdfkit": "^0.20.1",
+    "razorpay": "^2.9.8",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
