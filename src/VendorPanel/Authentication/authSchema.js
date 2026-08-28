@@ -58,6 +58,30 @@ const authSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    whatsapp: {
+      type: String,
+      default: '',
+    },
+    isPaidVendor: {
+      type: Boolean,
+      default: false,
+    },
+    state: {
+      type: String,
+      default: '',
+    },
+    city: {
+      type: String,
+      default: '',
+    },
+    locality: {
+      type: String,
+      default: '',
+    },
+    address: {
+      type: String,
+      default: '',
+    },
   },
   { timestamps: true }
 );

@@ -41,6 +41,7 @@ const seedDatabase = async () => {
 
     // 3. Seed Vendor Panel Data
     const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash('password123', salt);
 
     const vendor = await Vendor.create({
       vendorId: 'arham@lts.com',
@@ -56,6 +57,12 @@ const seedDatabase = async () => {
       emailAlerts: true,
       syncFrequency: 'Real-Time (Instant)',
       avatar: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=150',
+      state: 'Uttar Pradesh',
+      city: 'Noida',
+      locality: 'Sector 62',
+      address: 'LTS Tech Park, Sector 62, Noida, UP - 201301',
+      whatsapp: '+91 98765 43210',
+      isPaidVendor: true,
     });
     console.log('Vendor seeded successfully.');
 
