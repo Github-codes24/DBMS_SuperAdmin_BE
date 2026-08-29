@@ -53,6 +53,11 @@ const telecallerSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    createdByVendor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Vendor",
+      default: null,
+    },
   },
   { timestamps: true }
 );

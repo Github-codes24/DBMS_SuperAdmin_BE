@@ -16,6 +16,7 @@ import reportRoutes from './src/VendorPanel/SalesReports/reportRoutes.js';
 import profileRoutes from './src/VendorPanel/ProfileSettings/profileRoutes.js';
 import notificationRoutes from './src/VendorPanel/Notifications/notificationRoutes.js';
 import supportRoutes from './src/VendorPanel/HelpSupport/supportRoutes.js';
+import vendorTelecallerRoutes from './src/VendorPanel/TelecallerManagement/telecallerRoutes.js';
 
 
 // SUPER ADMIN PANEL ROUTE IMPORTS
@@ -72,6 +73,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/tickets', supportRoutes);
+app.use('/api/telecallers', vendorTelecallerRoutes);
 
 
 
