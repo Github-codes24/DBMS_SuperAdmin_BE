@@ -51,6 +51,10 @@ const superAdminVendorSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+    password: {
+      type: String,
+      default: '',
+    },
     state: {
       type: String,
       default: '',
