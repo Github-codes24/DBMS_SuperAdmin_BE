@@ -1,11 +1,13 @@
 import mongoose from 'mongoose';
 import Vendor from '../../VendorPanel/Authentication/authSchema.js';
+import SuperAdminVendor from '../../SuperadminPanel/VendorDatabase/vendorDatabaseSchema.js';
 import VendorImage from '../models/VendorImage.js';
 import VendorFollowup from '../models/VendorFollowup.js';
 import VendorNotification from '../models/VendorNotification.js';
 import PaymentOrder from '../models/PaymentOrder.js';
 import TelecallerAuditLog from '../models/TelecallerAuditLog.js';
 import bcrypt from 'bcryptjs';
+import { sendVendorCredentialsEmail } from '../../utils/emailHandler.js';
 
 
 
@@ -136,6 +138,56 @@ export const createVendor = async (
     ipAddress: ip || '',
   });
 
+  // Sync to SuperAdminVendor collection so it appears in SuperAdmin Vendor Directory
+  try {
+    const totalCount = await SuperAdminVendor.countDocuments();
+    const generatedTransNo = `TRX${90101 + totalCount}`;
+
+    await SuperAdminVendor.findOneAndUpdate(
+      { vendorId: vendor.vendorId },
+      {
+        vendorId: vendor.vendorId,
+        transNo: generatedTransNo,
+        vendorName: companyName ? companyName.trim() : (contactPerson ? contactPerson.trim() : 'Unnamed Vendor'),
+        ownerName: contactPerson ? contactPerson.trim() : '',
+        category: 'General',
+        verificationDateTime: new Date(),
+        contactNo: phone ? phone.trim() : '',
+        email: email ? email.trim().toLowerCase() : '',
+        password: hashedPassword,
+        state: state ? state.trim() : '',
+        city: city ? city.trim() : '',
+        completeAddress: fullAddress ? fullAddress.trim() : '',
+        status: 'Pending',
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  } catch (syncErr) {
+    console.error('Failed to sync SuperAdminVendor record:', syncErr.message);
+  }
+
+  // Email credentials trigger
+  let emailSent = false;
+  let emailError = null;
+
+  if (vendor.email && vendor.email.trim()) {
+    const emailResult = await sendVendorCredentialsEmail({
+      toEmail: vendor.email.trim(),
+      vendorName: vendor.storeName || vendor.fullName || 'Vendor Partner',
+      vendorId: vendor.vendorId,
+      password: temporaryPassword,
+    });
+
+    if (emailResult.success) {
+      emailSent = true;
+    } else {
+      emailSent = false;
+      emailError = emailResult.error || 'Failed to dispatch email';
+    }
+  } else {
+    emailError = 'Vendor email address was not provided.';
+  }
+
   // Don't return password hash
   const result = vendor.toObject();
 
@@ -143,10 +195,9 @@ export const createVendor = async (
 
   return {
     ...result,
-
-    // Return this only if your business requirement
-    // is to show the initial password to the telecaller.
     temporaryPassword,
+    emailSent,
+    ...(emailError && { emailError }),
   };
 };
 // ─── LIST VENDORS ─────────────────────────────────────────────────────────────

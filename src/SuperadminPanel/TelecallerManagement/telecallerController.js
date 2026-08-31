@@ -10,6 +10,7 @@ import {
   generateHTMLPDFReport,
 } from '../../utils/excelCsvHandler.js';
 import { createAuditLog } from '../../utils/auditLogger.js';
+import { sendTelecallerCredentialsEmail } from '../../utils/emailHandler.js';
 
 // Phone Number & Email Validation Helpers (Supports country codes, symbols +, -, (), spaces, and 7 to 15 digits)
 const validateMobileNumber = (mobileStr) => {
@@ -66,9 +67,8 @@ const normalizeStatus = (statusStr) => {
   return 'Active';
 };
 
-// ==========================================
+
 // 1. GET ALL TELECALLERS DIRECTORY
-// ==========================================
 // @desc    Get All Telecallers Directory (Search, Filter, Pagination, Assigned Customers Count)
 // @route   GET /api/v1/superadmin/telecallers
 // @access  Private (SuperAdmin)
@@ -143,9 +143,8 @@ export const getTelecallers = async (req, res) => {
   }
 };
 
-// ==========================================
+
 // 2. CREATE SINGLE TELECALLER ACCOUNT
-// ==========================================
 // @desc    Create Single Telecaller Account (Manual "+ Add Telecaller")
 // @route   POST /api/v1/superadmin/telecallers
 // @access  Private (SuperAdmin)
@@ -229,18 +228,50 @@ export const createTelecaller = async (req, res) => {
     delete resultObj.password;
     resultObj.assignedCustomersCount = 0;
 
+    // Trigger Credentials Email Service
+    let emailSent = false;
+    let emailError = null;
+
+    if (telecaller.email) {
+      const emailResult = await sendTelecallerCredentialsEmail({
+        toEmail: telecaller.email,
+        telecallerName: telecaller.fullName,
+        telecallerId: telecaller.userId,
+        password: password.trim(),
+      });
+
+      if (emailResult.success) {
+        emailSent = true;
+      } else {
+        emailSent = false;
+        emailError = emailResult.error || 'Failed to dispatch email';
+      }
+    } else {
+      emailError = 'Telecaller email address was not provided.';
+    }
+
+    const responseMessage = emailSent
+      ? 'Telecaller account created successfully'
+      : 'Telecaller account created successfully, but credentials email could not be sent.';
+
     res.status(201).json({
-      message: 'Telecaller account created successfully',
-      telecaller: resultObj,
+      success: true,
+      message: responseMessage,
+      data: {
+        telecallerId: telecaller.userId,
+        email: telecaller.email || '',
+        emailSent: emailSent,
+        ...(emailError && { emailError: emailError }),
+        telecaller: resultObj,
+      },
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// ==========================================
+
 // 3. GET SINGLE TELECALLER BY ID
-// ==========================================
 // @desc    Get Single Telecaller by Mongo _id, custom userId ('TC014'), email, or mobileNumber
 // @route   GET /api/v1/superadmin/telecallers/:id
 // @access  Private (SuperAdmin)
@@ -268,9 +299,8 @@ export const getTelecallerById = async (req, res) => {
   }
 };
 
-// ==========================================
+
 // 4. MANAGE / UPDATE TELECALLER ACCOUNT
-// ==========================================
 // @desc    Manage Telecaller Profile (Mobile, Email, Region, Status, Reset Password)
 // @route   PATCH /api/v1/superadmin/telecallers/:id
 // @access  Private (SuperAdmin)
@@ -370,9 +400,7 @@ export const updateTelecaller = async (req, res) => {
   }
 };
 
-// ==========================================
 // 5. BULK IMPORT TELECALLERS (DIRECT EXCEL/CSV FILE OR JSON PAYLOAD)
-// ==========================================
 // @desc    Bulk Import Telecallers from Excel / CSV Data (.xlsx, .csv, 50MB Limit & Validation)
 // @route   POST /api/v1/superadmin/telecallers/import
 // @access  Private (SuperAdmin)
@@ -520,9 +548,8 @@ export const importTelecallers = async (req, res) => {
   }
 };
 
-// ==========================================
+
 // 6. EXPORT TELECALLERS TO CSV (.csv)
-// ==========================================
 // @desc    Export Telecallers to CSV Format (.csv)
 // @route   GET /api/v1/superadmin/telecallers/export/csv
 // @access  Private (SuperAdmin)
@@ -551,9 +578,8 @@ export const exportTelecallersCSV = async (req, res) => {
   }
 };
 
-// ==========================================
+
 // 7. EXPORT TELECALLERS TO PDF REPORT
-// ==========================================
 // @desc    Export Telecallers to PDF Format (Report view)
 // @route   GET /api/v1/superadmin/telecallers/export/pdf
 // @access  Private (SuperAdmin)

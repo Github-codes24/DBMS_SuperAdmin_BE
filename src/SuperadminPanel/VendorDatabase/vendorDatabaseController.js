@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import SuperAdminVendor from './vendorDatabaseSchema.js';
+import Vendor from '../../VendorPanel/Authentication/authSchema.js';
 import {
   parseExcelOrCsvBuffer,
   filterUniqueRecords,
@@ -7,6 +9,17 @@ import {
   generateHTMLPDFReport,
 } from '../../utils/excelCsvHandler.js';
 import { createAuditLog } from '../../utils/auditLogger.js';
+import { sendVendorCredentialsEmail } from '../../utils/emailHandler.js';
+
+// Helper to generate a random 8-character password if not provided
+const generateRandomPassword = () => {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$';
+  let pass = '';
+  for (let i = 0; i < 8; i++) {
+    pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return pass;
+};
 
 // Helper to generate auto-increment Vendor ID (VEN001, VEN002...) and Trans No (TRX90101, TRX90102...)
 const generateVendorIdAndTransNo = async () => {
@@ -135,21 +148,27 @@ export const createVendor = async (req, res) => {
     srNo,
     transNo,
     vendorName,
+    ownerName,
     category,
     verificationDateTime,
     contactNo,
+    email,
+    password,
     state,
     city,
+    pincode,
+    completeAddress,
+    gstin,
     status = 'Pending',
   } = req.body;
 
   try {
     if (!vendorName || !vendorName.trim()) {
-      return res.status(400).json({ message: 'Vendor Name is required' });
+      return res.status(400).json({ success: false, message: 'Vendor Name is required' });
     }
 
     if (!category || !category.trim()) {
-      return res.status(400).json({ message: 'Category is required' });
+      return res.status(400).json({ success: false, message: 'Category is required' });
     }
 
     // Check if explicitly provided transNo already exists in DB
@@ -157,6 +176,7 @@ export const createVendor = async (req, res) => {
       const existingTrans = await SuperAdminVendor.findOne({ transNo: transNo.trim() });
       if (existingTrans) {
         return res.status(400).json({
+          success: false,
           message: `Transaction Number '${transNo.trim()}' is already in use by another vendor record. Please use a unique Trans No or leave blank to auto-generate.`,
         });
       }
@@ -173,21 +193,56 @@ export const createVendor = async (req, res) => {
       calculatedSrNo = (count + 1).toString().padStart(2, '0');
     }
 
+    const cleanEmail = email ? email.trim().toLowerCase() : '';
+    const rawPassword = password && password.trim() ? password.trim() : generateRandomPassword();
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+    // 1. Create SuperAdminVendor master record
     const vendor = await SuperAdminVendor.create({
       vendorId: autoVendorId,
       transNo: finalTransNo,
       srNo: calculatedSrNo,
       vendorName: vendorName.trim(),
+      ownerName: ownerName ? ownerName.trim() : '',
       category: category.trim(),
       verificationDateTime: verificationDateTime ? new Date(verificationDateTime) : new Date(),
       contactNo: contactNo ? contactNo.trim() : '',
+      email: cleanEmail,
+      password: hashedPassword,
       state: state ? state.trim() : '',
       city: city ? city.trim() : '',
+      pincode: pincode ? pincode.trim() : '',
+      completeAddress: completeAddress ? completeAddress.trim() : '',
+      gstin: gstin ? gstin.trim() : '',
       status: normalizeStatus(status),
       createdBy: req.superAdmin._id,
     });
 
-    // Automatic Audit Log Recording
+    // 2. Create or sync Vendor Auth record (so Vendor can log into Vendor Panel)
+    const vendorAuthEmail = cleanEmail || `${autoVendorId.toLowerCase()}@lts-dbms.com`;
+
+    try {
+      await Vendor.findOneAndUpdate(
+        { vendorId: autoVendorId },
+        {
+          vendorId: autoVendorId,
+          email: vendorAuthEmail,
+          fullName: ownerName && ownerName.trim() ? ownerName.trim() : vendorName.trim(),
+          phone: contactNo ? contactNo.trim() : '',
+          password: hashedPassword,
+          storeName: vendorName.trim(),
+          storeStatus: normalizeStatus(status) === 'Active' ? 'Active & Verified' : 'Pending Verification',
+          state: state ? state.trim() : '',
+          city: city ? city.trim() : '',
+          address: completeAddress ? completeAddress.trim() : '',
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    } catch (authErr) {
+      console.error('Failed to sync Vendor Auth collection:', authErr.message);
+    }
+
+    // 3. Automatic Audit Log Recording
     await createAuditLog({
       user: req.superAdmin?.adminId || 'SUPER',
       userName: req.superAdmin?.name || 'Super Admin',
@@ -197,12 +252,48 @@ export const createVendor = async (req, res) => {
       module: 'Vendor Database',
     });
 
+    // 4. Trigger Email Service (Only after successful vendor creation)
+    let emailSent = false;
+    let emailError = null;
+
+    if (cleanEmail) {
+      const emailResult = await sendVendorCredentialsEmail({
+        toEmail: cleanEmail,
+        vendorName: vendor.vendorName,
+        vendorId: vendor.vendorId,
+        password: rawPassword,
+      });
+
+      if (emailResult.success) {
+        emailSent = true;
+      } else {
+        emailSent = false;
+        emailError = emailResult.error || 'Failed to dispatch email';
+      }
+    } else {
+      emailError = 'Vendor email address was not provided.';
+    }
+
+    // 5. Construct API Response
+    const responseMessage = emailSent
+      ? 'Vendor created successfully'
+      : 'Vendor created successfully, but credentials email could not be sent.';
+
+    const responseData = {
+      vendorId: vendor.vendorId,
+      email: vendor.email || '',
+      emailSent: emailSent,
+      ...(emailError && { emailError: emailError }),
+      vendor: vendor,
+    };
+
     res.status(201).json({
-      message: 'Vendor record created successfully',
-      vendor,
+      success: true,
+      message: responseMessage,
+      data: responseData,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
