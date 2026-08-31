@@ -11,6 +11,7 @@ import SuperAdminCustomer from '../src/SuperadminPanel/CustomerDatabase/customer
 import SuperAdminVendor from '../src/SuperadminPanel/VendorDatabase/vendorDatabaseSchema.js';
 import SuperAdminTelecaller from '../src/SuperadminPanel/TelecallerManagement/telecallerSchema.js';
 import SuperAdminAuditLog from '../src/SuperadminPanel/AuditLogs/auditLogSchema.js';
+import { State, Category, Subcategory } from '../src/VendorPanel/VendorDashboard/cascadeFilterSchema.js';
 
 dotenv.config();
 
@@ -32,6 +33,9 @@ export const seedSuperAdmin = async () => {
     await SuperAdminVendor.deleteMany({});
     await SuperAdminTelecaller.deleteMany({});
     await SuperAdminAuditLog.deleteMany({});
+    await State.deleteMany({});
+    await Category.deleteMany({});
+    await Subcategory.deleteMany({});
     console.log('Existing Super Admin Panel data cleared.');
 
     // 2. Seed Initial Master SuperAdmin Account
@@ -41,6 +45,7 @@ export const seedSuperAdmin = async () => {
     const superAdminUser = await SuperAdmin.create({
       adminId: 'ADMIN-001',
       email: 'admin@lts.com',
+      phone: '9876543210',
       fullName: 'Super Admin',
       password: superAdminPassword,
       role: 'SuperAdmin',
@@ -284,7 +289,7 @@ export const seedSuperAdmin = async () => {
         pincode: '226001',
         registrationDate: new Date('2026-06-10'),
         status: 'Active',
-        assignedTelecaller: 'TC014',
+        assignedTelecaller: 'TC001',
         createdBy: superAdminUser._id,
       },
       {
@@ -297,7 +302,7 @@ export const seedSuperAdmin = async () => {
         pincode: '682001',
         registrationDate: new Date('2026-07-02'),
         status: 'Active',
-        assignedTelecaller: 'TC021',
+        assignedTelecaller: 'TC002',
         createdBy: superAdminUser._id,
       },
     ]);
@@ -433,7 +438,7 @@ export const seedSuperAdmin = async () => {
 
     await SuperAdminTelecaller.insertMany([
       {
-        userId: 'TC014',
+        userId: 'TC001',
         fullName: 'Amit Verma',
         mobileNumber: '+91 98765 43210',
         email: 'amit.verma@lts.com',
@@ -443,7 +448,7 @@ export const seedSuperAdmin = async () => {
         createdBy: superAdminUser._id,
       },
       {
-        userId: 'TC021',
+        userId: 'TC002',
         fullName: 'Neha Joshi',
         mobileNumber: '+91 97654 32109',
         email: 'neha.joshi@lts.com',
@@ -453,7 +458,7 @@ export const seedSuperAdmin = async () => {
         createdBy: superAdminUser._id,
       },
       {
-        userId: 'TC031',
+        userId: 'TC003',
         fullName: 'Ravi Singh',
         mobileNumber: '+91 98123 45678',
         email: 'ravi.singh@lts.com',
@@ -463,7 +468,7 @@ export const seedSuperAdmin = async () => {
         createdBy: superAdminUser._id,
       },
       {
-        userId: 'TC042',
+        userId: 'TC004',
         fullName: 'Priya Patel',
         mobileNumber: '+91 94321 09876',
         email: 'priya.patel@lts.com',
@@ -525,7 +530,53 @@ export const seedSuperAdmin = async () => {
         timestamp: new Date(`${todayStr}T11:42:00`),
       },
     ]);
-    console.log('Audit Logs seeded successfully.');
+    // 10. Seed Dashboard Cascade Filter Data (States, Categories, Subcategories matching UI)
+    await State.insertMany([
+      { name: 'Maharashtra', vendorCount: 1950958 },
+      { name: 'Uttar Pradesh', vendorCount: 1280656 },
+      { name: 'Tamil Nadu', vendorCount: 1175749 },
+      { name: 'Gujarat', vendorCount: 1014905 },
+      { name: 'Karnataka', vendorCount: 914058 },
+      { name: 'Rajasthan', vendorCount: 737685 },
+      { name: 'West Bengal', vendorCount: 654210 },
+      { name: 'Madhya Pradesh', vendorCount: 589400 },
+      { name: 'Telangana', vendorCount: 521090 },
+      { name: 'Kerala', vendorCount: 489120 },
+      { name: 'Punjab', vendorCount: 412500 },
+      { name: 'Haryana', vendorCount: 389100 },
+      { name: 'Bihar', vendorCount: 310450 },
+      { name: 'Odisha', vendorCount: 285100 },
+    ]);
+
+    const createdCategories = await Category.insertMany([
+      { name: 'Grocery & FMCG', vendorCount: 5420100 },
+      { name: 'Electronics & IT', vendorCount: 4850400 },
+      { name: 'Medical & Pharma', vendorCount: 3910550 },
+      { name: 'Home Products & Kitchenware', vendorCount: 3420900 },
+      { name: 'Hardware & Tools', vendorCount: 2890120 },
+      { name: 'Fashion & Apparel', vendorCount: 2410800 },
+      { name: 'Automotive & Spares', vendorCount: 1950300 },
+      { name: 'Services & Logistics', vendorCount: 1520100 },
+    ]);
+
+    const groceryCategory = createdCategories.find((c) => c.name === 'Grocery & FMCG');
+    const electronicsCategory = createdCategories.find((c) => c.name === 'Electronics & IT');
+    const medicalCategory = createdCategories.find((c) => c.name === 'Medical & Pharma');
+    const fashionCategory = createdCategories.find((c) => c.name === 'Fashion & Apparel');
+    const servicesCategory = createdCategories.find((c) => c.name === 'Services & Logistics');
+
+    await Subcategory.insertMany([
+      { name: 'Supermarkets & Kirana', category: groceryCategory?._id, parentCategory: 'Grocery & FMCG', vendorCount: 510200 },
+      { name: 'FMCG Wholesalers & Distributors', category: groceryCategory?._id, parentCategory: 'Grocery & FMCG', vendorCount: 320000 },
+      { name: 'Dairy, Bakery & Frozen Foods', category: groceryCategory?._id, parentCategory: 'Grocery & FMCG', vendorCount: 210500 },
+      { name: 'Organic & Health Foods', category: groceryCategory?._id, parentCategory: 'Grocery & FMCG', vendorCount: 150300 },
+      { name: 'Home Appliances', category: electronicsCategory?._id, parentCategory: 'Electronics & IT', vendorCount: 4207936 },
+      { name: 'Architecture', category: servicesCategory?._id, parentCategory: 'Services & Logistics', vendorCount: 1190209 },
+      { name: 'Medical Sector', category: medicalCategory?._id, parentCategory: 'Medical & Pharma', vendorCount: 964467 },
+      { name: 'Education', category: servicesCategory?._id, parentCategory: 'Services & Logistics', vendorCount: 843749 },
+      { name: 'Fashion Accessories', category: fashionCategory?._id, parentCategory: 'Fashion & Apparel', vendorCount: 834068 },
+    ]);
+    console.log('Dashboard Cascade Data (States, Categories, Subcategories) seeded successfully.');
 
     console.log('✨ Super Admin Seeding Completed Successfully! ✨');
     return superAdminUser;

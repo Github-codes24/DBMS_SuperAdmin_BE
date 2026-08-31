@@ -1,4 +1,5 @@
 import AuditLog from './auditLogSchema.js';
+import mongoose from 'mongoose';
 import { generateCSVData, generateHTMLPDFReport } from '../../utils/excelCsvHandler.js';
 
 // Format Date object to HH:mm (e.g. 10:21, 10:31, 11:05) for UI table

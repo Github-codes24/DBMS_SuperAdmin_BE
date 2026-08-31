@@ -2,11 +2,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import SuperAdmin from './authSchema.js';
 import { createAuditLog } from '../../utils/auditLogger.js';
+import { sendSmsOtp } from '../../utils/sendSms.js';
 
-// Helper to generate Access Token (24 Hours for stable testing & development)
+// Helper to generate Access Token (8 Hours)
 const generateAccessToken = (id) => {
   return jwt.sign({ id, role: 'SuperAdmin' }, process.env.JWT_SECRET || 'fallback_secret', {
-    expiresIn: '24h',
+    expiresIn: '8h',
   });
 };
 
@@ -31,54 +32,143 @@ const generateSixDigitOtp = () => {
 };
 
 
-// LOGIN API
-// @desc    Authenticates active user & issues access and refresh tokens
-// @route   POST /api/v1/auth/login
+// SEND LOGIN OTP API
+// @desc    Checks if registered active SuperAdmin exists for phone and sends 6-digit OTP
+// @route   POST /api/v1/auth/send-otp
 // @access  Public
-export const loginSuperAdmin = async (req, res) => {
-  const { email, password } = req.body;
+export const sendLoginOtp = async (req, res) => {
+  const { phone } = req.body;
 
   try {
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Please provide Email and Password' });
+    if (!phone) {
+      return res.status(400).json({ message: 'Please provide registered Mobile Number' });
     }
 
-    const admin = await SuperAdmin.findOne({ email: email.toLowerCase() });
+    const cleanPhone = String(phone).trim();
+    const admin = await SuperAdmin.findOne({ phone: cleanPhone });
 
     if (!admin) {
-      return res.status(401).json({ message: 'Invalid Email or Password' });
+      return res.status(404).json({ message: 'No registered Super Admin found with this mobile number' });
     }
 
-    // Account must exist, must not be deleted and must have ACTIVE status
-    if (admin.status !== 'Active') {
+    // Account must exist and must be ACTIVE
+    if ((admin.status || '').toUpperCase() !== 'ACTIVE') {
       return res.status(403).json({ message: 'Account is not active or has been disabled' });
     }
 
-    // Password comparison
-    const isPasswordMatch = await bcrypt.compare(password, admin.password);
-    if (!isPasswordMatch) {
-      return res.status(401).json({ message: 'Invalid Email or Password' });
+    // Generate 6-digit OTP and set 10 minute expiry
+    const otp = generateSixDigitOtp();
+    admin.loginOtp = otp;
+    admin.loginOtpExpires = Date.now() + 10 * 60 * 1000;
+    await admin.save();
+
+    // Trigger SMS delivery (Real Brevo API if key exists, otherwise Dev Mock log)
+    await sendSmsOtp(admin.phone, otp);
+
+    const responsePayload = {
+      message: 'OTP sent successfully to registered mobile number',
+      phone: admin.phone,
+    };
+
+    if (process.env.NODE_ENV !== 'production') {
+      responsePayload.otp = otp; // Dev preview for easy testing
     }
 
-    // Access token and refresh token generation
+    res.json(responsePayload);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+
+// VERIFY LOGIN OTP & EMAIL/PASSWORD LOGIN API (Hybrid)
+// @desc    Supports both Phone OTP login AND Email/Password login seamlessly
+// @route   POST /api/v1/auth/verify-otp or POST /api/v1/auth/login
+// @access  Public
+export const verifyLoginOtp = async (req, res) => {
+  const { phone, otp, email, password } = req.body;
+
+  try {
+    let admin = null;
+
+    // --- MODE 1: Email / Phone + Password Login ---
+    if (password) {
+      const identifier = email || phone;
+      if (!identifier) {
+        return res.status(400).json({ message: 'Please provide Email or Mobile Number along with Password' });
+      }
+
+      const cleanIdentifier = String(identifier).trim().toLowerCase();
+      admin = await SuperAdmin.findOne({
+        $or: [{ email: cleanIdentifier }, { phone: cleanIdentifier }],
+      });
+
+      if (!admin) {
+        return res.status(401).json({ message: 'Invalid email/phone or password' });
+      }
+
+      if ((admin.status || '').toUpperCase() !== 'ACTIVE') {
+        return res.status(403).json({ message: 'Account is not active or has been disabled' });
+      }
+
+      if (!admin.password) {
+        return res.status(401).json({ message: 'Password is not set for this account' });
+      }
+
+      const isMatch = await bcrypt.compare(password, admin.password);
+      if (!isMatch) {
+        return res.status(401).json({ message: 'Invalid email/phone or password' });
+      }
+    }
+    // --- MODE 2: Phone + OTP Login ---
+    else if (otp) {
+      if (!phone) {
+        return res.status(400).json({ message: 'Please provide Mobile Number and OTP' });
+      }
+
+      const cleanPhone = String(phone).trim();
+      admin = await SuperAdmin.findOne({
+        phone: cleanPhone,
+        loginOtp: String(otp).trim(),
+        loginOtpExpires: { $gt: Date.now() },
+      });
+
+      if (!admin) {
+        return res.status(400).json({ message: 'Invalid or expired OTP' });
+      }
+
+      if ((admin.status || '').toUpperCase() !== 'ACTIVE') {
+        return res.status(403).json({ message: 'Account is not active or has been disabled' });
+      }
+
+      // Clear OTP fields upon successful verification
+      admin.loginOtp = null;
+      admin.loginOtpExpires = null;
+    }
+    else {
+      return res.status(400).json({ message: 'Please provide Password or OTP to log in' });
+    }
+
+    // Access token (8 hours) and refresh token (7 days) generation
     const accessToken = generateAccessToken(admin._id);
     const refreshToken = generateRefreshToken(admin._id);
 
+    // Save refresh token & update admin record
     admin.refreshToken = refreshToken;
     await admin.save();
 
-    // Automatic Audit Log Recording
+    // Audit Log Recording
     await createAuditLog({
       user: admin.adminId || 'SUPER',
       userName: admin.fullName || 'Super Admin',
       userRole: admin.role || 'SUPER_ADMIN',
-      action: 'User Login',
+      action: password ? 'User Login via Password' : 'User Login via Phone OTP',
       record: 'SUPER_ADMIN_PANEL',
       module: 'Authentication',
     });
 
-    // Tokens handled through HTTP-only cookies
-    res.cookie('accessToken', accessToken, getCookieOptions(24 * 60 * 60 * 1000));
+    // Set Cookies (8 hours for Access Token, 7 days for Refresh Token)
+    res.cookie('accessToken', accessToken, getCookieOptions(8 * 60 * 60 * 1000));
     res.cookie('refreshToken', refreshToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
 
     res.json({
@@ -88,6 +178,7 @@ export const loginSuperAdmin = async (req, res) => {
         adminId: admin.adminId,
         fullName: admin.fullName,
         email: admin.email,
+        phone: admin.phone,
         role: admin.role,
         status: admin.status,
         avatar: admin.avatar,
@@ -100,149 +191,51 @@ export const loginSuperAdmin = async (req, res) => {
   }
 };
 
-
-// FORGOT PASSWORD API
-// @desc    Generates a 6-digit OTP and sends it to the user's email
-// @route   POST /api/v1/auth/forgot-password
-// @access  Public
-export const forgotPassword = async (req, res) => {
-  const { email } = req.body;
-
-  try {
-    if (!email) {
-      return res.status(400).json({ message: 'Please provide Email address' });
-    }
-
-    const admin = await SuperAdmin.findOne({ email: email.toLowerCase() });
-    if (!admin) {
-      return res.status(404).json({ message: 'No registered user found with this email' });
-    }
-
-    // Generate 6-digit OTP and set 10 minute expiry
-    const otp = generateSixDigitOtp();
-    admin.resetOtp = otp;
-    admin.resetOtpExpires = Date.now() + 10 * 60 * 1000;
-    admin.isOtpVerified = false;
-    await admin.save();
-
-    // Send OTP to email (mock return for dev testing)
-    res.json({
-      message: 'OTP sent to registered email address successfully',
-      email: admin.email,
-      otp: otp, // Dev preview
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
+// Export alias for direct Email/Password login controller calls
+export const loginWithEmailPassword = verifyLoginOtp;
 
 
-// VERIFY OTP API
-
-// @desc    Verifies the password-reset OTP
-// @route   POST /api/v1/auth/verify-otp
-// @access  Public
-export const verifyOtp = async (req, res) => {
-  const { email, otp } = req.body;
-
-  try {
-    if (!email || !otp) {
-      return res.status(400).json({ message: 'Please provide Email and OTP' });
-    }
-
-    const admin = await SuperAdmin.findOne({
-      email: email.toLowerCase(),
-      resetOtp: otp,
-      resetOtpExpires: { $gt: Date.now() },
-    });
-
-    if (!admin) {
-      return res.status(400).json({ message: 'Invalid or expired OTP' });
-    }
-
-    // Process: OTP verified, isOtpVerified set to true, OTP cleared
-    admin.isOtpVerified = true;
-    admin.resetOtp = null;
-    admin.resetOtpExpires = null;
-    await admin.save();
-
-    res.json({ message: 'OTP verified successfully. You can now reset your password.' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-
-// RESEND OTP API
-// @desc    Generates and sends a new password-reset OTP
+// RESEND LOGIN OTP API
+// @desc    Generates and sends a new login OTP to registered phone
 // @route   POST /api/v1/auth/resend-otp
 // @access  Public
-export const resendOtp = async (req, res) => {
-  const { email } = req.body;
+export const resendLoginOtp = async (req, res) => {
+  const { phone } = req.body;
 
   try {
-    if (!email) {
-      return res.status(400).json({ message: 'Please provide Email address' });
+    if (!phone) {
+      return res.status(400).json({ message: 'Please provide registered Mobile Number' });
     }
 
-    const admin = await SuperAdmin.findOne({ email: email.toLowerCase() });
+    const cleanPhone = String(phone).trim();
+    const admin = await SuperAdmin.findOne({ phone: cleanPhone });
+
     if (!admin) {
-      return res.status(404).json({ message: 'No registered user found with this email' });
+      return res.status(404).json({ message: 'No registered Super Admin found with this mobile number' });
+    }
+
+    if ((admin.status || '').toUpperCase() !== 'ACTIVE') {
+      return res.status(403).json({ message: 'Account is not active or has been disabled' });
     }
 
     const newOtp = generateSixDigitOtp();
-    admin.resetOtp = newOtp;
-    admin.resetOtpExpires = Date.now() + 10 * 60 * 1000;
-    admin.isOtpVerified = false;
+    admin.loginOtp = newOtp;
+    admin.loginOtpExpires = Date.now() + 10 * 60 * 1000;
     await admin.save();
 
-    res.json({
-      message: 'New OTP sent to registered email address successfully',
-      email: admin.email,
-      otp: newOtp, // Dev preview
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
+    // Trigger SMS delivery (Real Brevo API if key exists, otherwise Dev Mock log)
+    await sendSmsOtp(admin.phone, newOtp);
 
-// RESET PASSWORD API
-// @desc    Resets the password after successful OTP verification
-// @route   POST /api/v1/auth/reset-password
-// @access  Public
-export const resetPassword = async (req, res) => {
-  const { email, newPassword, confirmPassword } = req.body;
+    const responsePayload = {
+      message: 'New OTP sent to registered mobile number successfully',
+      phone: admin.phone,
+    };
 
-  try {
-    if (!email || !newPassword || !confirmPassword) {
-      return res.status(400).json({ message: 'Please provide Email, New Password, and Confirm Password' });
+    if (process.env.NODE_ENV !== 'production') {
+      responsePayload.otp = newOtp; // Dev preview
     }
 
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({ message: 'New password and confirm password do not match' });
-    }
-
-    const admin = await SuperAdmin.findOne({ email: email.toLowerCase() });
-
-    if (!admin) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Process: Password updated ONLY after OTP verification
-    if (!admin.isOtpVerified) {
-      return res.status(400).json({ message: 'OTP must be verified before resetting password' });
-    }
-
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    admin.password = await bcrypt.hash(newPassword, salt);
-
-    // Process: Stored refresh token is invalidated & OTP verified status cleared
-    admin.refreshToken = null;
-    admin.isOtpVerified = false;
-    await admin.save();
-
-    res.json({ message: 'Password reset successfully. Please log in again with your new password.' });
+    res.json(responsePayload);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -273,7 +266,7 @@ export const refreshAccessToken = async (req, res) => {
     admin.refreshToken = newRefreshToken;
     await admin.save();
 
-    res.cookie('accessToken', newAccessToken, getCookieOptions(24 * 60 * 60 * 1000));
+    res.cookie('accessToken', newAccessToken, getCookieOptions(8 * 60 * 60 * 1000));
     res.cookie('refreshToken', newRefreshToken, getCookieOptions(7 * 24 * 60 * 60 * 1000));
 
     res.json({
@@ -296,8 +289,9 @@ export const logoutSuperAdmin = async (req, res) => {
       await req.superAdmin.save();
     }
 
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    const cookieOptions = getCookieOptions(0);
+    res.clearCookie('accessToken', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
 
     res.json({ message: 'Logged out successfully' });
   } catch (error) {

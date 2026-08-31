@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import User from './userSchema.js';
+import Telecaller from '../TelecallerManagement/telecallerSchema.js';
 import { createAuditLog } from '../../utils/auditLogger.js';
 
 // Regex patterns for validation
@@ -9,8 +10,20 @@ const PHONE_REGEX = /^[0-9+\-\s]{10,15}$/;
 
 // Helper function to generate custom auto-increment user ID based on role
 const generateUserId = async (role) => {
-  const prefix = role === 'ADMIN' ? 'ADM' : 'TC';
-  
+  if (role === 'TELECALLER') {
+    const existingTelecallers = await Telecaller.find({}).select('userId');
+    let maxNum = 0;
+    existingTelecallers.forEach((tc) => {
+      if (tc.userId) {
+        const num = parseInt(tc.userId.replace(/^TC/i, ''), 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      }
+    });
+    const nextNum = maxNum > 0 ? maxNum + 1 : 1;
+    return `TC${nextNum.toString().padStart(3, '0')}`;
+  }
+
+  const prefix = 'ADM';
   const lastUser = await User.findOne({ userId: new RegExp(`^${prefix}`) })
     .sort({ createdAt: -1 })
     .exec();
@@ -30,8 +43,8 @@ const generateUserId = async (role) => {
 const EXCLUDE_SENSITIVE_FIELDS = '-password -refreshToken -otp -otpExpireAt -isOtpVerified';
 
 
-//CREATE USER API
-// @desc    Create a new User
+// CREATE USER API
+// @desc    Create a new User (ADMIN in users collection, TELECALLER in superadmintelecallers collection)
 // @route   POST /api/v1/users/
 // @access  Private (SUPER_ADMIN or ADMIN Required)
 export const createUser = async (req, res) => {
@@ -45,13 +58,14 @@ export const createUser = async (req, res) => {
     permissions = [],
     target = 0,
     assignedLeads = [],
+    assignedRegion = '',
   } = req.body;
 
   try {
     // 1. Mandatory Fields Validation
-    if (!fullName || !email || !phone || !password || !role) {
+    if (!fullName || !email || !phone || !role) {
       return res.status(400).json({
-        message: 'Please provide all required fields: fullName, email, phone, password, and role',
+        message: 'Please provide all required fields: fullName, email, phone, and role',
       });
     }
 
@@ -76,7 +90,13 @@ export const createUser = async (req, res) => {
       });
     }
 
-    if (password.length < 6) {
+    if (role === 'TELECALLER') {
+      if (!password || password.length < 6) {
+        return res.status(400).json({
+          message: 'Password is required for TELECALLER role and must be at least 6 characters long',
+        });
+      }
+    } else if (password && password.length < 6) {
       return res.status(400).json({
         message: 'Password must be at least 6 characters long',
       });
@@ -89,7 +109,7 @@ export const createUser = async (req, res) => {
       });
     }
 
-    const allowedStatuses = ['ACTIVE', 'INACTIVE', 'BLOCKED'];
+    const allowedStatuses = ['ACTIVE', 'INACTIVE', 'BLOCKED', 'Active', 'Disabled'];
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
         message: `Invalid status specified. Allowed statuses are: ${allowedStatuses.join(', ')}`,
@@ -119,22 +139,29 @@ export const createUser = async (req, res) => {
       });
     }
 
-    // 4. Uniqueness Check among non-deleted users (isDeleted: false)
-    const existingEmail = await User.findOne({
-      email: formattedEmail,
-      isDeleted: false,
-    });
-    if (existingEmail) {
+    // 4. Uniqueness Check across both User and Telecaller collections
+    const [existingUserEmail, existingTcEmail] = await Promise.all([
+      User.findOne({ email: formattedEmail, isDeleted: false }),
+      Telecaller.findOne({ email: formattedEmail, isDeleted: false }),
+    ]);
+    if (existingUserEmail || existingTcEmail) {
       return res.status(400).json({
         message: 'User with this email already exists',
       });
     }
 
-    const existingPhone = await User.findOne({
-      phone: formattedPhone,
-      isDeleted: false,
-    });
-    if (existingPhone) {
+    const cleanDigits = (p) => p.toString().replace(/[\s\-\(\)\.\+]/g, '');
+    const targetDigits = cleanDigits(formattedPhone);
+
+    const [allUsers, allTcs] = await Promise.all([
+      User.find({ isDeleted: false }).select('phone'),
+      Telecaller.find({ isDeleted: false }).select('mobileNumber'),
+    ]);
+
+    const existingUserPhone = allUsers.some((u) => u.phone && cleanDigits(u.phone) === targetDigits);
+    const existingTcPhone = allTcs.some((tc) => tc.mobileNumber && cleanDigits(tc.mobileNumber) === targetDigits);
+
+    if (existingUserPhone || existingTcPhone) {
       return res.status(400).json({
         message: 'User with this phone number already exists',
       });
@@ -143,33 +170,61 @@ export const createUser = async (req, res) => {
     // 5. Generate custom User ID (ADM001, TC001, etc.)
     const userId = await generateUserId(role);
 
-    // 6. Hash Password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    let createdUserDoc;
 
-    // 7. Create User Document
-    const user = await User.create({
-      userId,
-      fullName: fullName.trim(),
-      email: formattedEmail,
-      phone: formattedPhone,
-      password: hashedPassword,
-      role,
-      status,
-      permissions,
-      target,
-      assignedLeads,
-      createdBy: req.superAdmin._id,
-    });
+    if (role === 'TELECALLER') {
+      // Create directly in superadmintelecallers collection
+      const newTc = await Telecaller.create({
+        userId,
+        fullName: fullName.trim(),
+        mobileNumber: formattedPhone,
+        email: formattedEmail,
+        password: password.trim(),
+        assignedRegion: assignedRegion.trim(),
+        status: status.toUpperCase() === 'ACTIVE' || status === 'Active' ? 'Active' : 'Disabled',
+        createdBy: req.superAdmin?._id || req.user?._id,
+      });
 
-    const userResponse = user.toObject();
-    delete userResponse.password;
-    delete userResponse.otp;
-    delete userResponse.refreshToken;
+      const tcObj = newTc.toObject();
+      delete tcObj.password;
+      createdUserDoc = {
+        ...tcObj,
+        phone: tcObj.mobileNumber,
+        role: 'TELECALLER',
+        status: tcObj.status.toUpperCase() === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+      };
+    } else {
+      // Create in users collection for ADMIN
+      let hashedPassword = '';
+      if (password) {
+        const salt = await bcrypt.genSalt(10);
+        hashedPassword = await bcrypt.hash(password, salt);
+      }
+
+      const user = await User.create({
+        userId,
+        fullName: fullName.trim(),
+        email: formattedEmail,
+        phone: formattedPhone,
+        password: hashedPassword,
+        role,
+        status: status.toUpperCase(),
+        permissions,
+        target,
+        assignedLeads,
+        createdBy: req.superAdmin?._id || req.user?._id,
+      });
+
+      const userObj = user.toObject();
+      delete userObj.password;
+      delete userObj.otp;
+      delete userObj.refreshToken;
+      createdUserDoc = userObj;
+    }
 
     res.status(201).json({
       message: 'User created successfully',
-      user: userResponse,
+      user: createdUserDoc,
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -177,8 +232,8 @@ export const createUser = async (req, res) => {
 };
 
 
-//GET ALL USERS
-// @desc    Returns users with pagination, search, role/status filters and sorting
+// GET ALL USERS
+// @desc    Returns combined users (Admins from users collection & Telecallers from superadmintelecallers collection)
 // @route   GET /api/v1/users/
 // @access  Private (JWT Required)
 export const getUsers = async (req, res) => {
@@ -189,51 +244,61 @@ export const getUsers = async (req, res) => {
 
     const { search, role, status, sort, sortBy } = req.query;
 
-    // Filter non-deleted users
-    const query = { isDeleted: false };
+    const filterRole = role ? role.trim().toUpperCase() : null;
+    const filterStatus = status ? status.trim().toUpperCase() : null;
 
-    // Search filter (fullName, email, or phone)
-    if (search && search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i');
-      query.$or = [
-        { fullName: searchRegex },
-        { email: searchRegex },
-        { phone: searchRegex },
-      ];
+    let combinedList = [];
+
+    // Fetch from users collection if role is not TELECALLER
+    if (!filterRole || filterRole === 'ADMIN' || filterRole === 'SUPER_ADMIN') {
+      const uQuery = { isDeleted: false };
+      if (filterRole) uQuery.role = filterRole;
+      if (filterStatus) uQuery.status = filterStatus;
+      if (search && search.trim()) {
+        const searchRegex = new RegExp(search.trim(), 'i');
+        uQuery.$or = [{ fullName: searchRegex }, { email: searchRegex }, { phone: searchRegex }];
+      }
+      const adminUsers = await User.find(uQuery).select(EXCLUDE_SENSITIVE_FIELDS).lean();
+      combinedList.push(...adminUsers);
     }
 
-    // Role filter
-    if (role && role.trim()) {
-      query.role = role.trim().toUpperCase();
+    // Fetch from superadmintelecallers collection if role is not ADMIN/SUPER_ADMIN
+    if (!filterRole || filterRole === 'TELECALLER') {
+      const tcQuery = { isDeleted: false };
+      if (filterStatus) {
+        tcQuery.status = filterStatus === 'ACTIVE' ? { $in: ['Active', 'ACTIVE'] } : { $in: ['Disabled', 'DISABLED', 'INACTIVE'] };
+      }
+      if (search && search.trim()) {
+        const searchRegex = new RegExp(search.trim(), 'i');
+        tcQuery.$or = [{ fullName: searchRegex }, { email: searchRegex }, { mobileNumber: searchRegex }, { userId: searchRegex }];
+      }
+      const telecallers = await Telecaller.find(tcQuery).lean();
+      const formattedTcs = telecallers.map((tc) => ({
+        ...tc,
+        phone: tc.mobileNumber,
+        role: 'TELECALLER',
+        status: (tc.status || '').toUpperCase() === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+      }));
+      combinedList.push(...formattedTcs);
     }
 
-    // Status filter
-    if (status && status.trim()) {
-      query.status = status.trim().toUpperCase();
-    }
-
-    // Sorting option (createdAt asc / desc)
-    let sortOptions = { createdAt: -1 }; // default descending
+    // Sort combined results by createdAt descending (or ascending)
     const sortOrder = (sort || sortBy || '').toLowerCase();
-    if (sortOrder === 'asc' || sortOrder === '1') {
-      sortOptions = { createdAt: 1 };
-    }
+    combinedList.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return sortOrder === 'asc' || sortOrder === '1' ? dateA - dateB : dateB - dateA;
+    });
 
-    const totalUsers = await User.countDocuments(query);
-
-    const users = await User.find(query)
-      .select(EXCLUDE_SENSITIVE_FIELDS)
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limit)
-      .exec();
+    const totalUsers = combinedList.length;
+    const paginatedUsers = combinedList.slice(skip, skip + limit);
 
     res.json({
       totalUsers,
-      totalPages: Math.ceil(totalUsers / limit),
+      totalPages: Math.ceil(totalUsers / limit) || 1,
       currentPage: page,
       limit,
-      users,
+      users: paginatedUsers,
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -241,8 +306,8 @@ export const getUsers = async (req, res) => {
 };
 
 
-//GET USER BY ID
-// @desc    Returns a user by MongoDB user ID
+// GET USER BY ID
+// @desc    Returns a user by MongoDB ID from users or superadmintelecallers collection
 // @route   GET /api/v1/users/:userId
 // @access  Private (JWT Required)
 export const getUserById = async (req, res) => {
@@ -253,7 +318,20 @@ export const getUserById = async (req, res) => {
       return res.status(400).json({ message: 'Invalid MongoDB User ID format' });
     }
 
-    const user = await User.findOne({ _id: userId, isDeleted: false }).select(EXCLUDE_SENSITIVE_FIELDS);
+    let user = await User.findOne({ _id: userId, isDeleted: false }).select(EXCLUDE_SENSITIVE_FIELDS).lean();
+
+    if (!user) {
+      const tc = await Telecaller.findOne({ _id: userId, isDeleted: false }).lean();
+      if (tc) {
+        delete tc.password;
+        user = {
+          ...tc,
+          phone: tc.mobileNumber,
+          role: 'TELECALLER',
+          status: (tc.status || '').toUpperCase() === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+        };
+      }
+    }
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -266,8 +344,8 @@ export const getUserById = async (req, res) => {
 };
 
 
-//UPDATE USER
-// @desc    Updates an existing user subject to role-based restrictions
+// UPDATE USER
+// @desc    Updates an existing user/telecaller subject to role-based restrictions
 // @route   PATCH /api/v1/users/:userId
 // @access  Private (JWT + Role Rules Required)
 export const updateUser = async (req, res) => {
@@ -283,17 +361,23 @@ export const updateUser = async (req, res) => {
     const creatorRole = rawRole;
     const creatorId = (req.user?._id || req.superAdmin?._id)?.toString();
 
-    // 1. Role Rule: TELECALLER cannot update users
     if (creatorRole === 'TELECALLER') {
       return res.status(403).json({ message: 'TELECALLER is not authorized to update users' });
     }
 
-    const user = await User.findOne({ _id: userId, isDeleted: false });
+    // Try finding in User collection first, then Telecaller collection
+    let user = await User.findOne({ _id: userId, isDeleted: false });
+    let isTelecallerDoc = false;
+
+    if (!user) {
+      user = await Telecaller.findOne({ _id: userId, isDeleted: false });
+      if (user) isTelecallerDoc = true;
+    }
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // 2. Role Rule: ADMIN cannot update a SUPER_ADMIN
     if (creatorRole === 'ADMIN' && user.role === 'SUPER_ADMIN') {
       return res.status(403).json({ message: 'ADMIN cannot update a SUPER_ADMIN' });
     }
@@ -302,124 +386,111 @@ export const updateUser = async (req, res) => {
       fullName,
       email,
       phone,
+      mobileNumber,
       password,
       role,
       status,
       permissions,
       target,
       assignedLeads,
+      assignedRegion,
     } = req.body;
 
-    // 3. Role Rule: ADMIN cannot assign the SUPER_ADMIN role
     if (role === 'SUPER_ADMIN' && creatorRole === 'ADMIN') {
       return res.status(403).json({ message: 'ADMIN cannot assign SUPER_ADMIN role' });
     }
 
-    // 4. Role Rule: A user cannot change their own role
     if (creatorId && creatorId === user._id.toString() && role && role !== user.role) {
       return res.status(403).json({ message: 'A user cannot change their own role' });
     }
 
-    // 5. Update Validations & Duplication Checks
-    if (fullName) {
-      if (fullName.trim().length < 2) {
-        return res.status(400).json({ message: 'Full name must be at least 2 characters long' });
-      }
+    if (fullName && fullName.trim().length >= 2) {
       user.fullName = fullName.trim();
     }
 
-    if (email) {
-      const formattedEmail = email.toLowerCase().trim();
-      if (!EMAIL_REGEX.test(formattedEmail)) {
-        return res.status(400).json({ message: 'Please provide a valid email address' });
-      }
-      const existingEmail = await User.findOne({
-        email: formattedEmail,
-        isDeleted: false,
-        _id: { $ne: userId },
-      });
-      if (existingEmail) {
+    const updatedEmail = email ? email.toLowerCase().trim() : null;
+    if (updatedEmail) {
+      const [exU, exTC] = await Promise.all([
+        User.findOne({ email: updatedEmail, isDeleted: false, _id: { $ne: userId } }),
+        Telecaller.findOne({ email: updatedEmail, isDeleted: false, _id: { $ne: userId } }),
+      ]);
+      if (exU || exTC) {
         return res.status(400).json({ message: 'Email address is already in use by another user' });
       }
-      user.email = formattedEmail;
+      user.email = updatedEmail;
     }
 
-    if (phone) {
-      const formattedPhone = phone.trim();
-      if (!PHONE_REGEX.test(formattedPhone)) {
-        return res.status(400).json({ message: 'Please provide a valid phone number' });
-      }
-      const existingPhone = await User.findOne({
-        phone: formattedPhone,
-        isDeleted: false,
-        _id: { $ne: userId },
-      });
-      if (existingPhone) {
+    const updatedPhone = (phone || mobileNumber || '').trim();
+    if (updatedPhone) {
+      const cleanDigits = (p) => p.toString().replace(/[\s\-\(\)\.\+]/g, '');
+      const targetDigits = cleanDigits(updatedPhone);
+
+      const [allUsers, allTcs] = await Promise.all([
+        User.find({ isDeleted: false, _id: { $ne: userId } }).select('phone'),
+        Telecaller.find({ isDeleted: false, _id: { $ne: userId } }).select('mobileNumber'),
+      ]);
+
+      const existingUserPhone = allUsers.some((u) => u.phone && cleanDigits(u.phone) === targetDigits);
+      const existingTcPhone = allTcs.some((tc) => tc.mobileNumber && cleanDigits(tc.mobileNumber) === targetDigits);
+
+      if (existingUserPhone || existingTcPhone) {
         return res.status(400).json({ message: 'Phone number is already in use by another user' });
       }
-      user.phone = formattedPhone;
+
+      user.phone = updatedPhone;
+      if (isTelecallerDoc) user.mobileNumber = updatedPhone;
     }
 
     if (password) {
       if (password.length < 6) {
         return res.status(400).json({ message: 'Password must be at least 6 characters long' });
       }
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(password, salt);
-    }
-
-    if (role) {
-      const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'TELECALLER'];
-      if (!allowedRoles.includes(role)) {
-        return res.status(400).json({ message: 'Invalid role specified' });
+      if (isTelecallerDoc) {
+        user.password = password.trim();
+      } else {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
       }
-      user.role = role;
     }
 
     if (status) {
-      const allowedStatuses = ['ACTIVE', 'INACTIVE', 'BLOCKED'];
-      if (!allowedStatuses.includes(status)) {
-        return res.status(400).json({ message: 'Invalid status specified' });
+      if (isTelecallerDoc) {
+        user.status = status.toUpperCase() === 'ACTIVE' || status === 'Active' ? 'Active' : 'Disabled';
+      } else {
+        user.status = status.toUpperCase();
       }
-      user.status = status;
     }
 
-    if (permissions !== undefined) {
-      user.permissions = permissions;
+    if (isTelecallerDoc && assignedRegion !== undefined) {
+      user.assignedRegion = assignedRegion.trim();
     }
 
-    if (target !== undefined) {
-      user.target = target;
+    if (!isTelecallerDoc) {
+      if (permissions !== undefined) user.permissions = permissions;
+      if (target !== undefined) user.target = target;
+      if (assignedLeads !== undefined) user.assignedLeads = assignedLeads;
     }
 
-    if (assignedLeads !== undefined) {
-      user.assignedLeads = assignedLeads;
-    }
-
-    // Set updatedBy tracking
-    user.updatedBy = req.superAdmin._id;
-
+    user.updatedBy = req.superAdmin?._id || req.user?._id;
     await user.save();
 
-    // Automatic Audit Log Recording
-    const actionName = status === 'BLOCKED' || status === 'INACTIVE' ? 'Disabled Admin' : 'Updated Admin';
     await createAuditLog({
       user: 'SUPER',
       userName: req.superAdmin?.name || 'Super Admin',
       userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-      action: actionName,
+      action: status === 'BLOCKED' || status === 'INACTIVE' || status === 'Disabled' ? 'Disabled User' : 'Updated User',
       record: user.userId || user._id.toString(),
       module: 'User Management',
     });
 
-    const updatedUserResponse = user.toObject();
-    delete updatedUserResponse.password;
-    delete updatedUserResponse.otp;
-    delete updatedUserResponse.refreshToken;
+    const updatedUserObj = user.toObject();
+    delete updatedUserObj.password;
 
     res.json({
       message: 'User updated successfully',
-      user: updatedUserResponse,
+      user: isTelecallerDoc
+        ? { ...updatedUserObj, phone: updatedUserObj.mobileNumber, role: 'TELECALLER' }
+        : updatedUserObj,
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -428,7 +499,7 @@ export const updateUser = async (req, res) => {
 
 
 // DELETE USER (SOFT-DELETE)
-// @desc    Soft-deletes a user subject to role-based restrictions
+// @desc    Soft-deletes a user from users or superadmintelecallers collection
 // @route   DELETE /api/v1/users/:userId
 // @access  Private (JWT + Role Rules Required)
 export const deleteUser = async (req, res) => {
@@ -444,31 +515,31 @@ export const deleteUser = async (req, res) => {
     const creatorRole = rawRole;
     const creatorId = (req.user?._id || req.superAdmin?._id)?.toString();
 
-    // 1. Delete Rule: TELECALLER cannot delete users
     if (creatorRole === 'TELECALLER') {
       return res.status(403).json({ message: 'TELECALLER is not authorized to delete users' });
     }
 
-    const user = await User.findOne({ _id: userId, isDeleted: false });
+    let user = await User.findOne({ _id: userId, isDeleted: false });
+    if (!user) {
+      user = await Telecaller.findOne({ _id: userId, isDeleted: false });
+    }
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // 2. Delete Rule: ADMIN cannot delete a SUPER_ADMIN
     if (creatorRole === 'ADMIN' && user.role === 'SUPER_ADMIN') {
       return res.status(403).json({ message: 'ADMIN cannot delete a SUPER_ADMIN' });
     }
 
-    // 3. Delete Rule: A user cannot delete their own account
     if (creatorId && creatorId === user._id.toString()) {
       return res.status(403).json({ message: 'A user cannot delete their own account' });
     }
 
-    // 4. Perform Soft Delete
     user.isDeleted = true;
     user.deletedAt = new Date();
-    user.deletedBy = req.superAdmin._id;
-    user.updatedBy = req.superAdmin._id;
+    user.deletedBy = req.superAdmin?._id || req.user?._id;
+    user.updatedBy = req.superAdmin?._id || req.user?._id;
 
     await user.save();
 
@@ -477,3 +548,4 @@ export const deleteUser = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+

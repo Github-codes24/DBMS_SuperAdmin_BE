@@ -18,9 +18,24 @@ const authSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    phone: {
+      type: String,
+      unique: true,
+      required: true,
+      trim: true,
+    },
     password: {
       type: String,
-      required: true,
+      required: false,
+      default: '',
+    },
+    loginOtp: {
+      type: String,
+      default: null,
+    },
+    loginOtpExpires: {
+      type: Date,
+      default: null,
     },
     role: {
       type: String,

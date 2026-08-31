@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import Telecaller from './telecallerSchema.js';
+import User from '../UserManagement/userSchema.js';
 import Customer from '../CustomerDatabase/customerSchema.js';
 import {
   parseExcelOrCsvBuffer,
@@ -26,7 +27,7 @@ const validateEmail = (emailStr) => {
   return emailRegex.test(emailStr.toString().trim());
 };
 
-// Helper to generate auto-increment Telecaller ID (TC014, TC021, TC050...) safely
+// Helper to generate auto-increment Telecaller ID (TC001, TC002, TC003...) safely
 const generateTelecallerId = async () => {
   const existingTelecallers = await Telecaller.find({}).select('userId');
 
@@ -40,7 +41,7 @@ const generateTelecallerId = async () => {
     }
   });
 
-  const nextNum = maxNum > 0 ? maxNum + 1 : 14; // Default start at TC014 if empty
+  const nextNum = maxNum > 0 ? maxNum + 1 : 1;
   return `TC${nextNum.toString().padStart(3, '0')}`;
 };
 
@@ -184,16 +185,31 @@ export const createTelecaller = async (req, res) => {
       return res.status(400).json({ message: 'Initial Password is required for telecaller login credentials' });
     }
 
-    // Check mobile number uniqueness
-    const existingMobile = await Telecaller.findOne({ mobileNumber: mobileNumber.trim(), isDeleted: false });
-    if (existingMobile) {
-      return res.status(400).json({ message: 'A telecaller with this mobile number already exists' });
+    // Check mobile number uniqueness across both Telecaller and User collections
+    const cleanDigits = (p) => p.toString().replace(/[\s\-\(\)\.\+]/g, '');
+    const targetDigits = cleanDigits(mobileNumber);
+
+    const [allUsers, allTcs] = await Promise.all([
+      User.find({ isDeleted: false }).select('phone'),
+      Telecaller.find({ isDeleted: false }).select('mobileNumber'),
+    ]);
+
+    const existingUserMobile = allUsers.some((u) => u.phone && cleanDigits(u.phone) === targetDigits);
+    const existingTcMobile = allTcs.some((tc) => tc.mobileNumber && cleanDigits(tc.mobileNumber) === targetDigits);
+
+    if (existingUserMobile || existingTcMobile) {
+      return res.status(400).json({ message: 'A user or telecaller with this mobile number already exists' });
     }
 
-    // Check email uniqueness
-    const existingEmail = await Telecaller.findOne({ email: email.trim().toLowerCase(), isDeleted: false });
-    if (existingEmail) {
-      return res.status(400).json({ message: 'A telecaller with this email address already exists' });
+    // Check email uniqueness across both Telecaller and User collections
+    const targetEmail = email.trim().toLowerCase();
+    const [exUserEmail, exTcEmail] = await Promise.all([
+      User.findOne({ email: targetEmail, isDeleted: false }),
+      Telecaller.findOne({ email: targetEmail, isDeleted: false }),
+    ]);
+
+    if (exUserEmail || exTcEmail) {
+      return res.status(400).json({ message: 'A user or telecaller with this email address already exists' });
     }
 
     const autoUserId = userId && userId.trim() ? userId.trim() : await generateTelecallerId();
@@ -377,11 +393,26 @@ export const importTelecallers = async (req, res) => {
     // Helper to clean phone digits
     const cleanPhoneDigits = (phoneStr) => (phoneStr ? phoneStr.toString().replace(/[\s\-\(\)\.\+]/g, '') : '');
 
-    // Fetch all existing telecaller records for duplicate checking (email, mobileNumber, userId)
-    const existingRecords = await Telecaller.find({}).select('email mobileNumber userId');
-    const existingEmailsSet = new Set(existingRecords.map((r) => (r.email || '').toLowerCase().trim()).filter(Boolean));
-    const existingMobilesSet = new Set(existingRecords.map((r) => cleanPhoneDigits(r.mobileNumber)).filter(Boolean));
-    const existingUserIdsSet = new Set(existingRecords.map((r) => (r.userId || '').toLowerCase().trim()).filter(Boolean));
+    // Fetch all existing records from both User and Telecaller collections for duplicate checking
+    const [existingTcs, existingUsers] = await Promise.all([
+      Telecaller.find({ isDeleted: false }).select('email mobileNumber userId'),
+      User.find({ isDeleted: false }).select('email phone userId'),
+    ]);
+
+    const existingEmailsSet = new Set([
+      ...existingTcs.map((r) => (r.email || '').toLowerCase().trim()),
+      ...existingUsers.map((r) => (r.email || '').toLowerCase().trim()),
+    ].filter(Boolean));
+
+    const existingMobilesSet = new Set([
+      ...existingTcs.map((r) => cleanPhoneDigits(r.mobileNumber)),
+      ...existingUsers.map((r) => cleanPhoneDigits(r.phone)),
+    ].filter(Boolean));
+
+    const existingUserIdsSet = new Set([
+      ...existingTcs.map((r) => (r.userId || '').toLowerCase().trim()),
+      ...existingUsers.map((r) => (r.userId || '').toLowerCase().trim()),
+    ].filter(Boolean));
 
     // Filter incoming payload against existing email, mobile, userId and batch duplicates
     const uniqueRecords = [];
@@ -437,7 +468,7 @@ export const importTelecallers = async (req, res) => {
       }
     });
 
-    let currentTcNum = maxNum > 0 ? maxNum + 1 : 14;
+    let currentTcNum = maxNum > 0 ? maxNum + 1 : 1;
 
     const defaultSalt = await bcrypt.genSalt(10);
     const defaultHashedPassword = await bcrypt.hash('Telecaller@123', defaultSalt);
