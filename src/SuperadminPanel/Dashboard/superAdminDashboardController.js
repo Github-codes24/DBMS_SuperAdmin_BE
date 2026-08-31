@@ -1,45 +1,91 @@
 import { State, Category, Subcategory } from '../../VendorPanel/VendorDashboard/cascadeFilterSchema.js';
+import mongoose from 'mongoose';
+import SuperAdminVendor from '../VendorDatabase/vendorDatabaseSchema.js';
+import Customer from '../CustomerDatabase/customerSchema.js';
+import Telecaller from '../TelecallerManagement/telecallerSchema.js';
+import User from '../UserManagement/userSchema.js';
+import AuditLog from '../AuditLogs/auditLogSchema.js';
+import SupportTicket from '../../VendorPanel/HelpSupport/supportSchema.js';
+
+// Helper to compute real-time dynamic stats from MongoDB collections
+const getDynamicSuperAdminStats = async () => {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const [
+    totalVendors,
+    newVendors,
+    totalCustomers,
+    newCustomers,
+    totalVendorRequests,
+    newVendorRequests,
+    totalCustomerQueries,
+    newCustomerQueries,
+    todaysVendorAuditCount,
+    totalAuditLogs,
+    totalAdminUsers,
+    totalTelecallers,
+    activeTelecallers,
+    activeAdminUsers,
+  ] = await Promise.all([
+    SuperAdminVendor.countDocuments({ isDeleted: false }),
+    SuperAdminVendor.countDocuments({ isDeleted: false, createdAt: { $gte: startOfDay } }),
+    Customer.countDocuments({ isDeleted: false }),
+    Customer.countDocuments({ isDeleted: false, createdAt: { $gte: startOfDay } }),
+    SupportTicket.countDocuments({}),
+    SupportTicket.countDocuments({ status: 'Pending' }),
+    SupportTicket.countDocuments({ category: { $ne: 'Vendor' } }),
+    SupportTicket.countDocuments({ category: { $ne: 'Vendor' }, status: 'Pending' }),
+    AuditLog.countDocuments({ createdAt: { $gte: startOfDay } }),
+    AuditLog.countDocuments({}),
+    User.countDocuments({ isDeleted: false }),
+    Telecaller.countDocuments({ isDeleted: false }),
+    Telecaller.countDocuments({ isDeleted: false, status: 'Active' }),
+    User.countDocuments({ isDeleted: false, status: 'ACTIVE' }),
+  ]);
+
+  return {
+    newVendors: {
+      count: newVendors,
+      badgePercentage: '+10%',
+      totalVendors: totalVendors,
+    },
+    newCustomers: {
+      count: newCustomers,
+      badgePercentage: '+10%',
+      totalCustomers: totalCustomers,
+    },
+    newVendorRequests: {
+      count: newVendorRequests,
+      totalFYRequests: totalVendorRequests,
+    },
+    newCustomerQueries: {
+      count: newCustomerQueries,
+      totalQueries: totalCustomerQueries,
+    },
+    todaysVendorAudit: {
+      count: todaysVendorAuditCount,
+      pendingQuality: totalAuditLogs,
+    },
+    onlineUsersDMS: {
+      count: activeAdminUsers + activeTelecallers,
+      badgePercentage: '+100%',
+      totalUserCount: totalAdminUsers + totalTelecallers,
+    },
+    cascadeFilter: {
+      selectedState: 'All',
+      selectedCategory: 'All',
+      selectedSubCategory: 'All',
+    },
+  };
+};
 
 // @desc    Get Super Admin Dashboard KPI Stats & Cards
 // @route   GET /api/superadmin/dashboard/stats
 // @access  Private (SuperAdmin)
 export const getSuperAdminStats = async (req, res) => {
   try {
-    const stats = {
-      newVendors: {
-        count: 48,
-        badgePercentage: '+10%',
-        totalVendors: '12356688/0',
-      },
-      newCustomers: {
-        count: 373,
-        badgePercentage: '+10%',
-        totalCustomers: 56975,
-      },
-      newVendorRequests: {
-        count: 17,
-        totalFYRequests: 5363,
-      },
-      newCustomerQueries: {
-        count: 0,
-        totalQueries: 6,
-      },
-      todaysVendorAudit: {
-        count: 1006,
-        pendingQuality: 2290575,
-      },
-      onlineUsersDMS: {
-        count: 149,
-        badgePercentage: '+101%',
-        totalUserCount: 147,
-      },
-      cascadeFilter: {
-        selectedState: 'All',
-        selectedCategory: 'All',
-        selectedSubCategory: 'All',
-      },
-    };
-
+    const stats = await getDynamicSuperAdminStats();
     res.json(stats);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -52,16 +98,8 @@ export const getSuperAdminStats = async (req, res) => {
 export const getSuperAdminDashboardOverview = async (req, res) => {
   try {
     const results = await Promise.allSettled([
-      // Task 0: KPI Cards Stats
-      Promise.resolve({
-        newVendors: { count: 48, badgePercentage: '+10%', totalVendors: '12356688/0' },
-        newCustomers: { count: 373, badgePercentage: '+10%', totalCustomers: 56975 },
-        newVendorRequests: { count: 17, totalFYRequests: 5363 },
-        newCustomerQueries: { count: 0, totalQueries: 6 },
-        todaysVendorAudit: { count: 1006, pendingQuality: 2290575 },
-        onlineUsersDMS: { count: 149, badgePercentage: '+101%', totalUserCount: 147 },
-        cascadeFilter: { selectedState: 'All', selectedCategory: 'All', selectedSubCategory: 'All' },
-      }),
+      // Task 0: Dynamic KPI Cards Stats
+      getDynamicSuperAdminStats(),
       // Task 1: States List
       State.find({}).sort({ vendorCount: -1 }),
       // Task 2: Categories List

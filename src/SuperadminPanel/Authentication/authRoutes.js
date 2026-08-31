@@ -1,10 +1,8 @@
 import express from 'express';
 import {
-  loginSuperAdmin,
-  forgotPassword,
-  verifyOtp,
-  resendOtp,
-  resetPassword,
+  sendLoginOtp,
+  verifyLoginOtp,
+  resendLoginOtp,
   refreshAccessToken,
   logoutSuperAdmin,
   getCurrentUser,
@@ -13,20 +11,15 @@ import { protectSuperAdmin } from './authMiddleware.js';
 
 const router = express.Router();
 
-// Login
-router.post('/login', loginSuperAdmin);
+// Send OTP (Public)
+router.post('/send-otp', sendLoginOtp);
 
-// Forgot Password
-router.post('/forgot-password', forgotPassword);
+// Verify OTP & Login (Public)
+router.post('/verify-otp', verifyLoginOtp);
+router.post('/login', verifyLoginOtp);
 
-// Verify OTP
-router.post('/verify-otp', verifyOtp);
-
-// Resend OTP
-router.post('/resend-otp', resendOtp);
-
-// Reset Password
-router.post('/reset-password', resetPassword);
+// Resend OTP (Public)
+router.post('/resend-otp', resendLoginOtp);
 
 // Refresh Token
 router.post('/refresh-token', refreshAccessToken);
