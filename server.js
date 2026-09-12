@@ -37,6 +37,7 @@ import telecallerProfileRoutes from './src/Telecaller/routes/profile.routes.js';
 import telecallerReportRoutes from './src/Telecaller/routes/report.routes.js';
 import telecallerPaymentRoutes from './src/Telecaller/routes/payment.routes.js';
 import telecallerFollowupRoutes from './src/Telecaller/routes/followup.routes.js';
+import telecallerPlanRoutes from './src/Telecaller/routes/plan.routes.js';
 
 
 
@@ -97,6 +98,9 @@ app.use('/api/telecaller/profile',  telecallerProfileRoutes);
 app.use('/api/telecaller/report',   telecallerReportRoutes);
 app.use('/api/telecaller/payment',  telecallerPaymentRoutes);
 app.use('/api/telecaller/followup', telecallerFollowupRoutes);
+app.use('/api/telecaller/plans',    telecallerPlanRoutes);
+app.use('/api/customer/plan',       telecallerPlanRoutes);
+app.use('/api/plans',               telecallerPlanRoutes);
 
 
 // Root Route 

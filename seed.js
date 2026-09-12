@@ -14,6 +14,10 @@ import Report from './src/VendorPanel/SalesReports/reportSchema.js';
 import Notification from './src/VendorPanel/Notifications/notificationSchema.js';
 import SupportTicket from './src/VendorPanel/HelpSupport/supportSchema.js';
 import { State, Category, Subcategory } from './src/VendorPanel/VendorDashboard/cascadeFilterSchema.js';
+import Plan from './src/Telecaller/models/Plan.js';
+import { DEFAULT_PLANS } from './src/Telecaller/controllers/plan.controller.js';
+
+import Telecaller from './src/Telecaller/models/Telecaller.js';
 
 dotenv.config();
 
@@ -26,8 +30,9 @@ const seedDatabase = async () => {
     // 1. Seed Super Admin Panel Data
     await seedSuperAdmin();
 
-    // 2. Clear Vendor Panel Data
+    // 2. Clear Vendor & Telecaller Data
     await Vendor.deleteMany({});
+    await Telecaller.deleteMany({});
     await Product.deleteMany({});
     await Order.deleteMany({});
     await Customer.deleteMany({});
@@ -37,7 +42,12 @@ const seedDatabase = async () => {
     await State.deleteMany({});
     await Category.deleteMany({});
     await Subcategory.deleteMany({});
-    console.log('Existing Vendor Panel data cleared.');
+    await Plan.deleteMany({});
+    console.log('Existing Vendor & Telecaller data cleared.');
+
+    // 2.5 Seed Subscription Plans
+    await Plan.insertMany(DEFAULT_PLANS);
+    console.log('Subscription Plans seeded (4 Total).');
 
     // 3. Seed Vendor Panel Data
     const salt = await bcrypt.genSalt(10);
@@ -64,7 +74,43 @@ const seedDatabase = async () => {
       whatsapp: '+91 98765 43210',
       isPaidVendor: true,
     });
-    console.log('Vendor seeded successfully.');
+
+    const rajeshHashedPassword = await bcrypt.hash('pass@123', salt);
+    await Vendor.create({
+      vendorId: 'rajesh@lts.com',
+      email: 'rajesh@lts.com',
+      fullName: 'Rajesh Patel',
+      phone: '+91 98920 11223',
+      designation: 'Store Owner',
+      regionalJurisdiction: 'Maharashtra Region',
+      password: rajeshHashedPassword,
+      storeName: 'ABC Traders Pvt Ltd',
+      storeStatus: 'Active & Verified',
+      twoFactorAuth: false,
+      emailAlerts: true,
+      syncFrequency: 'Real-Time (Instant)',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+      state: 'Maharashtra',
+      city: 'Nagpur',
+      locality: 'Central Ave',
+      address: 'Shop #12, Commercial Hub, Central Ave, Wardha Road',
+      whatsapp: '+91 98920 11223',
+      isPaidVendor: true,
+    });
+    console.log('Vendors seeded successfully.');
+
+    // 3.5 Seed Active CRM Telecaller
+    await Telecaller.create({
+      name: 'Amit Verma',
+      employeeId: 'TC1001',
+      email: 'amit.verma@lts.com',
+      phone: '+91 98765 01001',
+      password: 'Telecaller@123',
+      role: 'TELECALLER',
+      status: 'ACTIVE',
+      createdByVendor: vendor._id,
+    });
+    console.log('Telecaller CRM account seeded successfully.');
 
     // 2. Seed States
     await State.insertMany([

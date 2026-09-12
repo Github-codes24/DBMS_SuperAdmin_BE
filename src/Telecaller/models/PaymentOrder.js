@@ -18,15 +18,13 @@ const packageItemSchema = new mongoose.Schema(
 const paymentOrderSchema = new mongoose.Schema(
   {
     vendorId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Vendor',
+      type: mongoose.Schema.Types.Mixed,
       required: true,
       index: true,
     },
     telecallerId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Vendor',
-      required: true,
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
     gateway: {
       type: String,
