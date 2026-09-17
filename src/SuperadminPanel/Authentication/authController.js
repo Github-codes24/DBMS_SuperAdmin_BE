@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import SuperAdmin from './authSchema.js';
 import { createAuditLog } from '../../utils/auditLogger.js';
 import { sendSmsOtp } from '../../utils/sendSms.js';
+import { sendPasswordResetEmail } from '../../utils/emailHandler.js';
 
 // Helper to generate Access Token (8 Hours)
 const generateAccessToken = (id) => {
@@ -318,3 +319,178 @@ export const getCurrentUser = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// FORGOT PASSWORD - SEND OTP
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    if (!email) {
+      return res.status(400).json({
+        message: 'Please provide registered Email Address',
+      });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    const admin = await SuperAdmin.findOne({
+      email: cleanEmail,
+    });
+
+    if (!admin) {
+      return res.status(404).json({
+        message: 'No registered Super Admin found with this email address',
+      });
+    }
+
+    if ((admin.status || '').toUpperCase() !== 'ACTIVE') {
+      return res.status(403).json({
+        message: 'Account is not active or has been disabled',
+      });
+    }
+
+    const otp = generateSixDigitOtp();
+
+    admin.resetOtp = otp;
+    admin.resetOtpExpires = Date.now() + 10 * 60 * 1000;
+    admin.isOtpVerified = false;
+
+    await admin.save();
+
+    const emailResult = await sendPasswordResetEmail({
+      toEmail: admin.email,
+      userName: admin.fullName,
+      otp,
+    });
+
+    if (!emailResult.success) {
+      return res.status(500).json({
+        message: 'Failed to send password reset OTP',
+      });
+    }
+
+    const responsePayload = {
+      message: 'Password reset OTP sent successfully',
+      email: admin.email,
+    };
+
+    // Only expose OTP during local development
+    if (process.env.NODE_ENV !== 'production') {
+      responsePayload.otp = otp;
+    }
+
+    return res.json(responsePayload);
+  } catch (error) {
+    return res.status(500).json({
+      message: 'Server error',
+      error: error.message,
+    });
+  }
+};
+// VERIFY FORGOT PASSWORD OTP
+export const verifyForgotPasswordOtp = async (req, res) => {
+  const { email, otp } = req.body;
+  try {
+    if (!email || !otp) {
+      return res.status(400).json({
+        message: 'Please provide Email Address and OTP',
+      });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanOtp = String(otp).trim();
+
+    const admin = await SuperAdmin.findOne({
+      email: cleanEmail,
+      resetOtp: cleanOtp,
+      resetOtpExpires: { $gt: Date.now() },
+    });
+
+    if (!admin) {
+      return res.status(400).json({
+        message: 'Invalid or expired OTP',
+      });
+    }
+
+    if ((admin.status || '').toUpperCase() !== 'ACTIVE') {
+      return res.status(403).json({
+        message: 'Account is not active or has been disabled',
+      });
+    }
+
+    admin.resetOtp = null;
+    admin.resetOtpExpires = null;
+    admin.isOtpVerified = true;
+
+    await admin.save();
+
+    return res.json({
+      message: 'OTP verified successfully',
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: 'Server error',
+      error: error.message,
+    });
+  }
+};
+// RESET PASSWORD
+export const resetPassword = async (req, res) => {
+  const { email, newPassword } = req.body;
+
+  try {
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        message: 'Please provide Email Address and New Password',
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        message: 'Password must be at least 8 characters long',
+      });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    const admin = await SuperAdmin.findOne({
+      email: cleanEmail,
+      isOtpVerified: true,
+    });
+
+    if (!admin) {
+      return res.status(400).json({
+        message: 'Please verify OTP before resetting password',
+      });
+    }
+
+    if ((admin.status || '').toUpperCase() !== 'ACTIVE') {
+      return res.status(403).json({
+        message: 'Account is not active or has been disabled',
+      });
+    }
+
+    admin.password = await bcrypt.hash(newPassword, 10);
+
+    // Invalidate reset authorization
+    admin.isOtpVerified = false;
+    admin.resetOtp = null;
+    admin.resetOtpExpires = null;
+
+    // Invalidate existing refresh token
+    admin.refreshToken = null;
+
+    await admin.save();
+
+    return res.json({
+      message: 'Password reset successfully',
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: 'Server error',
+      error: error.message,
+    });
+  }
+};
+
+
