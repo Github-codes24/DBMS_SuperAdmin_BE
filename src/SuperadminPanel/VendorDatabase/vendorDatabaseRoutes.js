@@ -8,6 +8,7 @@ import {
   importVendors,
   exportVendorsCSV,
   exportVendorsPDF,
+  activateVendor
 } from './vendorDatabaseController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
 
@@ -31,6 +32,14 @@ router
   .route('/')
   .get(protectSuperAdmin, getVendors)
   .post(protectSuperAdmin, createVendor);
+ 
+  // GENERATE VENDOR ID AND PASSWORD DURING ACTIVATION OF ACCOUNT 
+  router.patch(
+    '/:vendorId/activate',
+    protectSuperAdmin,
+    activateVendor
+  );
+
 
 // Get Single Vendor & Update Vendor (Accepts MongoDB _id, custom vendorId 'VEN002', or transNo 'TRX90102')
 router

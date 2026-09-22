@@ -138,7 +138,6 @@ export const getVendors = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 // 2. CREATE SINGLE VENDOR RECORD
 // @desc    Create Single Vendor Record (Manual "+ Add Vendor")
 // @route   POST /api/v1/superadmin/vendors
@@ -153,96 +152,150 @@ export const createVendor = async (req, res) => {
     verificationDateTime,
     contactNo,
     email,
-    password,
     state,
     city,
     pincode,
     completeAddress,
     gstin,
-    status = 'Pending',
   } = req.body;
-
   try {
+    const DEFAULT_VENDOR_LIMIT = 10;
+    const vendorCount = await SuperAdminVendor.countDocuments({
+      isDeleted: false,
+    });
+    if (vendorCount >= DEFAULT_VENDOR_LIMIT) {
+      return res.status(400).json({
+        success: false,
+        message: `Vendor limit reached. Maximum ${DEFAULT_VENDOR_LIMIT} vendors are allowed.`,
+      });
+    }
     if (!vendorName || !vendorName.trim()) {
-      return res.status(400).json({ success: false, message: 'Vendor Name is required' });
+      return res.status(400).json({
+        success: false,
+        message: 'Vendor Name is required',
+      });
     }
-
     if (!category || !category.trim()) {
-      return res.status(400).json({ success: false, message: 'Category is required' });
+      return res.status(400).json({
+        success: false,
+        message: 'Category is required',
+      });
     }
-
-    // Check if explicitly provided transNo already exists in DB
+    // Check explicitly provided transaction number
     if (transNo && transNo.trim()) {
-      const existingTrans = await SuperAdminVendor.findOne({ transNo: transNo.trim() });
+      const existingTrans = await SuperAdminVendor.findOne({
+        transNo: transNo.trim(),
+      });
       if (existingTrans) {
         return res.status(400).json({
           success: false,
-          message: `Transaction Number '${transNo.trim()}' is already in use by another vendor record. Please use a unique Trans No or leave blank to auto-generate.`,
+          message: `Transaction Number '${transNo.trim()}' is already in use.`,
         });
       }
     }
-
-    const { vendorId: autoVendorId, transNo: autoTransNo } = await generateVendorIdAndTransNo();
-
-    const finalTransNo = transNo && transNo.trim() ? transNo.trim() : autoTransNo;
-
-    // Auto srNo if not provided
+    const {
+      vendorId: autoVendorId,
+      transNo: autoTransNo,
+    } = await generateVendorIdAndTransNo();
+    const finalTransNo =
+      transNo && transNo.trim()
+        ? transNo.trim()
+        : autoTransNo;
+    // Auto Sr No
     let calculatedSrNo = srNo;
     if (!calculatedSrNo) {
-      const count = await SuperAdminVendor.countDocuments({ isDeleted: false });
-      calculatedSrNo = (count + 1).toString().padStart(2, '0');
+      const count = await SuperAdminVendor.countDocuments({
+        isDeleted: false,
+      });
+
+      calculatedSrNo = (count + 1)
+        .toString()
+        .padStart(2, '0');
     }
 
-    const cleanEmail = email ? email.trim().toLowerCase() : '';
-    const rawPassword = password && password.trim() ? password.trim() : generateRandomPassword();
-    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    const cleanEmail = email
+      ? email.trim().toLowerCase()
+      : '';
 
-    // 1. Create SuperAdminVendor master record
+    /*
+     * IMPORTANT:
+     * Do NOT generate a password here.
+     *
+     * Password will be generated only when
+     * Super Admin activates the vendor.
+     */
+
+    // 1. Create vendor master record
+
     const vendor = await SuperAdminVendor.create({
       vendorId: autoVendorId,
       transNo: finalTransNo,
       srNo: calculatedSrNo,
+
       vendorName: vendorName.trim(),
       ownerName: ownerName ? ownerName.trim() : '',
       category: category.trim(),
-      verificationDateTime: verificationDateTime ? new Date(verificationDateTime) : new Date(),
+
+      verificationDateTime: verificationDateTime
+        ? new Date(verificationDateTime)
+        : new Date(),
+
       contactNo: contactNo ? contactNo.trim() : '',
       email: cleanEmail,
-      password: hashedPassword,
+
       state: state ? state.trim() : '',
       city: city ? city.trim() : '',
       pincode: pincode ? pincode.trim() : '',
-      completeAddress: completeAddress ? completeAddress.trim() : '',
+      completeAddress: completeAddress
+        ? completeAddress.trim()
+        : '',
       gstin: gstin ? gstin.trim() : '',
-      status: normalizeStatus(status),
+
+      // ALWAYS Pending on creation
+      status: 'Pending',
+
       createdBy: req.superAdmin._id,
     });
 
-    // 2. Create or sync Vendor Auth record (so Vendor can log into Vendor Panel)
-    const vendorAuthEmail = cleanEmail || `${autoVendorId.toLowerCase()}@lts-dbms.com`;
+    // 2. Create Vendor authentication record
+    const vendorAuthEmail =
+      cleanEmail ||
+      `${autoVendorId.toLowerCase()}@lts-dbms.com`;
 
-    try {
-      await Vendor.findOneAndUpdate(
-        { vendorId: autoVendorId },
-        {
-          vendorId: autoVendorId,
-          email: vendorAuthEmail,
-          fullName: ownerName && ownerName.trim() ? ownerName.trim() : vendorName.trim(),
-          phone: contactNo ? contactNo.trim() : '',
-          password: hashedPassword,
-          storeName: vendorName.trim(),
-          storeStatus: normalizeStatus(status) === 'Active' ? 'Active & Verified' : 'Pending Verification',
-          state: state ? state.trim() : '',
-          city: city ? city.trim() : '',
-          address: completeAddress ? completeAddress.trim() : '',
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-    } catch (authErr) {
-      console.error('Failed to sync Vendor Auth collection:', authErr.message);
-    }
+    await Vendor.findOneAndUpdate(
+      { vendorId: autoVendorId },
+      {
+        vendorId: autoVendorId,
+        email: vendorAuthEmail,
 
-    // 3. Automatic Audit Log Recording
+        fullName:
+          ownerName && ownerName.trim()
+            ? ownerName.trim()
+            : vendorName.trim(),
+
+        phone: contactNo ? contactNo.trim() : '',
+
+        // No password until activation
+        password: null,
+
+        storeName: vendorName.trim(),
+
+        // Vendor cannot login yet
+        storeStatus: 'Pending Verification',
+
+        state: state ? state.trim() : '',
+        city: city ? city.trim() : '',
+        address: completeAddress
+          ? completeAddress.trim()
+          : '',
+      },
+      {
+        upsert: true,
+        returnDocument: 'after',
+        setDefaultsOnInsert: true,
+      }
+    );
+    // 3. Audit log
     await createAuditLog({
       user: req.superAdmin?.adminId || 'SUPER',
       userName: req.superAdmin?.name || 'Super Admin',
@@ -252,48 +305,147 @@ export const createVendor = async (req, res) => {
       module: 'Vendor Database',
     });
 
-    // 4. Trigger Email Service (Only after successful vendor creation)
-    let emailSent = false;
-    let emailError = null;
+    // 4. Response
+    return res.status(201).json({
+      success: true,
+      message: 'Vendor created successfully and is pending approval.',
+      data: {
+        vendorId: vendor.vendorId,
+        email: vendor.email || '',
+        status: vendor.status,
+        vendor,
+      },
+    });
 
-    if (cleanEmail) {
-      const emailResult = await sendVendorCredentialsEmail({
-        toEmail: cleanEmail,
+  } catch (error) {
+    console.error('Create vendor error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message,
+    });
+  }
+};
+// Active the Account and Send  
+export const activateVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    // Find vendor
+    const vendor = await SuperAdminVendor.findOne({
+      vendorId,
+      isDeleted: false,
+    });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    // Prevent activating an already active vendor
+    if (vendor.status === 'Active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Vendor is already active',
+      });
+    }
+
+    // Make sure vendor has an email
+    if (!vendor.email) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Vendor cannot be activated because no email address is available.',
+      });
+    }
+    /*
+     * Generate password ONLY during activation.
+     */
+    const rawPassword = generateRandomPassword();
+
+    const hashedPassword = await bcrypt.hash(
+      rawPassword,
+      10
+    );
+
+    // Update master vendor
+    vendor.status = 'Active';
+    vendor.password = hashedPassword;
+
+    await vendor.save();
+
+    // Update authentication record
+    const vendorAuth = await Vendor.findOneAndUpdate(
+      { vendorId },
+
+      {
+        email: vendor.email,
+        password: hashedPassword,
+        storeStatus: 'Active & Verified',
+      },
+
+      {
+        returnDocument: 'after',
+      }
+    );
+
+    if (!vendorAuth) {
+      // Important: don't silently continue
+      return res.status(500).json({
+        success: false,
+        message: 'Vendor authentication record not found.',
+      });
+    }
+
+    /*
+     * Send credentials AFTER successful activation.
+     */
+    const emailResult =
+      await sendVendorCredentialsEmail({
+        toEmail: vendor.email,
         vendorName: vendor.vendorName,
         vendorId: vendor.vendorId,
         password: rawPassword,
       });
 
-      if (emailResult.success) {
-        emailSent = true;
-      } else {
-        emailSent = false;
-        emailError = emailResult.error || 'Failed to dispatch email';
-      }
-    } else {
-      emailError = 'Vendor email address was not provided.';
-    }
-
-    // 5. Construct API Response
-    const responseMessage = emailSent
-      ? 'Vendor created successfully'
-      : 'Vendor created successfully, but credentials email could not be sent.';
-
-    const responseData = {
-      vendorId: vendor.vendorId,
-      email: vendor.email || '',
-      emailSent: emailSent,
-      ...(emailError && { emailError: emailError }),
-      vendor: vendor,
-    };
-
-    res.status(201).json({
-      success: true,
-      message: responseMessage,
-      data: responseData,
+    // Audit
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Activated Vendor',
+      record: vendor.transNo || vendor.vendorId,
+      module: 'Vendor Database',
     });
+
+    return res.status(200).json({
+      success: true,
+      message: emailResult.success
+        ? 'Vendor activated and credentials sent successfully.'
+        : 'Vendor activated, but credentials email could not be sent.',
+
+      data: {
+        vendorId: vendor.vendorId,
+        email: vendor.email,
+        status: vendor.status,
+        emailSent: emailResult.success,
+        ...(emailResult.error && {
+          emailError: emailResult.error,
+        }),
+      },
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    console.error('Activate vendor error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message,
+    });
   }
 };
 
@@ -315,7 +467,6 @@ export const getVendorById = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 
 // 4. UPDATE VENDOR RECORD (STATUS RULES ENFORCED)
 // @desc    Update Vendor Record & Status Rules
