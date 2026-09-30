@@ -12,6 +12,7 @@ import SuperAdminVendor from '../src/SuperadminPanel/VendorDatabase/vendorDataba
 import SuperAdminTelecaller from '../src/SuperadminPanel/TelecallerManagement/telecallerSchema.js';
 import SuperAdminAuditLog from '../src/SuperadminPanel/AuditLogs/auditLogSchema.js';
 import { State, Category, Subcategory } from '../src/VendorPanel/VendorDashboard/cascadeFilterSchema.js';
+import { generateReferCode } from "../src/utils/generateReferCode.js"
 
 dotenv.config();
 
@@ -51,6 +52,7 @@ export const seedSuperAdmin = async () => {
       role: 'SuperAdmin',
       status: 'Active',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      referCode: generateReferCode()
     });
     console.log('Master SuperAdmin Account seeded successfully.');
 

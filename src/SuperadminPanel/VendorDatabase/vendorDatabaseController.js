@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import SuperAdminVendor from './vendorDatabaseSchema.js';
+import SuperAdminVendor, { VendorFormField} from './vendorDatabaseSchema.js';
 import Vendor from '../../VendorPanel/Authentication/authSchema.js';
 import {
   parseExcelOrCsvBuffer,
@@ -9,6 +9,9 @@ import {
   generateHTMLPDFReport,
 } from '../../utils/excelCsvHandler.js';
 import { createAuditLog } from '../../utils/auditLogger.js';
+import {
+  validateAndPrepareCustomFields,
+} from '../../utils/vendorCustomFieldService.js';
 import { sendVendorCredentialsEmail } from '../../utils/emailHandler.js';
 
 // Helper to generate a random 8-character password if not provided
@@ -157,12 +160,17 @@ export const createVendor = async (req, res) => {
     pincode,
     completeAddress,
     gstin,
+    customFields = [],
+
   } = req.body;
   try {
-    const DEFAULT_VENDOR_LIMIT = 10;
+    const DEFAULT_VENDOR_LIMIT = 100;
     const vendorCount = await SuperAdminVendor.countDocuments({
       isDeleted: false,
     });
+    const validatedCustomFields =
+    await validateAndPrepareCustomFields(customFields);
+
     if (vendorCount >= DEFAULT_VENDOR_LIMIT) {
       return res.status(400).json({
         success: false,
@@ -253,6 +261,7 @@ export const createVendor = async (req, res) => {
 
       // ALWAYS Pending on creation
       status: 'Pending',
+      customFields: validatedCustomFields,
 
       createdBy: req.superAdmin._id,
     });
@@ -448,6 +457,350 @@ export const activateVendor = async (req, res) => {
     });
   }
 };
+// Search Filter for the vendor's
+export const searchVendors = async (req, res) => {
+  try {
+    const {
+      name,
+      state,
+      city,
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
+
+    if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Page must be a positive integer.',
+      });
+    }
+
+    if (
+      !Number.isInteger(limitNumber) ||
+      limitNumber < 1 ||
+      limitNumber > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Limit must be between 1 and 100.',
+      });
+    }
+
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const filter = {
+      isDeleted: false,
+    };
+
+    // Vendor name search
+    if (typeof name === 'string' && name.trim()) {
+      filter.vendorName = {
+        $regex: name.trim(),
+        $options: 'i',
+      };
+    }
+
+    // State filter
+    if (typeof state === 'string' && state.trim()) {
+      filter.state = state.trim();
+    }
+
+    // City filter
+    if (typeof city === 'string' && city.trim()) {
+      filter.city = city.trim();
+    }
+
+    const [vendors, total] = await Promise.all([
+      SuperAdminVendor.find(filter)
+        .select(
+          'vendorId vendorName contactNo verificationDateTime state city status createdBy'
+        )
+        .populate({
+          path: 'createdBy',
+          select: 'adminId referCode fullName',
+        })
+        .sort({ verificationDateTime: -1 })
+        .skip(skip)
+        .limit(limitNumber)
+        .lean(),
+
+      SuperAdminVendor.countDocuments(filter),
+    ]);
+
+    const data = vendors.map((vendor) => {
+      const agent = vendor.createdBy;
+
+      delete vendor.createdBy;
+
+      return {
+        ...vendor,
+        referId: agent?.adminId || null,
+        referCode: agent?.referCode || null,
+        agentName: agent?.fullName || null,
+      };
+    });
+
+    const totalPages = Math.ceil(total / limitNumber);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendors searched successfully.',
+      data,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        total,
+        totalPages,
+        hasNextPage: pageNumber < totalPages,
+        hasPreviousPage: pageNumber > 1,
+      },
+    });
+  } catch (error) {
+    console.error('Search vendors error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to search vendors.',
+    });
+  }
+};
+// Create Custom field in the Vendor
+export const createVendorFormField = async (req, res) => {
+  try {
+    const {
+      label,
+      type,
+      required = false,
+      placeholder = '',
+      options = [],
+    } = req.body;
+
+    if (!label || !label.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Field label is required.',
+      });
+    }
+
+    const allowedTypes = [
+      'TEXT',
+      'NUMBER',
+      'EMAIL',
+      'DATE',
+      'DROPDOWN',
+      'CHECKBOX',
+      'TOGGLE',
+      'TEXTAREA',
+    ];
+
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid field type.',
+      });
+    }
+
+    if (type === 'DROPDOWN') {
+      if (!Array.isArray(options) || options.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Options are required for dropdown fields.',
+        });
+      }
+    }
+
+    const field = await VendorFormField.create({
+      label: label.trim(),
+      type,
+      required: Boolean(required),
+      placeholder: placeholder?.trim() || '',
+      options: type === 'DROPDOWN' ? options : [],
+      createdBy: req.superAdmin._id,
+      updatedBy: req.superAdmin._id,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Vendor form field created successfully.',
+      data: field,
+    });
+  } catch (error) {
+    console.error('Create vendor form field error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error.',
+    });
+  }
+};
+// GET Custom Field Data 
+export const getVendorFormFields = async (req, res) => {
+  try {
+    const fields = await VendorFormField.find({
+      isActive: true,
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendor form fields fetched successfully.',
+      data: fields,
+    });
+  } catch (error) {
+    console.log("hi error");
+    console.error('Get vendor form fields error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error.',
+    });
+  }
+};
+
+export const updateVendorFormField = async (req, res) => {
+  try {
+    const { fieldId } = req.params;
+
+    const {
+      label,
+      type,
+      required,
+      placeholder,
+      options,
+    } = req.body;
+
+    const field = await VendorFormField.findOne({
+      _id: fieldId,
+      isActive: true,
+    });
+
+    if (!field) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor form field not found.',
+      });
+    }
+
+    if (label !== undefined) {
+      if (!label.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Field label cannot be empty.',
+        });
+      }
+
+      field.label = label.trim();
+    }
+
+    if (type !== undefined) {
+      const allowedTypes = [
+        'TEXT',
+        'NUMBER',
+        'EMAIL',
+        'DATE',
+        'DROPDOWN',
+        'CHECKBOX',
+        'TOGGLE',
+        'TEXTAREA',
+      ];
+
+      if (!allowedTypes.includes(type)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid field type.',
+        });
+      }
+
+      field.type = type;
+    }
+
+    if (required !== undefined) {
+      field.required = Boolean(required);
+    }
+
+    if (placeholder !== undefined) {
+      field.placeholder = placeholder.trim();
+    }
+
+    if (options !== undefined) {
+      if (field.type === 'DROPDOWN') {
+        if (!Array.isArray(options) || options.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Options are required for dropdown fields.',
+          });
+        }
+
+        field.options = options;
+      } else {
+        field.options = [];
+      }
+    }
+
+    field.updatedBy = req.superAdmin._id;
+
+    await field.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendor form field updated successfully.',
+      data: field,
+    });
+  } catch (error) {
+    console.error('Update vendor form field error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error.',
+    });
+  }
+};
+
+export const deleteVendorFormField = async (req, res) => {
+  try {
+    const { fieldId } = req.params;
+
+    const field = await VendorFormField.findOneAndUpdate(
+      {
+        _id: fieldId,
+        isActive: true,
+      },
+      {
+        $set: {
+          isActive: false,
+          updatedBy: req.superAdmin._id,
+        },
+      },
+      {
+        new: true,
+      }
+    );
+
+    if (!field) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor form field not found.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendor form field removed successfully.',
+    });
+  } catch (error) {
+    console.error('Delete vendor form field error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error.',
+    });
+  }
+};
+
 
 // 3. GET SINGLE VENDOR BY ID OR CUSTOM ID
 // @desc    Get Single Vendor Record by Mongo _id, custom vendorId (VEN002), or transNo (TRX90102)
