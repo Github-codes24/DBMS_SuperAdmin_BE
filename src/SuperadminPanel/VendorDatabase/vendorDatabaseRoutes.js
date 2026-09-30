@@ -8,6 +8,12 @@ import {
   importVendors,
   exportVendorsCSV,
   exportVendorsPDF,
+  searchVendors,
+  activateVendor,
+  createVendorFormField,
+  getVendorFormFields,
+  updateVendorFormField,
+  deleteVendorFormField,
 } from './vendorDatabaseController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
 
@@ -31,11 +37,47 @@ router
   .route('/')
   .get(protectSuperAdmin, getVendors)
   .post(protectSuperAdmin, createVendor);
+ 
+  // GENERATE VENDOR ID AND PASSWORD DURING ACTIVATION OF ACCOUNT 
+  router.patch(
+    '/:vendorId/activate',
+    protectSuperAdmin,
+    activateVendor
+  );
+
+  // Search Vendor's Based on state , city and name
+  router.get(
+    '/search',
+    protectSuperAdmin,
+    searchVendors
+  );
+  router.get(
+    '/form-fields',
+    protectSuperAdmin,
+    getVendorFormFields
+  );
+  router.post(
+    '/form-fields',
+    protectSuperAdmin,
+    createVendorFormField
+  );
+  router.patch(
+    '/form-fields/:fieldId',
+    protectSuperAdmin,
+    updateVendorFormField
+  );
+  router.delete(
+    '/form-fields/:fieldId',
+    protectSuperAdmin,
+    deleteVendorFormField
+  );
 
 // Get Single Vendor & Update Vendor (Accepts MongoDB _id, custom vendorId 'VEN002', or transNo 'TRX90102')
 router
   .route('/:id')
   .get(protectSuperAdmin, getVendorById)
   .patch(protectSuperAdmin, updateVendor);
+
+
 
 export default router;

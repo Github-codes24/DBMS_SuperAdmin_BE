@@ -94,6 +94,20 @@ const superAdminVendorSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    customFields: [
+      {
+        fieldId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'VendorFormField',
+          required: true,
+        },
+    
+        value: {
+          type: mongoose.Schema.Types.Mixed,
+          default: null,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -107,4 +121,76 @@ superAdminVendorSchema.index({ ownerName: 1, isDeleted: 1 });
 superAdminVendorSchema.index({ state: 1, city: 1, isDeleted: 1 });
 
 const SuperAdminVendor = mongoose.model('SuperAdminVendor', superAdminVendorSchema);
+
+const vendorFormFieldSchema = new mongoose.Schema(
+  {
+    label: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    type: {
+      type: String,
+      required: true,
+      enum: [
+        'TEXT',
+        'NUMBER',
+        'EMAIL',
+        'DATE',
+        'DROPDOWN',
+        'CHECKBOX',
+        'TOGGLE',
+        'TEXTAREA',
+      ],
+    },
+
+    required: {
+      type: Boolean,
+      default: false,
+    },
+
+    placeholder: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Used only when type is DROPDOWN
+    options: {
+      type: [String],
+      default: [],
+    },
+
+    // Soft delete
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SuperAdmin',
+      default: null,
+    },
+
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SuperAdmin',
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+vendorFormFieldSchema.index({ isActive: 1 });
+
+const VendorFormField = mongoose.model(
+  'VendorFormField',
+  vendorFormFieldSchema
+);
+
+export { VendorFormField };
 export default SuperAdminVendor;

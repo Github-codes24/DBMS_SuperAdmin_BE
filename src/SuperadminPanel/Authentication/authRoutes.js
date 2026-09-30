@@ -6,6 +6,9 @@ import {
   refreshAccessToken,
   logoutSuperAdmin,
   getCurrentUser,
+  forgotPassword,
+  verifyForgotPasswordOtp,
+  resetPassword
 } from './authController.js';
 import { protectSuperAdmin } from './authMiddleware.js';
 
@@ -30,5 +33,12 @@ router.post('/logout', protectSuperAdmin, logoutSuperAdmin);
 //  Get Current User (JWT Required)
 router.get('/me', protectSuperAdmin, getCurrentUser);
 router.get('/profile', protectSuperAdmin, getCurrentUser);
+
+// Forgot password 
+router.post('/forgot-password', forgotPassword);
+
+router.post('/verify-forgot-password-otp', verifyForgotPasswordOtp);
+
+router.post('/reset-password', resetPassword);
 
 export default router;

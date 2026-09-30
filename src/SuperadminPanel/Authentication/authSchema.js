@@ -7,6 +7,13 @@ const authSchema = new mongoose.Schema(
       unique: true,
       required: true,
     },
+    referCode: {
+      type: String,
+      unique: true,
+      sparse: true,
+      uppercase: true,
+      trim: true,
+    },
     email: {
       type: String,
       unique: true,

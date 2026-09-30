@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import SuperAdminVendor from './vendorDatabaseSchema.js';
+import SuperAdminVendor, { VendorFormField} from './vendorDatabaseSchema.js';
 import Vendor from '../../VendorPanel/Authentication/authSchema.js';
 import {
   parseExcelOrCsvBuffer,
@@ -9,6 +9,9 @@ import {
   generateHTMLPDFReport,
 } from '../../utils/excelCsvHandler.js';
 import { createAuditLog } from '../../utils/auditLogger.js';
+import {
+  validateAndPrepareCustomFields,
+} from '../../utils/vendorCustomFieldService.js';
 import { sendVendorCredentialsEmail } from '../../utils/emailHandler.js';
 
 // Helper to generate a random 8-character password if not provided
@@ -138,7 +141,6 @@ export const getVendors = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 // 2. CREATE SINGLE VENDOR RECORD
 // @desc    Create Single Vendor Record (Manual "+ Add Vendor")
 // @route   POST /api/v1/superadmin/vendors
@@ -153,96 +155,156 @@ export const createVendor = async (req, res) => {
     verificationDateTime,
     contactNo,
     email,
-    password,
     state,
     city,
     pincode,
     completeAddress,
     gstin,
-    status = 'Pending',
+    customFields = [],
+
   } = req.body;
-
   try {
+    const DEFAULT_VENDOR_LIMIT = 100;
+    const vendorCount = await SuperAdminVendor.countDocuments({
+      isDeleted: false,
+    });
+    const validatedCustomFields =
+    await validateAndPrepareCustomFields(customFields);
+
+    if (vendorCount >= DEFAULT_VENDOR_LIMIT) {
+      return res.status(400).json({
+        success: false,
+        message: `Vendor limit reached. Maximum ${DEFAULT_VENDOR_LIMIT} vendors are allowed.`,
+      });
+    }
     if (!vendorName || !vendorName.trim()) {
-      return res.status(400).json({ success: false, message: 'Vendor Name is required' });
+      return res.status(400).json({
+        success: false,
+        message: 'Vendor Name is required',
+      });
     }
-
     if (!category || !category.trim()) {
-      return res.status(400).json({ success: false, message: 'Category is required' });
+      return res.status(400).json({
+        success: false,
+        message: 'Category is required',
+      });
     }
-
-    // Check if explicitly provided transNo already exists in DB
+    // Check explicitly provided transaction number
     if (transNo && transNo.trim()) {
-      const existingTrans = await SuperAdminVendor.findOne({ transNo: transNo.trim() });
+      const existingTrans = await SuperAdminVendor.findOne({
+        transNo: transNo.trim(),
+      });
       if (existingTrans) {
         return res.status(400).json({
           success: false,
-          message: `Transaction Number '${transNo.trim()}' is already in use by another vendor record. Please use a unique Trans No or leave blank to auto-generate.`,
+          message: `Transaction Number '${transNo.trim()}' is already in use.`,
         });
       }
     }
-
-    const { vendorId: autoVendorId, transNo: autoTransNo } = await generateVendorIdAndTransNo();
-
-    const finalTransNo = transNo && transNo.trim() ? transNo.trim() : autoTransNo;
-
-    // Auto srNo if not provided
+    const {
+      vendorId: autoVendorId,
+      transNo: autoTransNo,
+    } = await generateVendorIdAndTransNo();
+    const finalTransNo =
+      transNo && transNo.trim()
+        ? transNo.trim()
+        : autoTransNo;
+    // Auto Sr No
     let calculatedSrNo = srNo;
     if (!calculatedSrNo) {
-      const count = await SuperAdminVendor.countDocuments({ isDeleted: false });
-      calculatedSrNo = (count + 1).toString().padStart(2, '0');
+      const count = await SuperAdminVendor.countDocuments({
+        isDeleted: false,
+      });
+
+      calculatedSrNo = (count + 1)
+        .toString()
+        .padStart(2, '0');
     }
 
-    const cleanEmail = email ? email.trim().toLowerCase() : '';
-    const rawPassword = password && password.trim() ? password.trim() : generateRandomPassword();
-    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    const cleanEmail = email
+      ? email.trim().toLowerCase()
+      : '';
 
-    // 1. Create SuperAdminVendor master record
+    /*
+     * IMPORTANT:
+     * Do NOT generate a password here.
+     *
+     * Password will be generated only when
+     * Super Admin activates the vendor.
+     */
+
+    // 1. Create vendor master record
+
     const vendor = await SuperAdminVendor.create({
       vendorId: autoVendorId,
       transNo: finalTransNo,
       srNo: calculatedSrNo,
+
       vendorName: vendorName.trim(),
       ownerName: ownerName ? ownerName.trim() : '',
       category: category.trim(),
-      verificationDateTime: verificationDateTime ? new Date(verificationDateTime) : new Date(),
+
+      verificationDateTime: verificationDateTime
+        ? new Date(verificationDateTime)
+        : new Date(),
+
       contactNo: contactNo ? contactNo.trim() : '',
       email: cleanEmail,
-      password: hashedPassword,
+
       state: state ? state.trim() : '',
       city: city ? city.trim() : '',
       pincode: pincode ? pincode.trim() : '',
-      completeAddress: completeAddress ? completeAddress.trim() : '',
+      completeAddress: completeAddress
+        ? completeAddress.trim()
+        : '',
       gstin: gstin ? gstin.trim() : '',
-      status: normalizeStatus(status),
+
+      // ALWAYS Pending on creation
+      status: 'Pending',
+      customFields: validatedCustomFields,
+
       createdBy: req.superAdmin._id,
     });
 
-    // 2. Create or sync Vendor Auth record (so Vendor can log into Vendor Panel)
-    const vendorAuthEmail = cleanEmail || `${autoVendorId.toLowerCase()}@lts-dbms.com`;
+    // 2. Create Vendor authentication record
+    const vendorAuthEmail =
+      cleanEmail ||
+      `${autoVendorId.toLowerCase()}@lts-dbms.com`;
 
-    try {
-      await Vendor.findOneAndUpdate(
-        { vendorId: autoVendorId },
-        {
-          vendorId: autoVendorId,
-          email: vendorAuthEmail,
-          fullName: ownerName && ownerName.trim() ? ownerName.trim() : vendorName.trim(),
-          phone: contactNo ? contactNo.trim() : '',
-          password: hashedPassword,
-          storeName: vendorName.trim(),
-          storeStatus: normalizeStatus(status) === 'Active' ? 'Active & Verified' : 'Pending Verification',
-          state: state ? state.trim() : '',
-          city: city ? city.trim() : '',
-          address: completeAddress ? completeAddress.trim() : '',
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-    } catch (authErr) {
-      console.error('Failed to sync Vendor Auth collection:', authErr.message);
-    }
+    await Vendor.findOneAndUpdate(
+      { vendorId: autoVendorId },
+      {
+        vendorId: autoVendorId,
+        email: vendorAuthEmail,
 
-    // 3. Automatic Audit Log Recording
+        fullName:
+          ownerName && ownerName.trim()
+            ? ownerName.trim()
+            : vendorName.trim(),
+
+        phone: contactNo ? contactNo.trim() : '',
+
+        // No password until activation
+        password: null,
+
+        storeName: vendorName.trim(),
+
+        // Vendor cannot login yet
+        storeStatus: 'Pending Verification',
+
+        state: state ? state.trim() : '',
+        city: city ? city.trim() : '',
+        address: completeAddress
+          ? completeAddress.trim()
+          : '',
+      },
+      {
+        upsert: true,
+        returnDocument: 'after',
+        setDefaultsOnInsert: true,
+      }
+    );
+    // 3. Audit log
     await createAuditLog({
       user: req.superAdmin?.adminId || 'SUPER',
       userName: req.superAdmin?.name || 'Super Admin',
@@ -252,50 +314,493 @@ export const createVendor = async (req, res) => {
       module: 'Vendor Database',
     });
 
-    // 4. Trigger Email Service (Only after successful vendor creation)
-    let emailSent = false;
-    let emailError = null;
+    // 4. Response
+    return res.status(201).json({
+      success: true,
+      message: 'Vendor created successfully and is pending approval.',
+      data: {
+        vendorId: vendor.vendorId,
+        email: vendor.email || '',
+        status: vendor.status,
+        vendor,
+      },
+    });
 
-    if (cleanEmail) {
-      const emailResult = await sendVendorCredentialsEmail({
-        toEmail: cleanEmail,
+  } catch (error) {
+    console.error('Create vendor error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message,
+    });
+  }
+};
+// Active the Account and Send  
+export const activateVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    // Find vendor
+    const vendor = await SuperAdminVendor.findOne({
+      vendorId,
+      isDeleted: false,
+    });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    // Prevent activating an already active vendor
+    if (vendor.status === 'Active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Vendor is already active',
+      });
+    }
+
+    // Make sure vendor has an email
+    if (!vendor.email) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Vendor cannot be activated because no email address is available.',
+      });
+    }
+    /*
+     * Generate password ONLY during activation.
+     */
+    const rawPassword = generateRandomPassword();
+
+    const hashedPassword = await bcrypt.hash(
+      rawPassword,
+      10
+    );
+
+    // Update master vendor
+    vendor.status = 'Active';
+    vendor.password = hashedPassword;
+
+    await vendor.save();
+
+    // Update authentication record
+    const vendorAuth = await Vendor.findOneAndUpdate(
+      { vendorId },
+
+      {
+        email: vendor.email,
+        password: hashedPassword,
+        storeStatus: 'Active & Verified',
+      },
+
+      {
+        returnDocument: 'after',
+      }
+    );
+
+    if (!vendorAuth) {
+      // Important: don't silently continue
+      return res.status(500).json({
+        success: false,
+        message: 'Vendor authentication record not found.',
+      });
+    }
+
+    /*
+     * Send credentials AFTER successful activation.
+     */
+    const emailResult =
+      await sendVendorCredentialsEmail({
+        toEmail: vendor.email,
         vendorName: vendor.vendorName,
         vendorId: vendor.vendorId,
         password: rawPassword,
       });
 
-      if (emailResult.success) {
-        emailSent = true;
-      } else {
-        emailSent = false;
-        emailError = emailResult.error || 'Failed to dispatch email';
-      }
-    } else {
-      emailError = 'Vendor email address was not provided.';
-    }
-
-    // 5. Construct API Response
-    const responseMessage = emailSent
-      ? 'Vendor created successfully'
-      : 'Vendor created successfully, but credentials email could not be sent.';
-
-    const responseData = {
-      vendorId: vendor.vendorId,
-      email: vendor.email || '',
-      emailSent: emailSent,
-      ...(emailError && { emailError: emailError }),
-      vendor: vendor,
-    };
-
-    res.status(201).json({
-      success: true,
-      message: responseMessage,
-      data: responseData,
+    // Audit
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Activated Vendor',
+      record: vendor.transNo || vendor.vendorId,
+      module: 'Vendor Database',
     });
+
+    return res.status(200).json({
+      success: true,
+      message: emailResult.success
+        ? 'Vendor activated and credentials sent successfully.'
+        : 'Vendor activated, but credentials email could not be sent.',
+
+      data: {
+        vendorId: vendor.vendorId,
+        email: vendor.email,
+        status: vendor.status,
+        emailSent: emailResult.success,
+        ...(emailResult.error && {
+          emailError: emailResult.error,
+        }),
+      },
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    console.error('Activate vendor error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message,
+    });
   }
 };
+// Search Filter for the vendor's
+export const searchVendors = async (req, res) => {
+  try {
+    const {
+      name,
+      state,
+      city,
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
+
+    if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Page must be a positive integer.',
+      });
+    }
+
+    if (
+      !Number.isInteger(limitNumber) ||
+      limitNumber < 1 ||
+      limitNumber > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Limit must be between 1 and 100.',
+      });
+    }
+
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const filter = {
+      isDeleted: false,
+    };
+
+    // Vendor name search
+    if (typeof name === 'string' && name.trim()) {
+      filter.vendorName = {
+        $regex: name.trim(),
+        $options: 'i',
+      };
+    }
+
+    // State filter
+    if (typeof state === 'string' && state.trim()) {
+      filter.state = state.trim();
+    }
+
+    // City filter
+    if (typeof city === 'string' && city.trim()) {
+      filter.city = city.trim();
+    }
+
+    const [vendors, total] = await Promise.all([
+      SuperAdminVendor.find(filter)
+        .select(
+          'vendorId vendorName contactNo verificationDateTime state city status createdBy'
+        )
+        .populate({
+          path: 'createdBy',
+          select: 'adminId referCode fullName',
+        })
+        .sort({ verificationDateTime: -1 })
+        .skip(skip)
+        .limit(limitNumber)
+        .lean(),
+
+      SuperAdminVendor.countDocuments(filter),
+    ]);
+
+    const data = vendors.map((vendor) => {
+      const agent = vendor.createdBy;
+
+      delete vendor.createdBy;
+
+      return {
+        ...vendor,
+        referId: agent?.adminId || null,
+        referCode: agent?.referCode || null,
+        agentName: agent?.fullName || null,
+      };
+    });
+
+    const totalPages = Math.ceil(total / limitNumber);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendors searched successfully.',
+      data,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        total,
+        totalPages,
+        hasNextPage: pageNumber < totalPages,
+        hasPreviousPage: pageNumber > 1,
+      },
+    });
+  } catch (error) {
+    console.error('Search vendors error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to search vendors.',
+    });
+  }
+};
+// Create Custom field in the Vendor
+export const createVendorFormField = async (req, res) => {
+  try {
+    const {
+      label,
+      type,
+      required = false,
+      placeholder = '',
+      options = [],
+    } = req.body;
+
+    if (!label || !label.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Field label is required.',
+      });
+    }
+
+    const allowedTypes = [
+      'TEXT',
+      'NUMBER',
+      'EMAIL',
+      'DATE',
+      'DROPDOWN',
+      'CHECKBOX',
+      'TOGGLE',
+      'TEXTAREA',
+    ];
+
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid field type.',
+      });
+    }
+
+    if (type === 'DROPDOWN') {
+      if (!Array.isArray(options) || options.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Options are required for dropdown fields.',
+        });
+      }
+    }
+
+    const field = await VendorFormField.create({
+      label: label.trim(),
+      type,
+      required: Boolean(required),
+      placeholder: placeholder?.trim() || '',
+      options: type === 'DROPDOWN' ? options : [],
+      createdBy: req.superAdmin._id,
+      updatedBy: req.superAdmin._id,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Vendor form field created successfully.',
+      data: field,
+    });
+  } catch (error) {
+    console.error('Create vendor form field error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error.',
+    });
+  }
+};
+// GET Custom Field Data 
+export const getVendorFormFields = async (req, res) => {
+  try {
+    const fields = await VendorFormField.find({
+      isActive: true,
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendor form fields fetched successfully.',
+      data: fields,
+    });
+  } catch (error) {
+    console.log("hi error");
+    console.error('Get vendor form fields error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error.',
+    });
+  }
+};
+
+export const updateVendorFormField = async (req, res) => {
+  try {
+    const { fieldId } = req.params;
+
+    const {
+      label,
+      type,
+      required,
+      placeholder,
+      options,
+    } = req.body;
+
+    const field = await VendorFormField.findOne({
+      _id: fieldId,
+      isActive: true,
+    });
+
+    if (!field) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor form field not found.',
+      });
+    }
+
+    if (label !== undefined) {
+      if (!label.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Field label cannot be empty.',
+        });
+      }
+
+      field.label = label.trim();
+    }
+
+    if (type !== undefined) {
+      const allowedTypes = [
+        'TEXT',
+        'NUMBER',
+        'EMAIL',
+        'DATE',
+        'DROPDOWN',
+        'CHECKBOX',
+        'TOGGLE',
+        'TEXTAREA',
+      ];
+
+      if (!allowedTypes.includes(type)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid field type.',
+        });
+      }
+
+      field.type = type;
+    }
+
+    if (required !== undefined) {
+      field.required = Boolean(required);
+    }
+
+    if (placeholder !== undefined) {
+      field.placeholder = placeholder.trim();
+    }
+
+    if (options !== undefined) {
+      if (field.type === 'DROPDOWN') {
+        if (!Array.isArray(options) || options.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Options are required for dropdown fields.',
+          });
+        }
+
+        field.options = options;
+      } else {
+        field.options = [];
+      }
+    }
+
+    field.updatedBy = req.superAdmin._id;
+
+    await field.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendor form field updated successfully.',
+      data: field,
+    });
+  } catch (error) {
+    console.error('Update vendor form field error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error.',
+    });
+  }
+};
+
+export const deleteVendorFormField = async (req, res) => {
+  try {
+    const { fieldId } = req.params;
+
+    const field = await VendorFormField.findOneAndUpdate(
+      {
+        _id: fieldId,
+        isActive: true,
+      },
+      {
+        $set: {
+          isActive: false,
+          updatedBy: req.superAdmin._id,
+        },
+      },
+      {
+        new: true,
+      }
+    );
+
+    if (!field) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor form field not found.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendor form field removed successfully.',
+    });
+  } catch (error) {
+    console.error('Delete vendor form field error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error.',
+    });
+  }
+};
+
 
 // 3. GET SINGLE VENDOR BY ID OR CUSTOM ID
 // @desc    Get Single Vendor Record by Mongo _id, custom vendorId (VEN002), or transNo (TRX90102)
@@ -315,7 +820,6 @@ export const getVendorById = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 
 // 4. UPDATE VENDOR RECORD (STATUS RULES ENFORCED)
 // @desc    Update Vendor Record & Status Rules
