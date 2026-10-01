@@ -7,6 +7,7 @@ import {
   importCustomers,
   exportCustomersCSV,
   exportCustomersPDF,
+  deleteCustomer
 } from './customerController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
 
@@ -33,5 +34,12 @@ router
 
 // Update Customer & Status Protection Rule
 router.patch('/:id', protectSuperAdmin, updateCustomer);
+
+// Delete Customer.
+router.delete(
+  '/:id',
+  protectSuperAdmin,
+  deleteCustomer
+);
 
 export default router;
