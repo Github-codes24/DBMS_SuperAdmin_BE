@@ -1,15 +1,13 @@
-import mongoose from 'mongoose';
-import Vendor from '../../VendorPanel/Authentication/authSchema.js';
-import SuperAdminVendor from '../../SuperadminPanel/VendorDatabase/vendorDatabaseSchema.js';
-import VendorImage from '../models/VendorImage.js';
-import VendorFollowup from '../models/VendorFollowup.js';
-import VendorNotification from '../models/VendorNotification.js';
-import PaymentOrder from '../models/PaymentOrder.js';
-import TelecallerAuditLog from '../models/TelecallerAuditLog.js';
-import bcrypt from 'bcryptjs';
-import { sendVendorCredentialsEmail } from '../../utils/emailHandler.js';
-
-
+import mongoose from "mongoose";
+import Vendor from "../../VendorPanel/Authentication/authSchema.js";
+import SuperAdminVendor from "../../SuperadminPanel/VendorDatabase/vendorDatabaseSchema.js";
+import VendorImage from "../models/VendorImage.js";
+import VendorFollowup from "../models/VendorFollowup.js";
+import VendorNotification from "../models/VendorNotification.js";
+import PaymentOrder from "../models/PaymentOrder.js";
+import TelecallerAuditLog from "../models/TelecallerAuditLog.js";
+import bcrypt from "bcryptjs";
+import { sendVendorCredentialsEmail } from "../../utils/emailHandler.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,7 +30,7 @@ export const createAuditLog = async ({
     performedBy,
     oldData,
     newData,
-    ipAddress: ipAddress || '',
+    ipAddress: ipAddress || "",
   });
 };
 
@@ -48,9 +46,7 @@ const generateVendorId = async () => {
   let exists = true;
 
   while (exists) {
-    const randomNumber = Math.floor(
-      100000 + Math.random() * 900000
-    );
+    const randomNumber = Math.floor(100000 + Math.random() * 900000);
 
     vendorId = `VEN${randomNumber}`;
 
@@ -61,11 +57,7 @@ const generateVendorId = async () => {
 };
 
 // CREATE VENDOR
-export const createVendor = async (
-  data,
-  performedBy,
-  ip
-) => {
+export const createVendor = async (data, performedBy, ip) => {
   const {
     companyName,
     contactPerson,
@@ -83,14 +75,10 @@ export const createVendor = async (
   const vendorId = await generateVendorId();
 
   // Generate temporary password
-  const temporaryPassword =
-    `Ven@${Math.floor(100000 + Math.random() * 900000)}`;
+  const temporaryPassword = `Ven@${Math.floor(100000 + Math.random() * 900000)}`;
 
   // Hash password
-  const hashedPassword = await bcrypt.hash(
-    temporaryPassword,
-    10
-  );
+  const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
   // Create vendor
   const vendor = await Vendor.create({
@@ -116,15 +104,13 @@ export const createVendor = async (
 
     address: fullAddress,
 
-    isPaidVendor:
-      isPaidVendor === true ||
-      isPaidVendor === 'true',
+    isPaidVendor: isPaidVendor === true || isPaidVendor === "true",
   });
 
   // Audit log
   await TelecallerAuditLog.create({
-    module: 'Vendor',
-    action: 'CREATE_VENDOR',
+    module: "Vendor",
+    action: "CREATE_VENDOR",
     vendorId: vendor._id,
     performedBy,
     oldData: null,
@@ -135,7 +121,7 @@ export const createVendor = async (
       phone: vendor.phone,
       email: vendor.email,
     },
-    ipAddress: ip || '',
+    ipAddress: ip || "",
   });
 
   // Sync to SuperAdminVendor collection so it appears in SuperAdmin Vendor Directory
@@ -148,22 +134,26 @@ export const createVendor = async (
       {
         vendorId: vendor.vendorId,
         transNo: generatedTransNo,
-        vendorName: companyName ? companyName.trim() : (contactPerson ? contactPerson.trim() : 'Unnamed Vendor'),
-        ownerName: contactPerson ? contactPerson.trim() : '',
-        category: 'General',
+        vendorName: companyName
+          ? companyName.trim()
+          : contactPerson
+            ? contactPerson.trim()
+            : "Unnamed Vendor",
+        ownerName: contactPerson ? contactPerson.trim() : "",
+        category: "General",
         verificationDateTime: new Date(),
-        contactNo: phone ? phone.trim() : '',
-        email: email ? email.trim().toLowerCase() : '',
+        contactNo: phone ? phone.trim() : "",
+        email: email ? email.trim().toLowerCase() : "",
         password: hashedPassword,
-        state: state ? state.trim() : '',
-        city: city ? city.trim() : '',
-        completeAddress: fullAddress ? fullAddress.trim() : '',
-        status: 'Pending',
+        state: state ? state.trim() : "",
+        city: city ? city.trim() : "",
+        completeAddress: fullAddress ? fullAddress.trim() : "",
+        status: "Pending",
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true },
     );
   } catch (syncErr) {
-    console.error('Failed to sync SuperAdminVendor record:', syncErr.message);
+    console.error("Failed to sync SuperAdminVendor record:", syncErr.message);
   }
 
   // Email credentials trigger
@@ -173,7 +163,7 @@ export const createVendor = async (
   if (vendor.email && vendor.email.trim()) {
     const emailResult = await sendVendorCredentialsEmail({
       toEmail: vendor.email.trim(),
-      vendorName: vendor.storeName || vendor.fullName || 'Vendor Partner',
+      vendorName: vendor.storeName || vendor.fullName || "Vendor Partner",
       vendorId: vendor.vendorId,
       password: temporaryPassword,
     });
@@ -182,10 +172,10 @@ export const createVendor = async (
       emailSent = true;
     } else {
       emailSent = false;
-      emailError = emailResult.error || 'Failed to dispatch email';
+      emailError = emailResult.error || "Failed to dispatch email";
     }
   } else {
-    emailError = 'Vendor email address was not provided.';
+    emailError = "Vendor email address was not provided.";
   }
 
   // Don't return password hash
@@ -223,9 +213,10 @@ export const listVendors = async ({
   // Text search across name, storeName, email
   if (search) {
     matchStage.$or = [
-      { fullName: { $regex: search, $options: 'i' } },
-      { storeName: { $regex: search, $options: 'i' } },
-      { email: { $regex: search, $options: 'i' } },
+      { fullName: { $regex: search, $options: "i" } },
+      { storeName: { $regex: search, $options: "i" } },
+      { email: { $regex: search, $options: "i" } },
+      { phone: { $regex: search, $options: "i" } },
     ];
   }
 
@@ -233,35 +224,34 @@ export const listVendors = async ({
   if (vendorCode) {
     matchStage.vendorId = {
       $regex: vendorCode,
-      $options: 'i',
+      $options: "i",
     };
   }
 
   // State filter
   if (state) {
-    matchStage['address.state'] = {
+    matchStage["address.state"] = {
       $regex: state,
-      $options: 'i',
+      $options: "i",
     };
   }
 
   // City filter
   if (city) {
-    matchStage['address.city'] = {
+    matchStage["address.city"] = {
       $regex: city,
-      $options: 'i',
+      $options: "i",
     };
   }
 
   // Build sort
   const sort = {};
-  sort[sortBy || 'createdAt'] =
-    sortOrder === 'asc' ? 1 : -1;
+  sort[sortBy || "createdAt"] = sortOrder === "asc" ? 1 : -1;
 
   const totalRecords = await Vendor.countDocuments(matchStage);
 
   const vendors = await Vendor.find(matchStage)
-    .select('-password')
+    .select("-password")
     .sort(sort)
     .skip(skip)
     .limit(limit)
@@ -271,25 +261,16 @@ export const listVendors = async ({
   let result = vendors;
 
   if (isPaid !== undefined) {
-    const paidVendorIds = await PaymentOrder.distinct(
-      'vendorId',
-      {
-        paymentStatus: 'Paid',
-      }
-    );
+    const paidVendorIds = await PaymentOrder.distinct("vendorId", {
+      paymentStatus: "Paid",
+    });
 
-    const paidSet = new Set(
-      paidVendorIds.map(String)
-    );
+    const paidSet = new Set(paidVendorIds.map(String));
 
     result = vendors.filter((v) => {
-      const inSet = paidSet.has(
-        String(v._id)
-      );
+      const inSet = paidSet.has(String(v._id));
 
-      return isPaid === 'true'
-        ? inSet
-        : !inSet;
+      return isPaid === "true" ? inSet : !inSet;
     });
   }
 
@@ -297,9 +278,7 @@ export const listVendors = async ({
     page,
     limit,
     totalRecords,
-    totalPages: Math.ceil(
-      totalRecords / limit
-    ),
+    totalPages: Math.ceil(totalRecords / limit),
     data: result,
   };
 };
@@ -309,11 +288,8 @@ export const listVendors = async ({
 /**
  * Return a complete vendor profile using aggregation.
  */
-export const getVendorFullProfile = async (
-  vendorId
-) => {
-  const objectId =
-    new mongoose.Types.ObjectId(vendorId);
+export const getVendorFullProfile = async (vendorId) => {
+  const objectId = new mongoose.Types.ObjectId(vendorId);
 
   const [vendor] = await Vendor.aggregate([
     {
@@ -331,9 +307,9 @@ export const getVendorFullProfile = async (
     // Images
     {
       $lookup: {
-        from: 'vendorimages',
+        from: "vendorimages",
         let: {
-          vid: '$_id',
+          vid: "$_id",
         },
         pipeline: [
           {
@@ -341,16 +317,10 @@ export const getVendorFullProfile = async (
               $expr: {
                 $and: [
                   {
-                    $eq: [
-                      '$vendorId',
-                      '$$vid',
-                    ],
+                    $eq: ["$vendorId", "$$vid"],
                   },
                   {
-                    $eq: [
-                      '$isDeleted',
-                      false,
-                    ],
+                    $eq: ["$isDeleted", false],
                   },
                 ],
               },
@@ -363,25 +333,22 @@ export const getVendorFullProfile = async (
             },
           },
         ],
-        as: 'images',
+        as: "images",
       },
     },
 
     // Payment Orders
     {
       $lookup: {
-        from: 'paymentorders',
+        from: "paymentorders",
         let: {
-          vid: '$_id',
+          vid: "$_id",
         },
         pipeline: [
           {
             $match: {
               $expr: {
-                $eq: [
-                  '$vendorId',
-                  '$$vid',
-                ],
+                $eq: ["$vendorId", "$$vid"],
               },
             },
           },
@@ -394,25 +361,22 @@ export const getVendorFullProfile = async (
             $limit: 5,
           },
         ],
-        as: 'paymentOrders',
+        as: "paymentOrders",
       },
     },
 
     // Followups
     {
       $lookup: {
-        from: 'vendorfollowups',
+        from: "vendorfollowups",
         let: {
-          vid: '$_id',
+          vid: "$_id",
         },
         pipeline: [
           {
             $match: {
               $expr: {
-                $eq: [
-                  '$vendorId',
-                  '$$vid',
-                ],
+                $eq: ["$vendorId", "$$vid"],
               },
             },
           },
@@ -425,25 +389,22 @@ export const getVendorFullProfile = async (
             $limit: 10,
           },
         ],
-        as: 'followups',
+        as: "followups",
       },
     },
 
     // Notifications
     {
       $lookup: {
-        from: 'vendornotifications',
+        from: "vendornotifications",
         let: {
-          vid: '$_id',
+          vid: "$_id",
         },
         pipeline: [
           {
             $match: {
               $expr: {
-                $eq: [
-                  '$vendorId',
-                  '$$vid',
-                ],
+                $eq: ["$vendorId", "$$vid"],
               },
             },
           },
@@ -456,7 +417,7 @@ export const getVendorFullProfile = async (
             $limit: 10,
           },
         ],
-        as: 'notifications',
+        as: "notifications",
       },
     },
   ]);
@@ -464,20 +425,18 @@ export const getVendorFullProfile = async (
   return vendor || null;
 };
 
-
-
 // ─── GET VENDOR CATEGORY ──────────────────────────────────────────────────────
 
 export const getVendorCategory = async (vendorId) => {
   const vendor = await Vendor.findById(vendorId)
-    .select('category specialization keywords')
+    .select("category specialization keywords")
     .lean();
 
   if (!vendor) return null;
 
   return {
-    category: vendor.category || '',
-    specialization: vendor.specialization || '',
+    category: vendor.category || "",
+    specialization: vendor.specialization || "",
     keywords: vendor.keywords || [],
   };
 };
@@ -487,10 +446,9 @@ export const updateVendorPersonal = async (
   vendorId,
   updates,
   performedBy,
-  ip
+  ip,
 ) => {
-  const vendor =
-    await Vendor.findById(vendorId);
+  const vendor = await Vendor.findById(vendorId);
 
   if (!vendor) return null;
 
@@ -503,32 +461,31 @@ export const updateVendorPersonal = async (
   };
 
   const allowedFields = [
-    'fullName',
-    'storeName',
-    'country',
-    'state',
-    'city',
-    'locality',
-    'email',
-    'gst',
-    'address',
+    "fullName",
+    "storeName",
+    "country",
+    "state",
+    "city",
+    "locality",
+    "email",
+    "gst",
+    "address",
   ];
 
   allowedFields.forEach((field) => {
     if (updates[field] !== undefined) {
       vendor[field] =
-        typeof updates[field] === 'string'
+        typeof updates[field] === "string"
           ? updates[field].trim()
           : updates[field];
     }
   });
 
-  const updated =
-    await vendor.save();
+  const updated = await vendor.save();
 
   await createAuditLog({
-    module: 'Vendor',
-    action: 'UPDATE_PERSONAL',
+    module: "Vendor",
+    action: "UPDATE_PERSONAL",
     vendorId: vendor._id,
     performedBy,
     oldData,
@@ -540,70 +497,65 @@ export const updateVendorPersonal = async (
 };
 
 // ─── UPDATE CONTACT & PAYMENT ─────────────────────────────────────────────────
-
 export const updateVendorContactPayment = async (
   vendorId,
   updates,
   performedBy,
-  ip
+  ip,
 ) => {
-  const vendor =
-    await Vendor.findById(vendorId);
-
+  // 1. Fetch vendor
+  const vendor = await Vendor.findById(vendorId);
   if (!vendor) return null;
 
+  // 2. Snapshot old data for audit
   const oldData = {
-    whatsapp: vendor.whatsapp,
-    alternateContact:
-      vendor.alternateContact,
-    website: vendor.website,
-    listingType:
-      vendor.listingType,
-    paymentTerm:
-      vendor.paymentTerm,
-    packageAmount:
-      vendor.packageAmount,
-    lastPayment:
-      vendor.lastPayment,
-    nextDue:
-      vendor.nextDue,
-    invoiceNumber:
-      vendor.invoiceNumber,
+    whatsapp: vendor.whatsapp || "",
+    alternateContact: vendor.alternateContact || "",
+    website: vendor.website || "",
+    listingType: vendor.listingType || "",
+    paymentTerm: vendor.paymentTerm || "",
+    packageAmount: vendor.packageAmount || "",
+    lastPayment: vendor.lastPayment || "",
+    nextDue: vendor.nextDue || "",
+    invoiceNumber: vendor.invoiceNumber || "",
   };
 
   const allowedFields = [
-    'whatsapp',
-    'alternateContact',
-    'website',
-    'listingType',
-    'paymentTerm',
-    'packageAmount',
-    'lastPayment',
-    'nextDue',
-    'invoiceNumber',
+    "whatsapp",
+    "alternateContact",
+    "website",
+    "listingType",
+    "paymentTerm",
+    "packageAmount",
+    "lastPayment",
+    "nextDue",
+    "invoiceNumber",
   ];
 
+  // 3. Apply updates
   allowedFields.forEach((field) => {
     if (updates[field] !== undefined) {
       vendor[field] =
-        typeof updates[field] === 'string'
+        typeof updates[field] === "string"
           ? updates[field].trim()
           : updates[field];
     }
   });
 
-  const updated =
-    await vendor.save();
+  const updated = await vendor.save();
 
-  await createAuditLog({
-    module: 'Vendor',
-    action: 'UPDATE_CONTACT_PAYMENT',
-    vendorId: vendor._id,
-    performedBy,
-    oldData,
-    newData: updates,
-    ipAddress: ip,
-  });
+  // 4. Create Audit Log
+  if (typeof createAuditLog === "function") {
+    await createAuditLog({
+      module: "Vendor",
+      action: "UPDATE_CONTACT_PAYMENT",
+      vendorId: vendor._id,
+      performedBy: performedBy || null,
+      oldData,
+      newData: updates,
+      ipAddress: ip,
+    });
+  }
 
   return updated;
 };
@@ -659,12 +611,11 @@ export const updateVendorContactPayment = async (
 //   return updated;
 // };
 
-
 export const updateVendorCategory = async (
   vendorId,
   updates,
   performedBy,
-  ip
+  ip,
 ) => {
   const vendor = await Vendor.findById(vendorId);
 
@@ -694,8 +645,8 @@ export const updateVendorCategory = async (
   const updated = await vendor.save();
 
   await createAuditLog({
-    module: 'Vendor',
-    action: 'UPDATE_CATEGORY',
+    module: "Vendor",
+    action: "UPDATE_CATEGORY",
     vendorId: vendor._id,
     performedBy,
     oldData,

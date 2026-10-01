@@ -32,15 +32,15 @@ export const validatePersonalUpdate = (body) => {
 export const validateContactPayment = (body) => {
   const { whatsapp, alternateContact, email } = body;
 
-  if (whatsapp && !PHONE_REGEX.test(whatsapp.trim())) {
+  if (whatsapp && whatsapp.trim() !== '' && !PHONE_REGEX.test(whatsapp.trim())) {
     return { valid: false, message: 'WhatsApp number must be exactly 10 digits.' };
   }
 
-  if (alternateContact && !PHONE_REGEX.test(alternateContact.trim())) {
+  if (alternateContact && alternateContact.trim() !== '' && !PHONE_REGEX.test(alternateContact.trim())) {
     return { valid: false, message: 'Alternate contact must be exactly 10 digits.' };
   }
 
-  if (email && !EMAIL_REGEX.test(email)) {
+  if (email && email.trim() !== '' && !EMAIL_REGEX.test(email.trim())) {
     return { valid: false, message: 'Invalid email address format.' };
   }
 

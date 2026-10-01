@@ -82,6 +82,18 @@ const authSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+
+    // --- Newly Added Fields ---
+    alternateContact: { type: String, default: '' },
+    website: { type: String, default: '' },
+    listingType: { type: String, default: '' },
+    paymentTerm: { type: String, default: '' },
+    packageAmount: { type: String, default: '' }, // String avoids cast errors when frontend passes ""
+    lastPayment: { type: String, default: '' },   // Use String or Date (if sanitized to null)
+    nextDue: { type: String, default: '' },       // Use String or Date (if sanitized to null)
+    invoiceNumber: { type: String, default: '' },
+
+
   },
   { timestamps: true }
 );
