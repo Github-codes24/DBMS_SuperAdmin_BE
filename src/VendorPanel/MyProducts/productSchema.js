@@ -48,7 +48,7 @@ const productSchema = new mongoose.Schema(
 );
 
 // Pre-save hook to calculate status based on stock level
-productSchema.pre('save', function (next) {
+productSchema.pre('save', function () {
   if (this.stock === 0) {
     this.status = 'Out of Stock';
   } else if (this.stock < 10) {
@@ -56,7 +56,6 @@ productSchema.pre('save', function (next) {
   } else {
     this.status = 'In Stock';
   }
-  next();
 });
 
 const Product = mongoose.model('Product', productSchema);
