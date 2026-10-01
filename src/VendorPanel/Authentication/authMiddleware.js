@@ -23,9 +23,9 @@ export const protect = async (req, res, next) => {
 
       req.vendorId = req.vendor.vendorId;
 
-      // Pending Vendor Verification Restriction Rule: Block operation if status is Pending
-      const vendorStatus = (req.vendor.status || '').toString().trim().toUpperCase();
-      if (vendorStatus === 'PENDING' || vendorStatus !== 'ACTIVE') {
+      // Pending Vendor Verification Restriction Rule: Block operation if storeStatus is Pending
+      const storeStatus = (req.vendor.storeStatus || '').toString().trim().toUpperCase();
+      if (storeStatus.includes('PENDING') || !storeStatus.includes('ACTIVE')) {
         return res.status(403).json({
           message: 'Your vendor account status is Pending verification by Super Admin. Operations are restricted until your account is approved.',
         });
