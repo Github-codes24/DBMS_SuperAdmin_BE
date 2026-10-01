@@ -424,3 +424,55 @@ export const exportCustomersPDF = async (req, res) => {
     res.status(500).json({ message: 'Server error during PDF export', error: error.message });
   }
 };
+
+export const deleteCustomer = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Find customer that is not already deleted
+    const customer = await Customer.findOne({
+      customerId: id,
+      isDeleted: false,
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer not found',
+      });
+    }
+
+    // Soft delete
+    customer.isDeleted = true;
+    customer.updatedBy = req.superAdmin?._id || null;
+
+    await customer.save();
+
+    // Audit log
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Deleted Customer',
+      record: customer.customerId,
+      module: 'Customer Database',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Customer deleted successfully.',
+      data: {
+        customerId: customer.customerId,
+        deleted: true,
+      },
+    });
+  } catch (error) {
+    console.error('Delete customer error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message,
+    });
+  }
+};

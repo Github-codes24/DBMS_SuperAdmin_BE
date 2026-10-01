@@ -75,8 +75,6 @@ const normalizeStatus = (statusStr) => {
   if (str === 'active') return 'Active';
   return 'Pending';
 };
-
-
 // 1. GET ALL VENDORS DIRECTORY
 // @desc    Get All Vendors Directory (Search, Filter, Pagination)
 // @route   GET /api/v1/superadmin/vendors
@@ -336,7 +334,7 @@ export const createVendor = async (req, res) => {
     });
   }
 };
-// Active the Account and Send  
+// Active the Account and Send Id and Password 
 export const activateVendor = async (req, res) => {
   try {
     const { vendorId } = req.params;
@@ -449,6 +447,210 @@ export const activateVendor = async (req, res) => {
 
   } catch (error) {
     console.error('Activate vendor error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message,
+    });
+  }
+};
+// Change Password of the Vendor
+export const changeVendorPassword = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { newPassword } = req.body;
+
+    // 1. Validate password
+    if (!newPassword || !newPassword.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password is required',
+      });
+    }
+
+    if (newPassword.trim().length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long',
+      });
+    }
+
+    // 2. Find vendor
+    const vendor = await SuperAdminVendor.findOne({
+      vendorId,
+      isDeleted: false,
+    });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    // 3. Make sure vendor is active
+    if (
+      vendor.status !== 'Active' &&
+      vendor.status !== 'ACTIVE'
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password can only be changed for an active vendor',
+      });
+    }
+
+    // 4. Make sure vendor has registered email
+    if (!vendor.email) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Vendor cannot receive password because no registered email address is available.',
+      });
+    }
+
+    // 5. Hash new password
+    const hashedPassword = await bcrypt.hash(
+      newPassword.trim(),
+      10
+    );
+
+    // 6. Update SuperAdminVendor password
+    vendor.password = hashedPassword;
+    vendor.updatedBy = req.superAdmin?._id || null;
+
+    await vendor.save();
+
+    // 7. Update Vendor authentication record
+    const vendorAuth = await Vendor.findOneAndUpdate(
+      { vendorId },
+
+      {
+        password: hashedPassword,
+      },
+
+      {
+        returnDocument: 'after',
+      }
+    );
+
+    if (!vendorAuth) {
+      return res.status(500).json({
+        success: false,
+        message: 'Vendor authentication record not found.',
+      });
+    }
+
+    // 8. Send new credentials to registered email
+    const emailResult =
+      await sendVendorCredentialsEmail({
+        toEmail: vendor.email,
+        vendorName: vendor.vendorName,
+        vendorId: vendor.vendorId,
+        password: newPassword.trim(),
+      });
+
+    // 9. Audit log
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Changed Vendor Password',
+      record: vendor.transNo || vendor.vendorId,
+      module: 'Vendor Database',
+    });
+
+    // 10. Response
+    return res.status(200).json({
+      success: true,
+      message: emailResult.success
+        ? 'Vendor password changed and credentials sent successfully.'
+        : 'Vendor password changed, but credentials email could not be sent.',
+
+      data: {
+        vendorId: vendor.vendorId,
+        email: vendor.email,
+        emailSent: emailResult.success,
+        ...(emailResult.error && {
+          emailError: emailResult.error,
+        }),
+      },
+    });
+
+  } catch (error) {
+    console.error(
+      'Change vendor password error:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message,
+    });
+  }
+};
+//Delete Vendor's
+export const deleteVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    // 1. Find vendor
+    const vendor = await SuperAdminVendor.findOne({
+      vendorId,
+      isDeleted: false,
+    });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found',
+      });
+    }
+
+    // 2. Soft delete vendor
+    vendor.isDeleted = true;
+    vendor.updatedBy = req.superAdmin?._id || null;
+
+    await vendor.save();
+
+    // 3. Disable vendor authentication
+    const vendorAuth = await Vendor.findOneAndUpdate(
+      { vendorId },
+
+      {
+        storeStatus: 'Deleted',
+      },
+
+      {
+        returnDocument: 'after',
+      }
+    );
+
+    // 4. Audit log
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Deleted Vendor',
+      record: vendor.transNo || vendor.vendorId,
+      module: 'Vendor Database',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Vendor deleted successfully.',
+      data: {
+        vendorId: vendor.vendorId,
+        deleted: true,
+      },
+    });
+
+  } catch (error) {
+    console.error(
+      'Delete vendor error:',
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -801,7 +1003,6 @@ export const deleteVendorFormField = async (req, res) => {
   }
 };
 
-
 // 3. GET SINGLE VENDOR BY ID OR CUSTOM ID
 // @desc    Get Single Vendor Record by Mongo _id, custom vendorId (VEN002), or transNo (TRX90102)
 // @route   GET /api/v1/superadmin/vendors/:id
@@ -820,7 +1021,6 @@ export const getVendorById = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 // 4. UPDATE VENDOR RECORD (STATUS RULES ENFORCED)
 // @desc    Update Vendor Record & Status Rules
 // @route   PATCH /api/v1/superadmin/vendors/:id

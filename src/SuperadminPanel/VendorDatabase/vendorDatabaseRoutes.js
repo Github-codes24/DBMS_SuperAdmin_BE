@@ -14,6 +14,9 @@ import {
   getVendorFormFields,
   updateVendorFormField,
   deleteVendorFormField,
+  changeVendorPassword,
+  deleteVendor
+
 } from './vendorDatabaseController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
 
@@ -44,13 +47,24 @@ router
     protectSuperAdmin,
     activateVendor
   );
-
+  // Change Password Of The Vendor
+  router.patch(
+    '/:vendorId/password',
+    protectSuperAdmin,
+    changeVendorPassword
+  );
+  // Delete Vendor
+  router.delete(
+    '/:vendorId',
+    deleteVendor
+  );
   // Search Vendor's Based on state , city and name
   router.get(
     '/search',
     protectSuperAdmin,
     searchVendors
   );
+  // Dynamic Form Field's
   router.get(
     '/form-fields',
     protectSuperAdmin,
