@@ -518,6 +518,7 @@ export const updateVendorContactPayment = async (
     lastPayment: vendor.lastPayment || "",
     nextDue: vendor.nextDue || "",
     invoiceNumber: vendor.invoiceNumber || "",
+    isPaidVendor: vendor.isPaidVendor || "",
   };
 
   const allowedFields = [
@@ -530,6 +531,7 @@ export const updateVendorContactPayment = async (
     "lastPayment",
     "nextDue",
     "invoiceNumber",
+    "isPaidVendor"
   ];
 
   // 3. Apply updates

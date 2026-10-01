@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const authSchema = new mongoose.Schema(
   {
@@ -20,15 +20,15 @@ const authSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      default: '',
+      default: "",
     },
     designation: {
       type: String,
-      default: '',
+      default: "",
     },
     regionalJurisdiction: {
       type: String,
-      default: '',
+      default: "",
     },
     password: {
       type: String,
@@ -40,7 +40,7 @@ const authSchema = new mongoose.Schema(
     },
     storeStatus: {
       type: String,
-      default: 'Active & Verified',
+      default: "Active & Verified",
     },
     twoFactorAuth: {
       type: Boolean,
@@ -52,51 +52,72 @@ const authSchema = new mongoose.Schema(
     },
     syncFrequency: {
       type: String,
-      default: 'Real-Time (Instant)',
+      default: "Real-Time (Instant)",
     },
     avatar: {
       type: String,
-      default: '',
+      default: "",
     },
     whatsapp: {
       type: String,
-      default: '',
+      default: "",
     },
     isPaidVendor: {
-      type: Boolean,
-      default: false,
+      type: String,
+      enum: ["Yes", "No"],
+      default: "No",
     },
     state: {
       type: String,
-      default: '',
+      default: "",
     },
     city: {
       type: String,
-      default: '',
+      default: "",
     },
     locality: {
       type: String,
-      default: '',
+      default: "",
     },
     address: {
       type: String,
-      default: '',
+      default: "",
     },
 
     // --- Newly Added Fields ---
-    alternateContact: { type: String, default: '' },
-    website: { type: String, default: '' },
-    listingType: { type: String, default: '' },
-    paymentTerm: { type: String, default: '' },
-    packageAmount: { type: String, default: '' }, // String avoids cast errors when frontend passes ""
-    lastPayment: { type: String, default: '' },   // Use String or Date (if sanitized to null)
-    nextDue: { type: String, default: '' },       // Use String or Date (if sanitized to null)
-    invoiceNumber: { type: String, default: '' },
+    alternateContact: { type: String, default: "" },
+    website: { type: String, default: "" },
+    listingType: { type: String, default: "" },
+    paymentTerm: { type: String, default: "" },
+    packageAmount: { type: String, default: "" }, // String avoids cast errors when frontend passes ""
+    lastPayment: { type: String, default: "" }, // Use String or Date (if sanitized to null)
+    nextDue: { type: String, default: "" }, // Use String or Date (if sanitized to null)
+    invoiceNumber: { type: String, default: "" },
 
-
+    category: {
+      type: String,
+      enum: [
+        "",
+        "Electrical & Electronics Repair",
+        "Retail & Grocery Store",
+        "Hardware & Sanitation",
+        "Automobile & Garage",
+      ],
+      default: "",
+    },
+    specialization: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    keywords: {
+      type: String,
+      trim: true,
+      default: "",
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-const Vendor = mongoose.model('Vendor', authSchema);
+const Vendor = mongoose.model("Vendor", authSchema);
 export default Vendor;
