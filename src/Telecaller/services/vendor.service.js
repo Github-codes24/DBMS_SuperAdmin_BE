@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Vendor from "../../VendorPanel/Authentication/authSchema.js";
 import SuperAdminVendor from "../../SuperadminPanel/VendorDatabase/vendorDatabaseSchema.js";
 import VendorImage from "../models/VendorImage.js";
+import Customer from "../../SuperadminPanel/CustomerDatabase/customerSchema.js"
 import VendorFollowup from "../models/VendorFollowup.js";
 import VendorNotification from "../models/VendorNotification.js";
 import PaymentOrder from "../models/PaymentOrder.js";
@@ -50,7 +51,7 @@ const generateVendorId = async () => {
 
     vendorId = `VEN${randomNumber}`;
 
-    exists = await Vendor.exists({ vendorId });
+    exists = await Customer.exists({ vendorId });
   }
 
   return vendorId;
@@ -81,7 +82,7 @@ export const createVendor = async (data, performedBy, ip) => {
   const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
   // Create vendor
-  const vendor = await Vendor.create({
+  const vendor = await Customer.create({
     vendorId,
 
     password: hashedPassword,
@@ -217,6 +218,7 @@ export const listVendors = async ({
       { storeName: { $regex: search, $options: "i" } },
       { email: { $regex: search, $options: "i" } },
       { phone: { $regex: search, $options: "i" } },
+      { alternateContact: { $regex: search, $options: "i" } },
     ];
   }
 
@@ -248,9 +250,9 @@ export const listVendors = async ({
   const sort = {};
   sort[sortBy || "createdAt"] = sortOrder === "asc" ? 1 : -1;
 
-  const totalRecords = await Vendor.countDocuments(matchStage);
+  const totalRecords = await Customer.countDocuments(matchStage);
 
-  const vendors = await Vendor.find(matchStage)
+  const vendors = await Customer.find(matchStage)
     .select("-password")
     .sort(sort)
     .skip(skip)
@@ -291,7 +293,7 @@ export const listVendors = async ({
 export const getVendorFullProfile = async (vendorId) => {
   const objectId = new mongoose.Types.ObjectId(vendorId);
 
-  const [vendor] = await Vendor.aggregate([
+  const [vendor] = await Customer.aggregate([
     {
       $match: {
         _id: objectId,
@@ -428,7 +430,7 @@ export const getVendorFullProfile = async (vendorId) => {
 // ─── GET VENDOR CATEGORY ──────────────────────────────────────────────────────
 
 export const getVendorCategory = async (vendorId) => {
-  const vendor = await Vendor.findById(vendorId)
+  const vendor = await Customer.findById(vendorId)
     .select("category specialization keywords")
     .lean();
 
@@ -448,7 +450,7 @@ export const updateVendorPersonal = async (
   performedBy,
   ip,
 ) => {
-  const vendor = await Vendor.findById(vendorId);
+  const vendor = await Customer.findById(vendorId);
 
   if (!vendor) return null;
 
@@ -504,7 +506,7 @@ export const updateVendorContactPayment = async (
   ip,
 ) => {
   // 1. Fetch vendor
-  const vendor = await Vendor.findById(vendorId);
+  const vendor = await Customer.findById(vendorId);
   if (!vendor) return null;
 
   // 2. Snapshot old data for audit
@@ -619,7 +621,7 @@ export const updateVendorCategory = async (
   performedBy,
   ip,
 ) => {
-  const vendor = await Vendor.findById(vendorId);
+  const vendor = await Customer.findById(vendorId);
 
   if (!vendor) return null;
 
