@@ -14,6 +14,7 @@ import {
   updateVendorPersonal,
   updateVendorContactPayment,
   updateVendorCategory,
+  listTelecallers
 } from '../services/vendor.service.js';
 
 import VendorImage from '../models/VendorImage.js';
@@ -334,6 +335,38 @@ export const updateCategory = asyncHandler(
       res,
       'Category updated successfully',
       updated
+    );
+  }
+);
+// GET Teleccaler 
+
+export const getTelecallers = asyncHandler(
+  async (req, res) => {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
+      sortBy,
+      sortOrder,
+    } = req.query;
+
+    const result = await listTelecallers({
+      page: Math.max(1, parseInt(page)),
+      limit: Math.min(
+        100,
+        Math.max(1, parseInt(limit))
+      ),
+      search,
+      status,
+      sortBy,
+      sortOrder,
+    });
+
+    return sendSuccess(
+      res,
+      "Telecallers fetched successfully",
+      result
     );
   }
 );

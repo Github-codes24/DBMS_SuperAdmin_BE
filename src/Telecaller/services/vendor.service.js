@@ -8,6 +8,7 @@ import PaymentOrder from "../models/PaymentOrder.js";
 import TelecallerAuditLog from "../models/TelecallerAuditLog.js";
 import bcrypt from "bcryptjs";
 import { sendVendorCredentialsEmail } from "../../utils/emailHandler.js";
+ import Telecaller from "../models/Telecaller.js"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -657,4 +658,76 @@ export const updateVendorCategory = async (
   });
 
   return updated;
+};
+
+// SEARCH TELLECALLER USING CATEGORY
+
+export const listTelecallers = async ({
+  page,
+  limit,
+  search,
+  status,
+  sortBy,
+  sortOrder,
+}) => {
+  const skip = (page - 1) * limit;
+
+  const filter = {
+    role: "TELECALLER",
+  };
+
+  if (search) {
+    filter.$or = [
+      {
+        name: {
+          $regex: search,
+          $options: "i",
+        },
+      },
+      {
+        employeeId: {
+          $regex: search,
+          $options: "i",
+        },
+      },
+      {
+        email: {
+          $regex: search,
+          $options: "i",
+        },
+      },
+      {
+        phone: {
+          $regex: search,
+          $options: "i",
+        },
+      },
+    ];
+  }
+
+  if (status) {
+    filter.status = status;
+  }
+
+  const sort = {};
+  sort[sortBy || "createdAt"] =
+    sortOrder === "asc" ? 1 : -1;
+
+  const totalRecords =
+    await Telecaller.countDocuments(filter);
+
+  const telecallers = await Telecaller.find(filter)
+    .select("-password")
+    .sort(sort)
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  return {
+    page,
+    limit,
+    totalRecords,
+    totalPages: Math.ceil(totalRecords / limit),
+    data: telecallers,
+  };
 };
