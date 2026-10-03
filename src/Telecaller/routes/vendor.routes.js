@@ -24,6 +24,7 @@ import {
   deleteImage,
   updateContactPayment,
   updateCategory,
+  getTelecallers
 } from '../controllers/vendor.controller.js';
 
 import {
@@ -32,6 +33,14 @@ import {
 } from '../controllers/followup.controller.js';
 
 const router = express.Router();
+
+// Tellecaller Fetch ----------------------------------------------------------------------------------------------
+router.get(
+  '/telecallers',
+  protectTelecaller,
+  getTelecallers
+);
+
 
 // ── Vendor Create ─────────────────────────────────────────────────────────────
 
@@ -42,6 +51,9 @@ router.post(
 );
 
 // ── Vendor List & Detail ──────────────────────────────────────────────────────
+
+
+
 
 router.get(
   '/',
@@ -113,6 +125,7 @@ router.get(
   '/:id/followups',
   protectTelecaller,
   getFollowups
-);
+)
+/*-----------------------------------------*/
 
 export default router;
