@@ -196,6 +196,11 @@ export const createVendor = async (data, performedBy, ip) => {
 /**
  * Fetch a paginated, filtered, searchable list of vendors.
  */
+// Helper to escape special regex characters (like +, ?, *, etc.)
+const escapeRegex = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
+
 export const listVendors = async ({
   page,
   limit,
@@ -208,92 +213,67 @@ export const listVendors = async ({
   sortOrder,
 }) => {
   const skip = (page - 1) * limit;
-
   const matchStage = {};
 
-  // Text search across name, storeName, email
   if (search) {
-  const trimmed = search.trim();
-  const digitsOnly = trimmed.replace(/\D/g, "");
+    const trimmed = search.trim();
+    // 1. Escaped version of the raw string (handles "+" in "+91 ...")
+    const safeSearch = escapeRegex(trimmed);
 
-  // If user typed numbers (e.g., 9766554433 or 97665 54433),
-  // turn "9766554433" into "9\s*7\s*6\s*6\s*5\s*5\s*4\s*4\s*3\s*3"
-  // so it matches "+91 97665 54433" regardless of formatting.
-  const phonePattern = digitsOnly.length > 0 
-    ? digitsOnly.split("").join("\\s*") 
-    : trimmed;
+    // 2. Extract digits only to handle flexible phone number spacing
+    const digitsOnly = trimmed.replace(/\D/g, "");
+    const phonePattern = digitsOnly.length > 0 
+      ? digitsOnly.split("").join("\\s*") 
+      : safeSearch;
 
-  matchStage.$or = [
-    { mobile: { $regex: phonePattern, $options: "i" } },
-    { name: { $regex: trimmed, $options: "i" } },
-    { companyName: { $regex: trimmed, $options: "i" } },
-    { customerId: { $regex: trimmed, $options: "i" } },
-  ];
-}
+    matchStage.$or = [
+      { mobile: { $regex: phonePattern, $options: "i" } },
+      { name: { $regex: safeSearch, $options: "i" } },
+      { companyName: { $regex: safeSearch, $options: "i" } },
+      { customerId: { $regex: safeSearch, $options: "i" } },
+    ];
+  }
 
-  // Vendor code search
   if (vendorCode) {
-    matchStage.vendorId = {
-      $regex: vendorCode,
+    matchStage.customerId = {
+      $regex: escapeRegex(vendorCode.trim()),
       $options: "i",
     };
   }
 
-  // State filter
   if (state) {
-    matchStage["address.state"] = {
-      $regex: state,
+    matchStage.state = {
+      $regex: escapeRegex(state.trim()),
       $options: "i",
     };
   }
 
-  // City filter
   if (city) {
-    matchStage["address.city"] = {
-      $regex: city,
+    matchStage.city = {
+      $regex: escapeRegex(city.trim()),
       $options: "i",
     };
   }
 
-  // Build sort
   const sort = {};
   sort[sortBy || "createdAt"] = sortOrder === "asc" ? 1 : -1;
 
   const totalRecords = await Customers.countDocuments(matchStage);
 
   const vendors = await Customers.find(matchStage)
-    .select("-password")
     .sort(sort)
     .skip(skip)
     .limit(limit)
     .lean();
-
-  // If isPaid filter
-  let result = vendors;
-
-  if (isPaid !== undefined) {
-    const paidVendorIds = await PaymentOrder.distinct("vendorId", {
-      paymentStatus: "Paid",
-    });
-
-    const paidSet = new Set(paidVendorIds.map(String));
-
-    result = vendors.filter((v) => {
-      const inSet = paidSet.has(String(v._id));
-
-      return isPaid === "true" ? inSet : !inSet;
-    });
-  }
 
   return {
     page,
     limit,
     totalRecords,
     totalPages: Math.ceil(totalRecords / limit),
-    data: result,
+    data: vendors,
   };
 };
-
 // ─── GET SINGLE VENDOR ────────────────────────────────────────────────────────
 
 /**
