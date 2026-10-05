@@ -11,55 +11,67 @@ const customerSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-    name: {
+
+    mobileNumber: {
       type: String,
       required: true,
       trim: true,
     },
+
     companyName: {
       type: String,
       required: true,
       trim: true,
     },
+
+    email: {
+      type: String,
+      default: '',
+      trim: true,
+      lowercase: true,
+    },
+
     state: {
       type: String,
       default: '',
       trim: true,
     },
+
     city: {
       type: String,
       default: '',
       trim: true,
     },
-    pincode: {
-      type: String,
-      default: '',
-      trim: true,
-    },
+
     registrationDate: {
       type: Date,
       default: Date.now,
     },
+
     status: {
       type: String,
-      enum: ['ACTIVE', 'PENDING', 'Active', 'Pending'],
+      enum: ['Active', 'Pending'],
       default: 'Active',
     },
+
     assignedTelecaller: {
       type: String,
       default: '',
       trim: true,
     },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'SuperAdmin',
       default: null,
     },
+
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'SuperAdmin',
       default: null,
     },
+
     isDeleted: {
       type: Boolean,
       default: false,
@@ -69,9 +81,11 @@ const customerSchema = new mongoose.Schema(
 );
 
 // Search indexes
-customerSchema.index({ name: 1, isDeleted: 1 });
 customerSchema.index({ companyName: 1, isDeleted: 1 });
+customerSchema.index({ mobileNumber: 1, isDeleted: 1 });
+customerSchema.index({ email: 1, isDeleted: 1 });
 customerSchema.index({ customerId: 1, isDeleted: 1 });
 
 const Customer = mongoose.model('SuperAdminCustomer', customerSchema);
+
 export default Customer;
