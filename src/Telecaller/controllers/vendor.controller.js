@@ -86,6 +86,7 @@ export const getVendors = asyncHandler(async (req, res) => {
 // ─── GET VENDOR BY ID ─────────────────────────────────────────────────────────
 
 export const getVendorById = asyncHandler(async (req, res) => {
+  // console.log(req.params.id);
   const vendor = await getVendorFullProfile(
     req.params.id
   );

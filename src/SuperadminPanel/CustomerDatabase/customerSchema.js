@@ -11,8 +11,7 @@ const customerSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-
-    mobileNumber: {
+    name: {
       type: String,
       required: true,
       trim: true,
@@ -86,6 +85,5 @@ customerSchema.index({ mobileNumber: 1, isDeleted: 1 });
 customerSchema.index({ email: 1, isDeleted: 1 });
 customerSchema.index({ customerId: 1, isDeleted: 1 });
 
-const Customer = mongoose.model('SuperAdminCustomer', customerSchema);
-
+const Customer = mongoose.model('SuperAdminCustomer', customerSchema,'customers');
 export default Customer;

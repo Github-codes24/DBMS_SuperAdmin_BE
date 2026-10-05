@@ -1,8 +1,7 @@
 import mongoose from "mongoose";
-import Vendor from "../../VendorPanel/Authentication/authSchema.js";
 import SuperAdminVendor from "../../SuperadminPanel/VendorDatabase/vendorDatabaseSchema.js";
 import VendorImage from "../models/VendorImage.js";
-import Customer from "../../SuperadminPanel/CustomerDatabase/customerSchema.js"
+import Customers from "../../SuperadminPanel/CustomerDatabase/customerSchema.js"
 import VendorFollowup from "../models/VendorFollowup.js";
 import VendorNotification from "../models/VendorNotification.js";
 import PaymentOrder from "../models/PaymentOrder.js";
@@ -52,7 +51,7 @@ const generateVendorId = async () => {
 
     vendorId = `VEN${randomNumber}`;
 
-    exists = await Customer.exists({ vendorId });
+    exists = await Customers.exists({ vendorId });
   }
 
   return vendorId;
@@ -83,7 +82,7 @@ export const createVendor = async (data, performedBy, ip) => {
   const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
   // Create vendor
-  const vendor = await Customer.create({
+  const vendor = await Customers.create({
     vendorId,
 
     password: hashedPassword,
@@ -214,14 +213,23 @@ export const listVendors = async ({
 
   // Text search across name, storeName, email
   if (search) {
-    matchStage.$or = [
-      { fullName: { $regex: search, $options: "i" } },
-      { storeName: { $regex: search, $options: "i" } },
-      { email: { $regex: search, $options: "i" } },
-      { phone: { $regex: search, $options: "i" } },
-      { alternateContact: { $regex: search, $options: "i" } },
-    ];
-  }
+  const trimmed = search.trim();
+  const digitsOnly = trimmed.replace(/\D/g, "");
+
+  // If user typed numbers (e.g., 9766554433 or 97665 54433),
+  // turn "9766554433" into "9\s*7\s*6\s*6\s*5\s*5\s*4\s*4\s*3\s*3"
+  // so it matches "+91 97665 54433" regardless of formatting.
+  const phonePattern = digitsOnly.length > 0 
+    ? digitsOnly.split("").join("\\s*") 
+    : trimmed;
+
+  matchStage.$or = [
+    { mobile: { $regex: phonePattern, $options: "i" } },
+    { name: { $regex: trimmed, $options: "i" } },
+    { companyName: { $regex: trimmed, $options: "i" } },
+    { customerId: { $regex: trimmed, $options: "i" } },
+  ];
+}
 
   // Vendor code search
   if (vendorCode) {
@@ -251,9 +259,9 @@ export const listVendors = async ({
   const sort = {};
   sort[sortBy || "createdAt"] = sortOrder === "asc" ? 1 : -1;
 
-  const totalRecords = await Customer.countDocuments(matchStage);
+  const totalRecords = await Customers.countDocuments(matchStage);
 
-  const vendors = await Customer.find(matchStage)
+  const vendors = await Customers.find(matchStage)
     .select("-password")
     .sort(sort)
     .skip(skip)
@@ -291,40 +299,46 @@ export const listVendors = async ({
 /**
  * Return a complete vendor profile using aggregation.
  */
-export const getVendorFullProfile = async (vendorId) => {
-  const objectId = new mongoose.Types.ObjectId(vendorId);
 
-  const [vendor] = await Customer.aggregate([
+
+export const getVendorFullProfile = async (customerId) => {
+  // 1. Guard against invalid ObjectId to prevent unhandled runtime errors
+  console.log(customerId);
+  if (!customerId || !mongoose.Types.ObjectId.isValid(customerId)) {
+    console.log(customerId);
+    return null;
+  }
+  console.log("hehe");
+  
+  const objectId = new mongoose.Types.ObjectId(customerId);
+  
+  const [customer] = await Customers.aggregate([
+    // Match customer by _id
     {
       $match: {
         _id: objectId,
       },
     },
 
+    // Exclude sensitive fields
     {
       $project: {
         password: 0,
       },
     },
 
-    // Images
+    // Images (Check if foreign key in image collection is customerId or vendorId)
     {
       $lookup: {
-        from: "vendorimages",
-        let: {
-          vid: "$_id",
-        },
+        from: "vendorimages", // Change to "customerimages" if you have a separate collection
+        let: { cid: "$_id" },
         pipeline: [
           {
             $match: {
               $expr: {
                 $and: [
-                  {
-                    $eq: ["$vendorId", "$$vid"],
-                  },
-                  {
-                    $eq: ["$isDeleted", false],
-                  },
+                  { $eq: ["$customerId", "$$cid"] }, // Use $customerId if referencing customers
+                  { $eq: ["$isDeleted", false] },
                 ],
               },
             },
@@ -344,14 +358,12 @@ export const getVendorFullProfile = async (vendorId) => {
     {
       $lookup: {
         from: "paymentorders",
-        let: {
-          vid: "$_id",
-        },
+        let: { cid: "$_id" },
         pipeline: [
           {
             $match: {
               $expr: {
-                $eq: ["$vendorId", "$$vid"],
+                $eq: ["$customerId", "$$cid"],
               },
             },
           },
@@ -371,15 +383,13 @@ export const getVendorFullProfile = async (vendorId) => {
     // Followups
     {
       $lookup: {
-        from: "vendorfollowups",
-        let: {
-          vid: "$_id",
-        },
+        from: "customerfollowups", // Adjust collection name if distinct for customers
+        let: { cid: "$_id" },
         pipeline: [
           {
             $match: {
               $expr: {
-                $eq: ["$vendorId", "$$vid"],
+                $eq: ["$customerId", "$$cid"],
               },
             },
           },
@@ -399,15 +409,13 @@ export const getVendorFullProfile = async (vendorId) => {
     // Notifications
     {
       $lookup: {
-        from: "vendornotifications",
-        let: {
-          vid: "$_id",
-        },
+        from: "customernotifications", // Adjust collection name if distinct for customers
+        let: { cid: "$_id" },
         pipeline: [
           {
             $match: {
               $expr: {
-                $eq: ["$vendorId", "$$vid"],
+                $eq: ["$customerId", "$$cid"],
               },
             },
           },
@@ -425,13 +433,14 @@ export const getVendorFullProfile = async (vendorId) => {
     },
   ]);
 
-  return vendor || null;
+  console.log("hehe");
+  return customer;
 };
 
 // ─── GET VENDOR CATEGORY ──────────────────────────────────────────────────────
 
 export const getVendorCategory = async (vendorId) => {
-  const vendor = await Customer.findById(vendorId)
+  const vendor = await Customers.findById(vendorId)
     .select("category specialization keywords")
     .lean();
 
@@ -451,10 +460,10 @@ export const updateVendorPersonal = async (
   performedBy,
   ip,
 ) => {
-  const vendor = await Customer.findById(vendorId);
+  const vendor = await Customers.findById(vendorId);
 
+  console.log(vendorId);
   if (!vendor) return null;
-
   const oldData = {
     fullName: vendor.fullName,
     email: vendor.email,
