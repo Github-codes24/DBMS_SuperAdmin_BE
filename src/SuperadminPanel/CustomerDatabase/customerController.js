@@ -39,60 +39,6 @@ const normalizeStatus = (statusStr) => {
 // @desc    Get All Customers Directory (Search, Filter, Pagination)
 // @route   GET /api/v1/superadmin/customers
 // @access  Private (SuperAdmin)
-// export const getCustomers = async (req, res) => {
-//   try {
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = parseInt(req.query.limit, 10) || 20;
-//     const skip = (page - 1) * limit;
-
-//     const { search, status, state, city } = req.query;
-
-//     const query = { isDeleted: false };
-
-//     // Search filter across name, companyName, state, city, pincode, customerId
-//     if (search && search.trim()) {
-//       const searchRegex = new RegExp(search.trim(), 'i');
-//       query.$or = [
-//         { name: searchRegex },
-//         { companyName: searchRegex },
-//         { state: searchRegex },
-//         { city: searchRegex },
-//         { pincode: searchRegex },
-//         { customerId: searchRegex },
-//       ];
-//     }
-
-//     if (status && status.trim()) {
-//       query.status = normalizeStatus(status);
-//     }
-
-//     if (state && state.trim()) {
-//       query.state = new RegExp(state.trim(), 'i');
-//     }
-
-//     if (city && city.trim()) {
-//       query.city = new RegExp(city.trim(), 'i');
-//     }
-
-//     const totalCustomers = await Customer.countDocuments(query);
-
-//     const customers = await Customer.find(query)
-//       .sort({ createdAt: -1 })
-//       .skip(skip)
-//       .limit(limit)
-//       .exec();
-
-//     res.json({
-//       totalCustomers,
-//       totalPages: Math.ceil(totalCustomers / limit),
-//       currentPage: page,
-//       limit,
-//       customers,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Server error', error: error.message });
-//   }
-// };
 export const getCustomers = async (req, res) => {
   try {
     // Disable browser/proxy caching for latest customer data
@@ -180,66 +126,10 @@ export const getCustomers = async (req, res) => {
     });
   }
 };
-
 // CREATE SINGLE CUSTOMER RECORD
 // @desc    Create Single Customer Record (Manual "+ Add Customer")
 // @route   POST /api/v1/superadmin/customers
 // @access  Private (SuperAdmin)
-// export const createCustomer = async (req, res) => {
-//   const {
-//     srNo,
-//    email,
-//     companyName,
-//     state,
-//     city,
-//     mobileNumber,
-//     registrationDate,
-//     status = 'Active',
-//     assignedTelecaller,
-//   } = req.body;
-
-//   try {
-//     if (!mobileNumber || !mobileNumber.trim()) {
-//       return res.status(400).json({
-//         message: 'Mobile Number is required',
-//       });
-//     }
-
-//     if (!companyName || !companyName.trim()) {
-//       return res.status(400).json({ message: 'Company Name is required' });
-//     }
-
-//     const customerId = await generateCustomerId();
-
-//     // Auto srNo if not provided
-//     let calculatedSrNo = srNo;
-//     if (!calculatedSrNo) {
-//       const count = await Customer.countDocuments({ isDeleted: false });
-//       calculatedSrNo = (count + 1).toString().padStart(2, '0');
-//     }
-
-//     const customer = await Customer.create({
-//       customerId,
-//       srNo: calculatedSrNo,
-//       mobileNumber: mobileNumber.trim(),
-//       companyName: companyName.trim(),
-//       state: state ? state.trim() : '',
-//       city: city ? city.trim() : '',
-//       email: email ? email.trim().toLowerCase() : '',
-//       registrationDate: registrationDate ? new Date(registrationDate) : new Date(),
-//       status: normalizeStatus(status),
-//       assignedTelecaller: assignedTelecaller ? assignedTelecaller.trim() : '',
-//       createdBy: req.superAdmin._id,
-//     });
-
-//     res.status(201).json({
-//       message: 'Customer record created successfully',
-//       customer,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Server error', error: error.message });
-//   }
-// };
 export const createCustomer = async (req, res) => {
   const {
     mobileNumber,
@@ -314,81 +204,10 @@ export const createCustomer = async (req, res) => {
     });
   }
 };
-
 // UPDATE CUSTOMER RECORD (STATUS RULES ENFORCED)
 // @desc    Update Customer Record & Status Rules
 // @route   PATCH /api/v1/superadmin/customers/:id
 // @access  Private (SuperAdmin)
-// export const updateCustomer = async (req, res) => {
-//   const { id } = req.params;
-
-//   try {
-//     const query = mongoose.Types.ObjectId.isValid(id)
-//       ? { _id: id, isDeleted: false }
-//       : { customerId: id.trim(), isDeleted: false };
-
-//     const customer = await Customer.findOne(query);
-
-//     if (!customer) {
-//       return res.status(404).json({ message: 'Customer record not found' });
-//     }
-
-//     const {
-//       srNo,
-//       name,
-//       companyName,
-//       state,
-//       city,
-//       pincode,
-//       registrationDate,
-//       status,
-//       assignedTelecaller,
-//     } = req.body;
-
-//     // BUSINESS RULE: Status Transition Protection
-//     // Pending -> Active is ALLOWED. Active -> Pending is STRICTLY PROHIBITED.
-//     if (status !== undefined) {
-//       const currentNormalized = normalizeStatus(customer.status);
-//       const incomingNormalized = normalizeStatus(status);
-
-//       if (currentNormalized === 'Active' && incomingNormalized === 'Pending') {
-//         return res.status(400).json({
-//           message: 'Status Transition Error: Cannot change status from Active back to Pending',
-//         });
-//       }
-//       customer.status = incomingNormalized;
-//     }
-
-//     if (name) customer.name = name.trim();
-//     if (companyName) customer.companyName = companyName.trim();
-//     if (state !== undefined) customer.state = state.trim();
-//     if (city !== undefined) customer.city = city.trim();
-//     if (pincode !== undefined) customer.pincode = pincode.trim();
-//     if (registrationDate) customer.registrationDate = new Date(registrationDate);
-//     if (assignedTelecaller !== undefined) customer.assignedTelecaller = assignedTelecaller.trim();
-//     if (srNo !== undefined) customer.srNo = srNo;
-
-//     customer.updatedBy = req.superAdmin._id;
-//     await customer.save();
-
-//     // Automatic Audit Log Recording
-//     await createAuditLog({
-//       user: req.superAdmin?.adminId || 'SUPER',
-//       userName: req.superAdmin?.name || 'Super Admin',
-//       userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-//       action: 'Updated Customer',
-//       record: customer.customerId,
-//       module: 'Customer Database',
-//     });
-
-//     res.json({
-//       message: 'Customer record updated successfully',
-//       customer,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Server error', error: error.message });
-//   }
-// };
 export const updateCustomer = async (req, res) => {
   const { id } = req.params;
 
@@ -510,8 +329,6 @@ export const updateCustomer = async (req, res) => {
     });
   }
 };
-
-
 // BULK IMPORT CUSTOMERS (DIRECT EXCEL/CSV FILE UPLOAD OR JSON PAYLOAD)
 // @desc    Bulk Import Customers from Excel / CSV Data (.xlsx, .csv, 50MB Limit & Duplicate Check)
 // @route   POST /api/v1/superadmin/customers/import
@@ -613,7 +430,6 @@ export const importCustomers = async (req, res) => {
     res.status(500).json({ message: 'Server error during import', error: error.message });
   }
 };
-
 // EXPORT CUSTOMERS TO CSV (.csv)
 // @desc    Export Customers to CSV Format (.csv)
 // @route   GET /api/v1/superadmin/customers/export/csv
@@ -660,7 +476,6 @@ export const exportCustomersCSV = async (req, res) => {
     res.status(500).json({ message: 'Server error during CSV export', error: error.message });
   }
 };
-
 // EXPORT CUSTOMERS TO PDF REPORT
 // @desc    Export Customers to PDF Format (Report view)
 // @route   GET /api/v1/superadmin/customers/export/pdf
