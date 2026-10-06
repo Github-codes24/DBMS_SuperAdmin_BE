@@ -234,23 +234,23 @@ export const listVendors = async ({
   const matchStage = {};
 
   if (search) {
-    const trimmed = search.trim();
-    const safeSearch = escapeRegex(trimmed);
+  const trimmed = search.trim();
+  const safeSearch = escapeRegex(trimmed);
 
-    const digitsOnly = trimmed.replace(/\D/g, "");
-    const phonePattern = digitsOnly.length > 0 
-      ? digitsOnly.split("").join("\\s*") 
-      : safeSearch;
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  const phonePattern = digitsOnly.length > 0 
+    ? digitsOnly.split("").join("\\s*") 
+    : safeSearch;
 
-    matchStage.$or = [
-      { 
-        mobile: { $regex: phonePattern, $options: "i" } ,
-        mobileNumber: { $regex: phonePattern, $options: "i" } },
-      { fullName: { $regex: safeSearch, $options: "i" } },
-      { companyName: { $regex: safeSearch, $options: "i" } },
-      { customerId: { $regex: safeSearch, $options: "i" } },
-    ];
-  }
+  matchStage.$or = [
+    { mobile: { $regex: phonePattern, $options: "i" } },
+    { mobileNumber: { $regex: phonePattern, $options: "i" } },
+    { phone: { $regex: phonePattern, $options: "i" } },
+    { fullName: { $regex: safeSearch, $options: "i" } },
+    { companyName: { $regex: safeSearch, $options: "i" } },
+    { customerId: { $regex: safeSearch, $options: "i" } },
+  ];
+}
 
   if (vendorCode) {
     matchStage.customerId = {
