@@ -11,12 +11,7 @@ const customerSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
+  
     companyName: {
       type: String,
       required: true,
