@@ -47,7 +47,6 @@ export const createNewVendor = asyncHandler(async (req, res) => {
 });
 
 // ─── GET VENDORS ──────────────────────────────────────────────────────────────
-
 export const getVendors = asyncHandler(async (req, res) => {
   const {
     page = 1,
@@ -63,10 +62,7 @@ export const getVendors = asyncHandler(async (req, res) => {
 
   const result = await listVendors({
     page: Math.max(1, parseInt(page)),
-    limit: Math.min(
-      100,
-      Math.max(1, parseInt(limit))
-    ),
+    limit: Math.min(100, Math.max(1, parseInt(limit))),
     search,
     vendorCode,
     isPaid,
@@ -76,13 +72,21 @@ export const getVendors = asyncHandler(async (req, res) => {
     sortOrder,
   });
 
+  // If no documents matched
+  if (!result.found) {
+    return res.status(200).json({
+      success: false,
+      message: 'No vendors found matching your criteria',
+      data: result,
+    });
+  }
+
   return sendSuccess(
     res,
     'Vendors fetched successfully',
     result
   );
 });
-
 // ─── GET VENDOR BY ID ─────────────────────────────────────────────────────────
 
 export const getVendorById = asyncHandler(async (req, res) => {

@@ -217,10 +217,8 @@ export const listVendors = async ({
 
   if (search) {
     const trimmed = search.trim();
-    // 1. Escaped version of the raw string (handles "+" in "+91 ...")
     const safeSearch = escapeRegex(trimmed);
 
-    // 2. Extract digits only to handle flexible phone number spacing
     const digitsOnly = trimmed.replace(/\D/g, "");
     const phonePattern = digitsOnly.length > 0 
       ? digitsOnly.split("").join("\\s*") 
@@ -260,6 +258,18 @@ export const listVendors = async ({
 
   const totalRecords = await Customers.countDocuments(matchStage);
 
+  // If no match found, exit early
+  if (totalRecords === 0) {
+    return {
+      found: false,
+      page,
+      limit,
+      totalRecords: 0,
+      totalPages: 0,
+      data: [],
+    };
+  }
+
   const vendors = await Customers.find(matchStage)
     .sort(sort)
     .skip(skip)
@@ -267,6 +277,7 @@ export const listVendors = async ({
     .lean();
 
   return {
+    found: true,
     page,
     limit,
     totalRecords,
@@ -274,8 +285,6 @@ export const listVendors = async ({
     data: vendors,
   };
 };
-// ─── GET SINGLE VENDOR ────────────────────────────────────────────────────────
-
 /**
  * Return a complete vendor profile using aggregation.
  */
