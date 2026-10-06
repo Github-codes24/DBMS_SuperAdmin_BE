@@ -58,74 +58,95 @@ const generateVendorId = async () => {
 };
 
 // CREATE VENDOR
+
+// import TelecallerAuditLog from ...
+// import SuperAdminVendor from ...
+// import { sendVendorCredentialsEmail } from ...
+
 export const createVendor = async (data, performedBy, ip) => {
   const {
     companyName,
     contactPerson,
+
     phone,
+    mobile,
     whatsapp,
     email,
     state,
     city,
+    name,
     locality,
     isPaidVendor,
     fullAddress,
+    address,
+    customerId: inputCustomerId,
   } = data;
 
-  // Generate vendor ID
-  const vendorId = await generateVendorId();
+  // 1. Generate vendorId / customerId
+  const vendorId = data.vendorId || (await generateVendorId());
+  const finalCustomerId = inputCustomerId || vendorId;
 
-  // Generate temporary password
+  // 2. Generate temporary password
   const temporaryPassword = `Ven@${Math.floor(100000 + Math.random() * 900000)}`;
-
-  // Hash password
   const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
-  // Create vendor
-  const vendor = await Customers.create({
-    vendorId,
+  const contactPhone = phone || mobile || '';
+  const vendorContactName = contactPerson || fullName || name || '';
+  const vendorAddress = fullAddress || address || '';
 
-    password: hashedPassword,
+  // 3. Create document in 'customers' collection
+  const sanitizedCompanyName = companyName ? companyName.trim() : '';
+if (!sanitizedCompanyName) {
+  throw new Error('Company name is required.');
+}
 
-    fullName: contactPerson,
+// 2. Validate createdBy ObjectId safely
+const createdById =
+  performedBy && mongoose.Types.ObjectId.isValid(performedBy)
+    ? new mongoose.Types.ObjectId(performedBy)
+    : null;
 
-    storeName: companyName,
+const vendor = await Customers.create({
+  customerId: finalCustomerId,
+  vendorId: vendorId || '',
+  password: hashedPassword,
+  fullName: vendorContactName || '',
+  companyName: sanitizedCompanyName,
+  mobileNumber: contactPhone ? String(contactPhone).trim() : '',
+  whatsapp: whatsapp ? String(whatsapp).trim() : '',
+  email: email ? email.trim().toLowerCase() : '',
+  state: state ? state.trim() : '',
+  city: city ? city.trim() : '',
+  locality: locality ? locality.trim() : '',
+  address: typeof vendorAddress === 'string' ? vendorAddress.trim() : '',
+  isPaidVendor: isPaidVendor === true || isPaidVendor === 'true' || isPaidVendor === 'yes',
+  assignedTelecaller: performedBy ? String(performedBy) : '',
+  createdBy: createdById,
+  status: 'Active',
+});
 
-    phone,
+  // 4. Audit Log
+  try {
+    await TelecallerAuditLog.create({
+      module: 'Vendor',
+      action: 'CREATE_VENDOR',
+      vendorId: vendor._id,
+      performedBy,
+      oldData: null,
+      newData: {
+        vendorId: vendor.vendorId,
+        fullName: vendor.fullName,
+        companyName: vendor.companyName,
+        phone: vendor.phone,
+        email: vendor.email,
+      },
+      ipAddress: ip || '',
+    });
+  } catch (auditErr) {
+    console.error('AuditLog error:', auditErr.message);
+  }
 
-    whatsapp,
-
-    email,
-
-    state,
-
-    city,
-
-    locality,
-
-    address: fullAddress,
-
-    isPaidVendor: isPaidVendor === true || isPaidVendor === "true",
-  });
-
-  // Audit log
-  await TelecallerAuditLog.create({
-    module: "Vendor",
-    action: "CREATE_VENDOR",
-    vendorId: vendor._id,
-    performedBy,
-    oldData: null,
-    newData: {
-      vendorId: vendor.vendorId,
-      fullName: vendor.fullName,
-      storeName: vendor.storeName,
-      phone: vendor.phone,
-      email: vendor.email,
-    },
-    ipAddress: ip || "",
-  });
-
-  // Sync to SuperAdminVendor collection so it appears in SuperAdmin Vendor Directory
+  // 5. SuperAdmin Vendor Directory Sync
   try {
     const totalCount = await SuperAdminVendor.countDocuments();
     const generatedTransNo = `TRX${90101 + totalCount}`;
@@ -135,53 +156,50 @@ export const createVendor = async (data, performedBy, ip) => {
       {
         vendorId: vendor.vendorId,
         transNo: generatedTransNo,
-        vendorName: companyName
-          ? companyName.trim()
-          : contactPerson
-            ? contactPerson.trim()
-            : "Unnamed Vendor",
-        ownerName: contactPerson ? contactPerson.trim() : "",
-        category: "General",
+        vendorName: vendor.companyName || vendor.fullName || 'Unnamed Vendor',
+        ownerName: vendor.fullName || '',
+        category: 'General',
         verificationDateTime: new Date(),
-        contactNo: phone ? phone.trim() : "",
-        email: email ? email.trim().toLowerCase() : "",
+        contactNo: vendor.phone,
+        email: vendor.email,
         password: hashedPassword,
-        state: state ? state.trim() : "",
-        city: city ? city.trim() : "",
-        completeAddress: fullAddress ? fullAddress.trim() : "",
-        status: "Pending",
+        state: vendor.state,
+        city: vendor.city,
+        completeAddress: vendor.address,
+        status: 'Pending',
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     );
   } catch (syncErr) {
-    console.error("Failed to sync SuperAdminVendor record:", syncErr.message);
+    console.error('Failed to sync SuperAdminVendor record:', syncErr.message);
   }
 
-  // Email credentials trigger
+  // 6. Email notification
   let emailSent = false;
   let emailError = null;
 
   if (vendor.email && vendor.email.trim()) {
-    const emailResult = await sendVendorCredentialsEmail({
-      toEmail: vendor.email.trim(),
-      vendorName: vendor.storeName || vendor.fullName || "Vendor Partner",
-      vendorId: vendor.vendorId,
-      password: temporaryPassword,
-    });
+    try {
+      const emailResult = await sendVendorCredentialsEmail({
+        toEmail: vendor.email.trim(),
+        vendorName: vendor.companyName || vendor.fullName || 'Vendor Partner',
+        vendorId: vendor.vendorId,
+        password: temporaryPassword,
+      });
 
-    if (emailResult.success) {
-      emailSent = true;
-    } else {
-      emailSent = false;
-      emailError = emailResult.error || "Failed to dispatch email";
+      if (emailResult && emailResult.success) {
+        emailSent = true;
+      } else {
+        emailError = emailResult?.error || 'Failed to dispatch email';
+      }
+    } catch (err) {
+      emailError = err.message;
     }
   } else {
-    emailError = "Vendor email address was not provided.";
+    emailError = 'Vendor email address was not provided.';
   }
 
-  // Don't return password hash
   const result = vendor.toObject();
-
   delete result.password;
 
   return {
@@ -225,8 +243,10 @@ export const listVendors = async ({
       : safeSearch;
 
     matchStage.$or = [
-      { mobile: { $regex: phonePattern, $options: "i" } },
-      { name: { $regex: safeSearch, $options: "i" } },
+      { 
+        mobile: { $regex: phonePattern, $options: "i" } ,
+        mobileNumber: { $regex: phonePattern, $options: "i" } },
+      { fullName: { $regex: safeSearch, $options: "i" } },
       { companyName: { $regex: safeSearch, $options: "i" } },
       { customerId: { $regex: safeSearch, $options: "i" } },
     ];
