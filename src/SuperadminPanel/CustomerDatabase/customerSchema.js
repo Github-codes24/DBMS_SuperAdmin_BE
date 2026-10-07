@@ -1,23 +1,148 @@
 import mongoose from 'mongoose';
 
+// const customerSchema = new mongoose.Schema(
+//   {
+//     customerId: {
+//       type: String,
+//       unique: true,
+//       required: true,
+//     },
+//     srNo: {
+//       type: String,
+//       default: '',
+//     },
+  
+//     companyName: {
+//       type: String,
+//       required: true,
+//       trim: true,
+//     },
+
+//     email: {
+//       type: String,
+//       default: '',
+//       trim: true,
+//       lowercase: true,
+//     },
+
+//     state: {
+//       type: String,
+//       default: '',
+//       trim: true,
+//     },
+
+//     city: {
+//       type: String,
+//       default: '',
+//       trim: true,
+//     },
+
+//     registrationDate: {
+//       type: Date,
+//       default: Date.now,
+//     },
+
+//     status: {
+//       type: String,
+//       enum: ['Active', 'Pending'],
+//       default: 'Active',
+//     },
+
+//     assignedTelecaller: {
+//       type: String,
+//       default: '',
+//       trim: true,
+//     },
+
+//     createdBy: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: 'SuperAdmin',
+//       default: null,
+//     },
+
+//     updatedBy: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: 'SuperAdmin',
+//       default: null,
+//     },
+
+//     isDeleted: {
+//       type: Boolean,
+//       default: false,
+//     },
+//   },
+//   { timestamps: true }
+// );
+
+// Search indexes
 const customerSchema = new mongoose.Schema(
   {
+    // ==========================================
+    // 1. VENDOR PERSONAL INFORMATION
+    // ==========================================
+
     customerId: {
       type: String,
       unique: true,
       required: true,
     },
-    srNo: {
+
+    // Vendor Code
+    vendorCode: {
       type: String,
       default: '',
+      trim: true,
     },
-  
+
+    // System Register Date
+    registrationDate: {
+      type: Date,
+      default: Date.now,
+    },
+
+    // Vendor Name *
+    vendorName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    // Vendor Company Name *
     companyName: {
       type: String,
       required: true,
       trim: true,
     },
 
+    // Country Name
+    country: {
+      type: String,
+      default: 'India',
+      trim: true,
+    },
+
+    // State Name
+    state: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // City Name
+    city: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Locality
+    locality: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Email
     email: {
       type: String,
       default: '',
@@ -25,27 +150,162 @@ const customerSchema = new mongoose.Schema(
       lowercase: true,
     },
 
-    state: {
+    // GST Number
+    gstNumber: {
       type: String,
       default: '',
       trim: true,
     },
 
-    city: {
+    // Address
+    address: {
       type: String,
       default: '',
       trim: true,
     },
 
-    registrationDate: {
+    // ==========================================
+    // 2. UPLOAD IMAGE
+    // ==========================================
+
+    image: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // ==========================================
+    // 3. CONTACT AND PAYMENT INFORMATION
+    // ==========================================
+
+    // Registered Phone No. (Locked) *
+    registeredPhoneNo: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    // Whatsapp No.
+    whatsappNo: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Alternate Contact No.
+    alternateContactNo: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Website
+    website: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Vendor Listing Type
+    vendorListingType: {
+      type: String,
+      enum: ['Not-Verified', 'Verified', 'Premium'],
+      default: 'Not-Verified',
+    },
+
+    // Is Paid Vendor
+    isPaidVendor: {
+      type: String,
+      enum: ['Yes', 'No'],
+      default: 'No',
+    },
+
+    // Package Paid Amount
+    packagePaidAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    // Last Payment Date
+    lastPaymentDate: {
       type: Date,
-      default: Date.now,
+      default: null,
     },
+
+    // Payment Term
+    paymentTerm: {
+      type: String,
+      enum: ['Monthly', 'Quarterly', 'Yearly', 'One-time'],
+      default: null,
+    },
+
+    // Last Payment Invoice No.
+    lastPaymentInvoiceNo: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Next Payment Due Date
+    nextPaymentDueDate: {
+      type: Date,
+      default: null,
+    },
+
+    // Active Package List
+    activePackageList: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Created By / Telecaller
+    createdByTelecaller: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // ==========================================
+    // 4. VENDOR CATEGORY DETAILS
+    // ==========================================
+
+    // Primary Business Category
+    primaryBusinessCategory: {
+      type: String,
+      enum: [
+        'Electrical & Electronics Repair',
+        'Grocery & FMCG',
+        'Electronics & IT',
+        'Medical & Pharma',
+        'Home Products & Kitchenware',
+        'Hardware & Tools',
+        'Fashion & Apparel',
+      ],
+      default: null,
+    },
+
+    // Service Specialization
+    serviceSpecialization: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Keywords / Tags for Telecaller Search
+    keywordsTags: {
+      type: [String],
+      default: [],
+    },
+
+    // ==========================================
+    // CUSTOMER STATUS / AUDIT
+    // ==========================================
 
     status: {
       type: String,
-      enum: ['Active', 'Pending'],
-      default: 'Active',
+      enum: ["Active", "Pending", "Blocked"],
+      default: "Active",
     },
 
     assignedTelecaller: {
@@ -71,13 +331,14 @@ const customerSchema = new mongoose.Schema(
       default: false,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
-
-// Search indexes
 customerSchema.index({ companyName: 1, isDeleted: 1 });
 customerSchema.index({ mobileNumber: 1, isDeleted: 1 });
 customerSchema.index({ email: 1, isDeleted: 1 });
+customerSchema.index({ status:1,    isDeleted:1})
 customerSchema.index({ customerId: 1, isDeleted: 1 });
 
 const Customer = mongoose.model('SuperAdminCustomer', customerSchema,'customers');

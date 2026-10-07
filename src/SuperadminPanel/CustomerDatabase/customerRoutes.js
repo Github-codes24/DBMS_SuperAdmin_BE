@@ -7,9 +7,11 @@ import {
   importCustomers,
   exportCustomersCSV,
   exportCustomersPDF,
-  deleteCustomer
+  deleteCustomer,
+  blockCustomer
 } from './customerController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
+import createUploader from "../../utils/upload.js"
 
 // Configure Multer Memory Storage for 50MB Direct Excel/CSV File Uploads (Supports any field name)
 const upload = multer({
@@ -18,6 +20,8 @@ const upload = multer({
 });
 
 const router = express.Router();
+// Get refrence for the Create-Uploader.
+const customerUpload = createUploader("customers");
 
 // Export Data Endpoints (CSV & PDF)
 router.get('/export/csv', protectSuperAdmin, exportCustomersCSV);
@@ -30,10 +34,20 @@ router.post('/import', protectSuperAdmin, upload.any(), importCustomers);
 router
   .route('/')
   .get(protectSuperAdmin, getCustomers)
-  .post(protectSuperAdmin, createCustomer);
+  .post(protectSuperAdmin,
+    customerUpload.single("image"),
+     createCustomer);
 
 // Update Customer & Status Protection Rule
-router.patch('/:id', protectSuperAdmin, updateCustomer);
+router.patch('/:id',
+ protectSuperAdmin,
+customerUpload.single("image"),
+ updateCustomer);
+
+ // Block Customer 
+ router.patch("/:id/block",
+ protectSuperAdmin,
+  blockCustomer);
 
 // Delete Customer.
 router.delete(
