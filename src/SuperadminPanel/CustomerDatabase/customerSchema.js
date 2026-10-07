@@ -1,80 +1,5 @@
 import mongoose from 'mongoose';
 
-// const customerSchema = new mongoose.Schema(
-//   {
-//     customerId: {
-//       type: String,
-//       unique: true,
-//       required: true,
-//     },
-//     srNo: {
-//       type: String,
-//       default: '',
-//     },
-  
-//     companyName: {
-//       type: String,
-//       required: true,
-//       trim: true,
-//     },
-
-//     email: {
-//       type: String,
-//       default: '',
-//       trim: true,
-//       lowercase: true,
-//     },
-
-//     state: {
-//       type: String,
-//       default: '',
-//       trim: true,
-//     },
-
-//     city: {
-//       type: String,
-//       default: '',
-//       trim: true,
-//     },
-
-//     registrationDate: {
-//       type: Date,
-//       default: Date.now,
-//     },
-
-//     status: {
-//       type: String,
-//       enum: ['Active', 'Pending'],
-//       default: 'Active',
-//     },
-
-//     assignedTelecaller: {
-//       type: String,
-//       default: '',
-//       trim: true,
-//     },
-
-//     createdBy: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: 'SuperAdmin',
-//       default: null,
-//     },
-
-//     updatedBy: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: 'SuperAdmin',
-//       default: null,
-//     },
-
-//     isDeleted: {
-//       type: Boolean,
-//       default: false,
-//     },
-//   },
-//   { timestamps: true }
-// );
-
-// Search indexes
 const customerSchema = new mongoose.Schema(
   {
     // ==========================================
@@ -94,6 +19,20 @@ const customerSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Keep this for compatibility with existing code/indexes
+    vendorId: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Serial Number
+    srNo: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
     // System Register Date
     registrationDate: {
       type: Date,
@@ -107,7 +46,13 @@ const customerSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Vendor Company Name *
+    // Keep for compatibility with existing main code
+    fullName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
     companyName: {
       type: String,
       required: true,
@@ -185,8 +130,22 @@ const customerSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Keep mobileNumber for compatibility with existing main code/index
+    mobileNumber: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
     // Whatsapp No.
     whatsappNo: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    // Keep existing main field
+    whatsapp: {
       type: String,
       default: '',
       trim: true,
@@ -270,7 +229,6 @@ const customerSchema = new mongoose.Schema(
     // 4. VENDOR CATEGORY DETAILS
     // ==========================================
 
-    // Primary Business Category
     primaryBusinessCategory: {
       type: String,
       enum: [
@@ -285,14 +243,12 @@ const customerSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Service Specialization
     serviceSpecialization: {
       type: String,
       default: '',
       trim: true,
     },
 
-    // Keywords / Tags for Telecaller Search
     keywordsTags: {
       type: [String],
       default: [],
@@ -304,8 +260,8 @@ const customerSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["Active", "Pending", "Blocked"],
-      default: "Active",
+      enum: ['Active', 'Pending', 'Blocked'],
+      default: 'Active',
     },
 
     assignedTelecaller: {
@@ -335,11 +291,17 @@ const customerSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
 customerSchema.index({ companyName: 1, isDeleted: 1 });
 customerSchema.index({ mobileNumber: 1, isDeleted: 1 });
 customerSchema.index({ email: 1, isDeleted: 1 });
-customerSchema.index({ status:1,    isDeleted:1})
+customerSchema.index({ status: 1, isDeleted: 1 });
 customerSchema.index({ customerId: 1, isDeleted: 1 });
 
-const Customer = mongoose.model('SuperAdminCustomer', customerSchema,'customers');
+const Customer = mongoose.model(
+  'SuperAdminCustomer',
+  customerSchema,
+  'customers'
+);
+
 export default Customer;
