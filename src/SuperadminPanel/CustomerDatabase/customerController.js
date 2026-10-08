@@ -456,6 +456,8 @@ export const importCustomers = async (req, res) => {
       const registrationDate = rawRegDate ? new Date(rawRegDate) : new Date();
       const status = normalizeStatus(c.status || c.Status);
       const assignedTelecaller = (c.assignedTelecaller || c.Telecaller || c['Assigned Telecaller'] || c.TC || '').toString().trim();
+      const mobileNumber = (c.mobileNumber || c.MobileNumber || c['Mobile Number'] || c.Mobile || '').toString().trim();
+      const email = (c.email || c.Email || c['Email Address'] || '').toString().trim().toLowerCase();
       console.log(`--> Preparing new customer entry: ${customerId}, ${name}, ${companyName}, ${state}, ${city}, ${pincode}, ${registrationDate.toISOString()}, ${status}, ${assignedTelecaller}`);
       return {
         customerId,
@@ -468,12 +470,26 @@ export const importCustomers = async (req, res) => {
         registrationDate,
         status,
         assignedTelecaller,
+        mobileNumber,
+        email,
         createdBy: req.superAdmin._id,
       };
     });
 
     const insertedCustomers = await Customer.insertMany(newCustomerEntries);
     console.log(`Inserted ${insertedCustomers.length} new customer records successfully.`);
+
+    insertedCustomers.forEach((r, index) => {
+      console.log(`-->> Inserted record ${index}:`, {
+        customerId: r.customerId,
+        name: r.name,
+        companyName: r.companyName,
+        nameType: typeof r.name,
+        companyNameType: typeof r.companyName,
+        mobileNumber: r.mobileNumber,
+        email: r.email,
+      });
+    });
 
     res.status(201).json({
       message: `Import completed successfully: ${insertedCustomers.length} unique customer records imported. ${skippedDuplicatesCount} duplicate/invalid records were discarded.`,
