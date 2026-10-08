@@ -334,14 +334,22 @@ export const updateCustomer = async (req, res) => {
 // @route   POST /api/v1/superadmin/customers/import
 // @access  Private (SuperAdmin)
 export const importCustomers = async (req, res) => {
+  console.log("Import Customers Request Body:", req.body);
   try {
+    console.log("IMPORT STEP 1: Controller started");
     let customers = req.body?.customers;
+    console.log("IMPORT STEP 2: Request body received");
 
     // Direct Binary Excel / CSV file upload via multer (req.file or req.files)
     const uploadedFile = req.file || (Array.isArray(req.files) && req.files.length > 0 ? req.files[0] : null);
+  
+    console.log("IMPORT STEP 3: File:", uploadedFile?.originalname);
     if (uploadedFile && uploadedFile.buffer) {
+      console.log("IMPORT STEP 4: Parsing file");
       customers = parseExcelOrCsvBuffer(uploadedFile.buffer);
+      console.log("IMPORT STEP 5: Parsed records:", customers.length);
     }
+    console.log("IMPORT STEP 6: Fetching existing customers");
 
     if (!Array.isArray(customers) || customers.length === 0) {
       return res.status(400).json({ message: 'Please attach a valid Excel/CSV file (.xlsx, .xls, .csv) or provide a non-empty array of customer records' });
@@ -349,9 +357,55 @@ export const importCustomers = async (req, res) => {
 
     // Fetch existing customer keys for duplicate checking
     const existingRecords = await Customer.find({ isDeleted: false }).select('customerId name companyName');
+    console.log("IMPORT STEP 7: Existing customers:", existingRecords.length);
+
+    console.log("IMPORT STEP 8: Creating existing keys");
+
+    // const existingKeysSet = new Set(
+    //   existingRecords.map((r) => {
+    //     console.log("Checking DB record:", {
+    //       customerId: r.customerId,
+    //       name: r.name,
+    //       companyName: r.companyName
+    //     });
+
+    //     return `${(r.name || "").toString().toLowerCase().trim()}_${(
+    //       r.companyName || ""
+    //     ).toString().toLowerCase().trim()}`;
+    //   })
+    // );
+
     const existingKeysSet = new Set(
-      existingRecords.map((r) => `${r.name.toLowerCase().trim()}_${r.companyName.toLowerCase().trim()}`)
+      existingRecords.map((r) => {
+        // console.log("Checking DB record:", { customerId: r.customerId, name: r.name, companyName: r.companyName });
+          const name = (r.name || "").toString().trim().toLowerCase();
+          const companyName = (r.companyName || "")
+            .toString()
+            .trim()
+            .toLowerCase();
+
+          if (!name || !companyName) return null;
+
+          return `${name.toLowerCase()}_${companyName.toLowerCase()}`;
+        })
+        .filter(Boolean),
     );
+    console.log("IMPORT STEP 9: Existing keys created");
+
+    if (uploadedFile && uploadedFile.buffer) {
+      customers = parseExcelOrCsvBuffer(uploadedFile.buffer);
+    }
+    console.log("Existing records count:", existingRecords.length);
+
+    // existingRecords.forEach((r, index) => {
+    //   console.log(`Existing record ${index}:`, {
+    //     customerId: r.customerId,
+    //     name: r.name,
+    //     companyName: r.companyName,
+    //     nameType: typeof r.name,
+    //     companyNameType: typeof r.companyName,
+    //   });
+    // });
 
     // Use reusable filterUniqueRecords utility
     const { uniqueRecords, skippedDuplicatesCount } = filterUniqueRecords(
@@ -402,7 +456,7 @@ export const importCustomers = async (req, res) => {
       const registrationDate = rawRegDate ? new Date(rawRegDate) : new Date();
       const status = normalizeStatus(c.status || c.Status);
       const assignedTelecaller = (c.assignedTelecaller || c.Telecaller || c['Assigned Telecaller'] || c.TC || '').toString().trim();
-
+      console.log(`--> Preparing new customer entry: ${customerId}, ${name}, ${companyName}, ${state}, ${city}, ${pincode}, ${registrationDate.toISOString()}, ${status}, ${assignedTelecaller}`);
       return {
         customerId,
         srNo,
@@ -419,6 +473,7 @@ export const importCustomers = async (req, res) => {
     });
 
     const insertedCustomers = await Customer.insertMany(newCustomerEntries);
+    console.log(`Inserted ${insertedCustomers.length} new customer records successfully.`);
 
     res.status(201).json({
       message: `Import completed successfully: ${insertedCustomers.length} unique customer records imported. ${skippedDuplicatesCount} duplicate/invalid records were discarded.`,
