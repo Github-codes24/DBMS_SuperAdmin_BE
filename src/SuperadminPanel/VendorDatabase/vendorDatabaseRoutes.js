@@ -16,7 +16,8 @@ import {
   deleteVendorFormField,
   changeVendorPassword,
   deleteVendor,
-  blockVendor
+  blockVendor,
+  unblockVendor
 
 } from './vendorDatabaseController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
@@ -60,18 +61,16 @@ router
     protectSuperAdmin,
     deleteVendor
   );
-  // Block Vendor 
-  router.patch(
-    '/:vendorId/block',
-    protectSuperAdmin,
-    blockVendor
-  )
   // Search Vendor's Based on state , city and name
   router.get(
     '/search',
     protectSuperAdmin,
     searchVendors
   );
+  // block vendor 
+  router.patch('/:id/block',protectSuperAdmin,blockVendor)
+  // unblock vendor 
+  router.patch('/:id/unblock',protectSuperAdmin,unblockVendor)
   // Dynamic Form Field's
   router.get(
     '/form-fields',

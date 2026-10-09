@@ -181,16 +181,6 @@ export const createVendor = async (req, res) => {
         message: 'Vendor Name is required',
       });
     }
-     // Check for existing Vendor Name
-     const existingVendor = await SuperAdminVendor.findOne({
-      vendorName: vendorName.trim()
-    });
-    if (existingVendor) {
-      return res.status(409).json({
-        success: false,
-        message: "A vendor with this name already exists."
-      });
-    }
     if (!category || !category.trim()) {
       return res.status(400).json({
         success: false,
@@ -351,7 +341,7 @@ export const activateVendor = async (req, res) => {
 
     // Find vendor
     const vendor = await SuperAdminVendor.findOne({
-      _id:vendorId,
+      vendorId,
       isDeleted: false,
     });
 
@@ -488,7 +478,7 @@ export const changeVendorPassword = async (req, res) => {
 
     // 2. Find vendor
     const vendor = await SuperAdminVendor.findOne({
-     _id: vendorId,
+      vendorId,
       isDeleted: false,
     });
 
@@ -532,24 +522,16 @@ export const changeVendorPassword = async (req, res) => {
     await vendor.save();
 
     // 7. Update Vendor authentication record
-    // const vendorAuth = await Vendor.findOneAndUpdate(
-    //   {_id:vendorId },
-
-    //   {
-    //     password: hashedPassword,
-    //   },
-
-    //   {
-    //     returnDocument: 'after',
-    //   }
-    // );
-   // find the Actual Vendor 
     const vendorAuth = await Vendor.findOneAndUpdate(
-      { vendorId: vendor.vendorId },
+      { vendorId },
+
       {
-        $set: { password: hashedPassword },
+        password: hashedPassword,
       },
-      { new: true }
+
+      {
+        returnDocument: 'after',
+      }
     );
 
     if (!vendorAuth) {
@@ -1020,6 +1002,7 @@ export const deleteVendorFormField = async (req, res) => {
     });
   }
 };
+
 // 3. GET SINGLE VENDOR BY ID OR CUSTOM ID
 // @desc    Get Single Vendor Record by Mongo _id, custom vendorId (VEN002), or transNo (TRX90102)
 // @route   GET /api/v1/superadmin/vendors/:id
@@ -1044,18 +1027,12 @@ export const getVendorById = async (req, res) => {
 // @access  Private (SuperAdmin)
 export const updateVendor = async (req, res) => {
   const { id } = req.params;
+
   try {
     const vendor = await findVendorByIdOrCustomId(id);
 
     if (!vendor) {
       return res.status(404).json({ message: 'Vendor record not found' });
-    }
-    // Check for Blocked status 
-    if (vendor.status === 'Blocked') {
-      return res.status(400).json({
-        success: false,
-        message: 'Blocked vendors cannot be updated.'
-      });
     }
 
     const {
@@ -1069,6 +1046,7 @@ export const updateVendor = async (req, res) => {
       city,
       status,
     } = req.body;
+
     // BUSINESS RULE: Status Transition Protection
     // Pending -> Active is ALLOWED. Active -> Pending is STRICTLY PROHIBITED.
     if (status !== undefined) {
@@ -1288,7 +1266,6 @@ export const importVendors = async (req, res) => {
   }
 };
 
-
 // EXPORT VENDORS TO CSV (.csv)
 // @desc    Export Vendors to CSV Format (.csv)
 // @route   GET /api/v1/superadmin/vendors/export/csv
@@ -1369,50 +1346,109 @@ export const exportVendorsPDF = async (req, res) => {
     res.status(500).json({ message: 'Server error during PDF export', error: error.message });
   }
 };
-// Block Vendor
+// -----------------Block Vendor ------------------------------------------
 export const blockVendor = async (req, res) => {
   try {
-    const { vendorId } = req.params;
-     // 1. Validate MongoDB ObjectId
-     if (!mongoose.isObjectIdOrHexString(vendorId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid vendor ID."
-      });
-    }
-    // Query the database . and update the status 
-    const vendor = await SuperAdminVendor.findOneAndUpdate(
-      {
-        _id: vendorId,
-        isDeleted: false,
-        status: { $in: ["Active", "Pending"] }
-      },
-      {
-        $set: {
-          status: "Blocked"
-        }
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    );
+    const { id } = req.params;
+
+    const vendor = await SuperAdminVendor.findOne({
+      _id: id,
+      isDeleted: false,
+    });
+
     if (!vendor) {
       return res.status(404).json({
         success: false,
-        message: "Active vendor not found."
+        message: "Vendor not found",
       });
     }
+
+    if (vendor.status === "Blocked") {
+      return res.status(400).json({
+        success: false,
+        message: "Vendor is already blocked",
+      });
+    }
+
+    vendor.status = "Blocked";
+    vendor.updatedBy = req.user?._id || null;
+
+    await vendor.save();
+
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Blocked Vendor',
+      record: vendor.transNo || vendor.vendorId,
+      module: 'Vendor Database',
+    });
+
     return res.status(200).json({
       success: true,
       message: "Vendor blocked successfully",
-      // data: vendor
+      data: vendor,
     });
   } catch (error) {
-    console.error("Error blocking vendor:", error);
+    console.error("Block vendor error:", error);
+
     return res.status(500).json({
       success: false,
-      message: "Failed to block vendor."
+      message: "Failed to block vendor",
+      error: error.message,
     });
   }
 };
+// -------------------- Unblock Vendor----------------------------------
+export const unblockVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const vendor = await SuperAdminVendor.findOne({
+      _id: id,
+      isDeleted: false,
+    });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
+    }
+
+    if (vendor.status !== "Blocked") {
+      return res.status(400).json({
+        success: false,
+        message: "Vendor is not blocked",
+      });
+    }
+
+    vendor.status = "Active";
+    vendor.updatedBy = req.user?._id || null;
+
+    await vendor.save();
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Unblocked Vendor',
+      record: vendor.transNo || vendor.vendorId,
+      module: 'Vendor Database',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Vendor unblocked successfully",
+      data: vendor,
+    });
+  } catch (error) {
+    console.error("Unblock vendor error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to unblock vendor",
+      error: error.message,
+    });
+  }
+};
+

@@ -496,8 +496,6 @@ export const updateUser = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
-
 // DELETE USER (SOFT-DELETE)
 // @desc    Soft-deletes a user from users or superadmintelecallers collection
 // @route   DELETE /api/v1/users/:userId

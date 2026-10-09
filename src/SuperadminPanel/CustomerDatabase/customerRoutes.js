@@ -8,7 +8,8 @@ import {
   exportCustomersCSV,
   exportCustomersPDF,
   deleteCustomer,
-  blockCustomer
+  blockCustomer,
+  unblockCustomer
 } from './customerController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
 import createUploader from "../../utils/upload.js"
@@ -45,9 +46,14 @@ customerUpload.single("image"),
  updateCustomer);
 
  // Block Customer 
- router.patch("/:id/block",
+ router.patch('/:id/block',
  protectSuperAdmin,
   blockCustomer);
+
+  // UnBlock Customer 
+  router.patch('/:id/unblock',
+ protectSuperAdmin,
+  unblockCustomer);
 
 // Delete Customer.
 router.delete(
