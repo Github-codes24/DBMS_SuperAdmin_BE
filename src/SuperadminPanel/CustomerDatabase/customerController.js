@@ -453,17 +453,22 @@ export const importCustomers = async (req, res) => {
       const city = (c.city || c.City || '').toString().trim();
       const pincode = (c.pincode || c.Pincode || c['Pin Code'] || c.PinCode || c.Zip || '').toString().trim();
       const rawRegDate = c.registrationDate || c.RegistrationDate || c['Registration Date'] || c['Reg Date'];
-      const registrationDate = rawRegDate ? new Date(rawRegDate) : new Date();
+      const parsedRegistrationDate = rawRegDate ? new Date(rawRegDate) : new Date();
+      const registrationDate = Number.isNaN(parsedRegistrationDate.getTime()) ? new Date() : parsedRegistrationDate;
       const status = normalizeStatus(c.status || c.Status);
       const assignedTelecaller = (c.assignedTelecaller || c.Telecaller || c['Assigned Telecaller'] || c.TC || '').toString().trim();
       const mobileNumber = (c.mobileNumber || c.MobileNumber || c['Mobile Number'] || c.Mobile || '').toString().trim();
       const email = (c.email || c.Email || c['Email Address'] || '').toString().trim().toLowerCase();
-      console.log(`--> Preparing new customer entry: ${customerId}, ${name}, ${companyName}, ${state}, ${city}, ${pincode}, ${registrationDate.toISOString()}, ${status}, ${assignedTelecaller}`);
+      const category = (c.category || c.Category || req.body?.category || req.body?.serviceCategory || '').toString().trim();
+      const subCategory = (c.subCategory || c.SubCategory || c['Sub Category'] || req.body?.subCategory || req.body?.serviceSubcategories || '').toString().trim();
       return {
         customerId,
         srNo,
         name,
+        fullName: name,
         companyName,
+        category,
+        subCategory,
         state,
         city,
         pincode,

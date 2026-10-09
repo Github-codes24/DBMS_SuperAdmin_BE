@@ -21,6 +21,11 @@ const customerSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    name: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     password: {
       type: String,
       default: '',
@@ -28,6 +33,16 @@ const customerSchema = new mongoose.Schema(
     companyName: {
       type: String,
       required: true,
+      trim: true,
+    },
+    category: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    subCategory: {
+      type: String,
+      default: '',
       trim: true,
     },
     // Matches the existing index: { mobileNumber: 1, isDeleted: 1 }
