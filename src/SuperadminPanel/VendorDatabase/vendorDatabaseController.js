@@ -181,6 +181,16 @@ export const createVendor = async (req, res) => {
         message: 'Vendor Name is required',
       });
     }
+     // Check for existing Vendor Name
+     const existingVendor = await SuperAdminVendor.findOne({
+      vendorName: vendorName.trim()
+    });
+    if (existingVendor) {
+      return res.status(409).json({
+        success: false,
+        message: "A vendor with this name already exists."
+      });
+    }
     if (!category || !category.trim()) {
       return res.status(400).json({
         success: false,
@@ -341,7 +351,7 @@ export const activateVendor = async (req, res) => {
 
     // Find vendor
     const vendor = await SuperAdminVendor.findOne({
-      vendorId,
+      _id:vendorId,
       isDeleted: false,
     });
 
@@ -478,7 +488,7 @@ export const changeVendorPassword = async (req, res) => {
 
     // 2. Find vendor
     const vendor = await SuperAdminVendor.findOne({
-      vendorId,
+     _id: vendorId,
       isDeleted: false,
     });
 
@@ -522,16 +532,24 @@ export const changeVendorPassword = async (req, res) => {
     await vendor.save();
 
     // 7. Update Vendor authentication record
+    // const vendorAuth = await Vendor.findOneAndUpdate(
+    //   {_id:vendorId },
+
+    //   {
+    //     password: hashedPassword,
+    //   },
+
+    //   {
+    //     returnDocument: 'after',
+    //   }
+    // );
+   // find the Actual Vendor 
     const vendorAuth = await Vendor.findOneAndUpdate(
-      { vendorId },
-
+      { vendorId: vendor.vendorId },
       {
-        password: hashedPassword,
+        $set: { password: hashedPassword },
       },
-
-      {
-        returnDocument: 'after',
-      }
+      { new: true }
     );
 
     if (!vendorAuth) {
@@ -1002,7 +1020,6 @@ export const deleteVendorFormField = async (req, res) => {
     });
   }
 };
-
 // 3. GET SINGLE VENDOR BY ID OR CUSTOM ID
 // @desc    Get Single Vendor Record by Mongo _id, custom vendorId (VEN002), or transNo (TRX90102)
 // @route   GET /api/v1/superadmin/vendors/:id
@@ -1027,12 +1044,18 @@ export const getVendorById = async (req, res) => {
 // @access  Private (SuperAdmin)
 export const updateVendor = async (req, res) => {
   const { id } = req.params;
-
   try {
     const vendor = await findVendorByIdOrCustomId(id);
 
     if (!vendor) {
       return res.status(404).json({ message: 'Vendor record not found' });
+    }
+    // Check for Blocked status 
+    if (vendor.status === 'Blocked') {
+      return res.status(400).json({
+        success: false,
+        message: 'Blocked vendors cannot be updated.'
+      });
     }
 
     const {
@@ -1046,7 +1069,6 @@ export const updateVendor = async (req, res) => {
       city,
       status,
     } = req.body;
-
     // BUSINESS RULE: Status Transition Protection
     // Pending -> Active is ALLOWED. Active -> Pending is STRICTLY PROHIBITED.
     if (status !== undefined) {
@@ -1091,7 +1113,6 @@ export const updateVendor = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 // BULK IMPORT VENDORS (DIRECT FILE UPLOAD OR JSON PAYLOAD)
 // @desc    Bulk Import Vendors from Excel / CSV Data (.xlsx, .csv, 50MB Limit & Duplicate Check)
 // @route   POST /api/v1/superadmin/vendors/import
@@ -1304,8 +1325,6 @@ export const exportVendorsCSV = async (req, res) => {
     res.status(500).json({ message: 'Server error during CSV export', error: error.message });
   }
 };
-
-
 // EXPORT VENDORS TO PDF REPORT
 // @desc    Export Vendors to PDF Format (Report view)
 // @route   GET /api/v1/superadmin/vendors/export/pdf
@@ -1348,5 +1367,52 @@ export const exportVendorsPDF = async (req, res) => {
     res.status(200).send(pdfHtmlReport);
   } catch (error) {
     res.status(500).json({ message: 'Server error during PDF export', error: error.message });
+  }
+};
+// Block Vendor
+export const blockVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+     // 1. Validate MongoDB ObjectId
+     if (!mongoose.isObjectIdOrHexString(vendorId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid vendor ID."
+      });
+    }
+    // Query the database . and update the status 
+    const vendor = await SuperAdminVendor.findOneAndUpdate(
+      {
+        _id: vendorId,
+        isDeleted: false,
+        status: { $in: ["Active", "Pending"] }
+      },
+      {
+        $set: {
+          status: "Blocked"
+        }
+      },
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Active vendor not found."
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "Vendor blocked successfully",
+      // data: vendor
+    });
+  } catch (error) {
+    console.error("Error blocking vendor:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to block vendor."
+    });
   }
 };
