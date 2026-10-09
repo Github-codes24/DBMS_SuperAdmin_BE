@@ -269,8 +269,6 @@ export const createTelecaller = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
-
 // 3. GET SINGLE TELECALLER BY ID
 // @desc    Get Single Telecaller by Mongo _id, custom userId ('TC014'), email, or mobileNumber
 // @route   GET /api/v1/superadmin/telecallers/:id
@@ -298,8 +296,6 @@ export const getTelecallerById = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
-
 // 4. MANAGE / UPDATE TELECALLER ACCOUNT
 // @desc    Manage Telecaller Profile (Mobile, Email, Region, Status, Reset Password)
 // @route   PATCH /api/v1/superadmin/telecallers/:id
@@ -399,7 +395,6 @@ export const updateTelecaller = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 // 5. BULK IMPORT TELECALLERS (DIRECT EXCEL/CSV FILE OR JSON PAYLOAD)
 // @desc    Bulk Import Telecallers from Excel / CSV Data (.xlsx, .csv, 50MB Limit & Validation)
 // @route   POST /api/v1/superadmin/telecallers/import
@@ -547,8 +542,6 @@ export const importTelecallers = async (req, res) => {
     res.status(500).json({ message: 'Server error during import', error: error.message });
   }
 };
-
-
 // 6. EXPORT TELECALLERS TO CSV (.csv)
 // @desc    Export Telecallers to CSV Format (.csv)
 // @route   GET /api/v1/superadmin/telecallers/export/csv
@@ -619,3 +612,107 @@ export const exportTelecallersPDF = async (req, res) => {
     res.status(500).json({ message: 'Server error during PDF export', error: error.message });
   }
 };
+//---------------------------------- block the telecaller ---------------------------------------------
+export const blockTelecaller = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const telecaller = await findTelecallerByIdOrCustomId(id);
+
+    if (!telecaller) {
+      return res.status(404).json({
+        success: false,
+        message: "Telecaller account not found",
+      });
+    }
+
+    if (telecaller.status === "Blocked") {
+      return res.status(400).json({
+        success: false,
+        message: "Telecaller is already blocked",
+      });
+    }
+
+    telecaller.status = "Blocked";
+    telecaller.updatedBy = req.superAdmin._id;
+
+    await telecaller.save();
+
+    await createAuditLog({
+      user: req.superAdmin?.adminId || "SUPER",
+      userName: req.superAdmin?.name || "Super Admin",
+      userRole: req.superAdmin?.role || "SUPER_ADMIN",
+      action: "Blocked Telecaller",
+      record: telecaller.userId,
+      module: "Telecaller Management",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Telecaller blocked successfully",
+      telecaller: {
+        userId: telecaller.userId,
+        fullName: telecaller.fullName,
+        status: telecaller.status,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to block telecaller",
+      error: error.message,
+    });
+  }
+};
+//---------------------- unblock the telecaller -------------------------------------------------------
+export const unblockTelecaller = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const telecaller = await findTelecallerByIdOrCustomId(id);
+
+    if (!telecaller) {
+      return res.status(404).json({
+        success: false,
+        message: "Telecaller account not found",
+      });
+    }
+
+    if (telecaller.status !== "Blocked") {
+      return res.status(400).json({
+        success: false,
+        message: "Telecaller is not blocked",
+      });
+    }
+
+    telecaller.status = "Active";
+    telecaller.updatedBy = req.superAdmin._id;
+
+    await telecaller.save();
+
+    await createAuditLog({
+      user: req.superAdmin?.adminId || "SUPER",
+      userName: req.superAdmin?.name || "Super Admin",
+      userRole: req.superAdmin?.role || "SUPER_ADMIN",
+      action: "Unblocked Telecaller",
+      record: telecaller.userId,
+      module: "Telecaller Management",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Telecaller unblocked successfully",
+      telecaller: {
+        userId: telecaller.userId,
+        fullName: telecaller.fullName,
+        status: telecaller.status,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to unblock telecaller",
+      error: error.message,
+    });
+  }
+};
+

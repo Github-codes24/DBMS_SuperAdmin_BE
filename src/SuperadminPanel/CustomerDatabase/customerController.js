@@ -136,9 +136,7 @@ export const getCustomers = async (req, res) => {
 // @access  Private (SuperAdmin)
 export const createCustomer = async (req, res) => {
   try {
-    console.log("BODY:", req.body);
-    console.log("FILE:", req.file);
-
+  
     const {
       vendorCode,
       registrationDate,
@@ -613,3 +611,49 @@ export const blockCustomer = async (req, res) => {
     });
   }
 };
+//-----------unblock customer 
+
+export const unblockCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await Customer.findOne({
+      _id: id,
+      isDeleted: false,
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+    }
+
+    if (customer.status !== "Blocked") {
+      return res.status(400).json({
+        success: false,
+        message: "Customer is not blocked",
+      });
+    }
+
+    customer.status = "Active";
+    customer.updatedBy = req.user?._id || null;
+
+    await customer.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Customer unblocked successfully",
+      data: customer,
+    });
+  } catch (error) {
+    console.error("Unblock customer error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to unblock customer",
+      error: error.message,
+    });
+  }
+};
+

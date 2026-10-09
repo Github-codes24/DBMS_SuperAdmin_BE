@@ -1091,7 +1091,6 @@ export const updateVendor = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 // BULK IMPORT VENDORS (DIRECT FILE UPLOAD OR JSON PAYLOAD)
 // @desc    Bulk Import Vendors from Excel / CSV Data (.xlsx, .csv, 50MB Limit & Duplicate Check)
 // @route   POST /api/v1/superadmin/vendors/import
@@ -1267,7 +1266,6 @@ export const importVendors = async (req, res) => {
   }
 };
 
-
 // EXPORT VENDORS TO CSV (.csv)
 // @desc    Export Vendors to CSV Format (.csv)
 // @route   GET /api/v1/superadmin/vendors/export/csv
@@ -1304,8 +1302,6 @@ export const exportVendorsCSV = async (req, res) => {
     res.status(500).json({ message: 'Server error during CSV export', error: error.message });
   }
 };
-
-
 // EXPORT VENDORS TO PDF REPORT
 // @desc    Export Vendors to PDF Format (Report view)
 // @route   GET /api/v1/superadmin/vendors/export/pdf
@@ -1350,3 +1346,109 @@ export const exportVendorsPDF = async (req, res) => {
     res.status(500).json({ message: 'Server error during PDF export', error: error.message });
   }
 };
+// -----------------Block Vendor ------------------------------------------
+export const blockVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const vendor = await SuperAdminVendor.findOne({
+      _id: id,
+      isDeleted: false,
+    });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
+    }
+
+    if (vendor.status === "Blocked") {
+      return res.status(400).json({
+        success: false,
+        message: "Vendor is already blocked",
+      });
+    }
+
+    vendor.status = "Blocked";
+    vendor.updatedBy = req.user?._id || null;
+
+    await vendor.save();
+
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Blocked Vendor',
+      record: vendor.transNo || vendor.vendorId,
+      module: 'Vendor Database',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Vendor blocked successfully",
+      data: vendor,
+    });
+  } catch (error) {
+    console.error("Block vendor error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to block vendor",
+      error: error.message,
+    });
+  }
+};
+// -------------------- Unblock Vendor----------------------------------
+export const unblockVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const vendor = await SuperAdminVendor.findOne({
+      _id: id,
+      isDeleted: false,
+    });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
+    }
+
+    if (vendor.status !== "Blocked") {
+      return res.status(400).json({
+        success: false,
+        message: "Vendor is not blocked",
+      });
+    }
+
+    vendor.status = "Active";
+    vendor.updatedBy = req.user?._id || null;
+
+    await vendor.save();
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      action: 'Unblocked Vendor',
+      record: vendor.transNo || vendor.vendorId,
+      module: 'Vendor Database',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Vendor unblocked successfully",
+      data: vendor,
+    });
+  } catch (error) {
+    console.error("Unblock vendor error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to unblock vendor",
+      error: error.message,
+    });
+  }
+};
+
