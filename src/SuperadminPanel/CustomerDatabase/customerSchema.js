@@ -9,7 +9,7 @@ const customerSchema = new mongoose.Schema(
     customerId: {
       type: String,
       unique: true,
-      required: true,
+      // required: true,
     },
 
     // Vendor Code
@@ -42,7 +42,7 @@ const customerSchema = new mongoose.Schema(
     // Vendor Name *
     vendorName: {
       type: String,
-      required: true,
+      // required: true,
       trim: true,
     },
 
@@ -55,7 +55,7 @@ const customerSchema = new mongoose.Schema(
 
     companyName: {
       type: String,
-      required: true,
+      // required: true,
       trim: true,
     },
 
@@ -126,7 +126,7 @@ const customerSchema = new mongoose.Schema(
     // Registered Phone No. (Locked) *
     registeredPhoneNo: {
       type: String,
-      required: true,
+      // required: true,
       trim: true,
     },
 
