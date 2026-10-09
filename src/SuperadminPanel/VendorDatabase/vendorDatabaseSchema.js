@@ -20,6 +20,7 @@ const superAdminVendorSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      unique:true
     },
     ownerName: {
       type: String,
@@ -77,7 +78,7 @@ const superAdminVendorSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['ACTIVE', 'PENDING', 'Active', 'Pending'],
+      enum: ['ACTIVE', 'PENDING', 'Active', 'Pending','Blocked','blocked'],
       default: 'Pending',
     },
     createdBy: {

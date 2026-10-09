@@ -58,6 +58,7 @@ router
   // Delete Vendor
   router.delete(
     '/:vendorId',
+    protectSuperAdmin,
     deleteVendor
   );
   // Search Vendor's Based on state , city and name

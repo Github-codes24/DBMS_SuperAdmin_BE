@@ -45,6 +45,15 @@ const customerSchema = new mongoose.Schema(
       // required: true,
       trim: true,
     },
+    name: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    password: {
+      type: String,
+      default: '',
+    },
 
     // Keep for compatibility with existing main code
     fullName: {
@@ -58,6 +67,17 @@ const customerSchema = new mongoose.Schema(
       // required: true,
       trim: true,
     },
+    category: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    subCategory: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    // Matches the existing index: { mobileNumber: 1, isDeleted: 1}
 
     // Country Name
     country: {
