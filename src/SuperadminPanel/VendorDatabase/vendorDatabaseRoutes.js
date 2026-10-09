@@ -15,7 +15,8 @@ import {
   updateVendorFormField,
   deleteVendorFormField,
   changeVendorPassword,
-  deleteVendor
+  deleteVendor,
+  blockVendor
 
 } from './vendorDatabaseController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
@@ -56,8 +57,15 @@ router
   // Delete Vendor
   router.delete(
     '/:vendorId',
+    protectSuperAdmin,
     deleteVendor
   );
+  // Block Vendor 
+  router.patch(
+    '/:vendorId/block',
+    protectSuperAdmin,
+    blockVendor
+  )
   // Search Vendor's Based on state , city and name
   router.get(
     '/search',
