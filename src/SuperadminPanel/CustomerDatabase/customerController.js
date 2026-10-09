@@ -25,7 +25,6 @@ const generateCustomerId = async () => {
   const nextNumber = maxNum + 1;
   return `CUST${nextNumber.toString().padStart(3, '0')}`;
 };
-
 // Normalize status string for consistent formatting
 const normalizeStatus = (statusStr) => {
   if (!statusStr) return 'Active';
@@ -33,95 +32,100 @@ const normalizeStatus = (statusStr) => {
   if (str === 'pending') return 'Pending';
   return 'Active';
 };
-
-
 // GET ALL CUSTOMERS DIRECTORY
 // @desc    Get All Customers Directory (Search, Filter, Pagination)
 // @route   GET /api/v1/superadmin/customers
 // @access  Private (SuperAdmin)
 export const getCustomers = async (req, res) => {
   try {
-    // Disable browser/proxy caching for latest customer data
-    res.setHeader(
-      'Cache-Control',
-      'no-store, no-cache, must-revalidate, proxy-revalidate'
-    );
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 20;
-    const skip = (page - 1) * limit;
-
     const {
-      search,
-      status,
-      state,
+      number,
       city,
+      state,
+      status,
+      companyName,
+      page = 1,
+      limit = 10,
     } = req.query;
 
-    const query = {
+    const pageNumber = Math.max(Number(page), 1);
+    const limitNumber = Math.max(Number(limit), 1);
+
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const filter = {
       isDeleted: false,
     };
 
-    // Search across customer fields
-    if (search && search.trim()) {
-      const searchRegex = new RegExp(
-        search.trim(),
-        'i'
-      );
-
-      query.$or = [
-        { mobileNumber: searchRegex },
-        { companyName: searchRegex },
-        { email: searchRegex },
-        { state: searchRegex },
-        { city: searchRegex },
-        { customerId: searchRegex },
-      ];
+    // Phone number search
+    if (number) {
+      filter.registeredPhoneNo = number;
     }
 
-    if (status && status.trim()) {
-      query.status = normalizeStatus(status);
+    // City search
+    if (city) {
+      filter.city = {
+        $regex: city,
+        $options: "i",
+      };
     }
 
-    if (state && state.trim()) {
-      query.state = new RegExp(
-        state.trim(),
-        'i'
-      );
+    // State search
+    if (state) {
+      filter.state = {
+        $regex: state,
+        $options: "i",
+      };
     }
 
-    if (city && city.trim()) {
-      query.city = new RegExp(
-        city.trim(),
-        'i'
-      );
+    // Status search
+    if (status) {
+      filter.status = {
+        $regex: `^${status}$`,
+        $options: "i",
+      };
     }
 
-    const totalCustomers =
-      await Customer.countDocuments(query);
+    // Company name search
+    if (companyName) {
+      filter.companyName = {
+        $regex: companyName,
+        $options: "i",
+      };
+    }
 
-    const customers = await Customer.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
+    const [customers, totalCustomers] = await Promise.all([
+      Customer.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNumber),
 
-    return res.json({
-      totalCustomers,
-      totalPages: Math.ceil(
-        totalCustomers / limit
-      ),
-      currentPage: page,
-      limit,
-      customers,
+      Customer.countDocuments(filter),
+    ]);
+
+    const totalPages = Math.ceil(totalCustomers / limitNumber);
+
+    return res.status(200).json({
+      success: true,
+      message: "Customers fetched successfully",
+
+      pagination: {
+        currentPage: pageNumber,
+        limit: limitNumber,
+        totalCustomers,
+        totalPages,
+        hasNextPage: pageNumber < totalPages,
+        hasPreviousPage: pageNumber > 1,
+      },
+
+      data: customers,
     });
   } catch (error) {
-    console.error('Get Customers Error:', error);
+    console.error("Get customers error:", error);
 
     return res.status(500).json({
-      message: 'Server error',
+      success: false,
+      message: "Failed to fetch customers",
       error: error.message,
     });
   }
@@ -131,75 +135,108 @@ export const getCustomers = async (req, res) => {
 // @route   POST /api/v1/superadmin/customers
 // @access  Private (SuperAdmin)
 export const createCustomer = async (req, res) => {
-  const {
-    mobileNumber,
-    companyName,
-    email,
-    state,
-    city,
-    registrationDate,
-    status = 'Active',
-    assignedTelecaller,
-  } = req.body;
-
   try {
-    if (!mobileNumber || !mobileNumber.trim()) {
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+
+    const {
+      vendorCode,
+      registrationDate,
+      vendorName,
+      companyName,
+      country,
+      state,
+      city,
+      locality,
+      email,
+      gstNumber,
+      address,
+
+      registeredPhoneNo,
+      whatsappNo,
+      alternateContactNo,
+      website,
+      vendorListingType,
+      isPaidVendor,
+      packagePaidAmount,
+      lastPaymentDate,
+      paymentTerm,
+      lastPaymentInvoiceNo,
+      nextPaymentDueDate,
+      activePackageList,
+      createdByTelecaller,
+
+      primaryBusinessCategory,
+      serviceSpecialization,
+      keywordsTags,
+    } = req.body;
+
+    // Required fields
+    if (!vendorName || !companyName || !registeredPhoneNo) {
       return res.status(400).json({
-        message: 'Mobile Number is required',
+        success: false,
+        message:
+          "vendorName, companyName and registeredPhoneNo are required",
       });
     }
 
-    if (!companyName || !companyName.trim()) {
-      return res.status(400).json({
-        message: 'Company Name is required',
-      });
-    }
+    // Uploaded image
+    const image = req.file
+      ? `/uploads/customers/${req.file.filename}`
+      : "";
 
-    const customerId = await generateCustomerId();
-
-    // Auto srNo if not provided
-    const count = await Customer.countDocuments({
-      isDeleted: false,
-    });
-
-    const calculatedSrNo = (count + 1)
-      .toString()
-      .padStart(2, '0');
+    // Customer ID
+    const customerId = `CUST-${Date.now()}`;
 
     const customer = await Customer.create({
       customerId,
-      srNo: calculatedSrNo,
 
-      mobileNumber: mobileNumber.trim(),
-      companyName: companyName.trim(),
+      vendorCode,
+      registrationDate,
+      vendorName,
+      companyName,
+      country,
+      state,
+      city,
+      locality,
+      email,
+      gstNumber,
+      address,
 
-      email: email ? email.trim().toLowerCase() : '',
+      image,
 
-      state: state ? state.trim() : '',
-      city: city ? city.trim() : '',
+      registeredPhoneNo,
+      whatsappNo,
+      alternateContactNo,
+      website,
+      vendorListingType,
+      isPaidVendor,
+      packagePaidAmount,
+      lastPaymentDate,
+      paymentTerm,
+      lastPaymentInvoiceNo,
+      nextPaymentDueDate,
+      activePackageList,
+      createdByTelecaller,
 
-      registrationDate: registrationDate
-        ? new Date(registrationDate)
-        : new Date(),
+      primaryBusinessCategory,
+      serviceSpecialization,
+      keywordsTags,
 
-      status: normalizeStatus(status),
-
-      assignedTelecaller: assignedTelecaller
-        ? assignedTelecaller.trim()
-        : '',
-
-      createdBy: req.superAdmin._id,
+      createdBy: req.user?._id || null,
     });
 
     return res.status(201).json({
-      message: 'Customer record created successfully',
-      customer,
+      success: true,
+      message: "Customer created successfully",
+      data: customer,
     });
   } catch (error) {
-    console.error('Create Customer Error:', error);
+    console.error("Create customer error:", error);
 
     return res.status(500).json({
-      message: 'Server error',
+      success: false,
+      message: "Failed to create customer",
       error: error.message,
     });
   }
@@ -209,122 +246,80 @@ export const createCustomer = async (req, res) => {
 // @route   PATCH /api/v1/superadmin/customers/:id
 // @access  Private (SuperAdmin)
 export const updateCustomer = async (req, res) => {
-  const { id } = req.params;
-
   try {
-    const query = mongoose.Types.ObjectId.isValid(id)
-      ? { _id: id, isDeleted: false }
-      : { customerId: id.trim(), isDeleted: false };
+    const { id } = req.params;
 
-    const customer = await Customer.findOne(query);
+    const customer = await Customer.findOne({
+      _id: id,
+      isDeleted: false,
+    });
 
     if (!customer) {
       return res.status(404).json({
-        message: 'Customer record not found',
+        success: false,
+        message: "Customer not found",
       });
     }
 
-    const {
-      mobileNumber,
-      companyName,
-      email,
-      state,
-      city,
-      registrationDate,
-      status,
-      assignedTelecaller,
-    } = req.body;
+    // Prevent updating protected/system fields
+    const allowedFields = [
+      "vendorCode",
+      "registrationDate",
+      "vendorName",
+      "companyName",
+      "country",
+      "state",
+      "city",
+      "locality",
+      "email",
+      "gstNumber",
+      "address",
 
-    // Required field validation during update
-    if (
-      mobileNumber !== undefined &&
-      (!mobileNumber || !mobileNumber.trim())
-    ) {
-      return res.status(400).json({
-        message: 'Mobile Number cannot be empty',
-      });
-    }
+      "image",
 
-    if (
-      companyName !== undefined &&
-      (!companyName || !companyName.trim())
-    ) {
-      return res.status(400).json({
-        message: 'Company Name cannot be empty',
-      });
-    }
+      "registeredPhoneNo",
+      "whatsappNo",
+      "alternateContactNo",
+      "website",
+      "vendorListingType",
+      "isPaidVendor",
+      "packagePaidAmount",
+      "lastPaymentDate",
+      "paymentTerm",
+      "lastPaymentInvoiceNo",
+      "nextPaymentDueDate",
+      "activePackageList",
+      "createdByTelecaller",
 
-    // Status transition protection
-    if (status !== undefined) {
-      const currentNormalized = normalizeStatus(customer.status);
-      const incomingNormalized = normalizeStatus(status);
+      "primaryBusinessCategory",
+      "serviceSpecialization",
+      "keywordsTags",
 
-      // Pending -> Active allowed
-      // Active -> Pending prohibited
-      if (
-        currentNormalized === 'Active' &&
-        incomingNormalized === 'Pending'
-      ) {
-        return res.status(400).json({
-          message:
-            'Status Transition Error: Cannot change status from Active back to Pending',
-        });
+      "status",
+      "assignedTelecaller",
+    ];
+
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        customer[field] = req.body[field];
       }
+    });
 
-      customer.status = incomingNormalized;
-    }
-
-    if (mobileNumber !== undefined) {
-      customer.mobileNumber = mobileNumber.trim();
-    }
-
-    if (companyName !== undefined) {
-      customer.companyName = companyName.trim();
-    }
-
-    if (email !== undefined) {
-      customer.email = email.trim().toLowerCase();
-    }
-
-    if (state !== undefined) {
-      customer.state = state.trim();
-    }
-
-    if (city !== undefined) {
-      customer.city = city.trim();
-    }
-
-    if (registrationDate !== undefined) {
-      customer.registrationDate = new Date(registrationDate);
-    }
-
-    if (assignedTelecaller !== undefined) {
-      customer.assignedTelecaller = assignedTelecaller.trim();
-    }
-
-    customer.updatedBy = req.superAdmin._id;
+    customer.updatedBy = req.user?._id || null;
 
     await customer.save();
 
-    // Automatic Audit Log Recording
-    await createAuditLog({
-      user: req.superAdmin?.adminId || 'SUPER',
-      userName: req.superAdmin?.name || 'Super Admin',
-      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-      action: 'Updated Customer',
-      record: customer.customerId,
-      module: 'Customer Database',
-    });
-
-    return res.json({
-      message: 'Customer record updated successfully',
-      customer,
+    return res.status(200).json({
+      success: true,
+      message: "Customer updated successfully",
+      data: customer,
     });
   } catch (error) {
-    console.error('Update Customer Error:', error);
+    console.error("Update customer error:", error);
 
     return res.status(500).json({
-      message: 'Server error',
+      success: false,
+      message: "Failed to update customer",
       error: error.message,
     });
   }
@@ -593,14 +588,14 @@ export const exportCustomersPDF = async (req, res) => {
     res.status(500).json({ message: 'Server error during PDF export', error: error.message });
   }
 };
-
+// Delete the Customer 
 export const deleteCustomer = async (req, res) => {
   const { id } = req.params;
 
   try {
     // Find customer that is not already deleted
     const customer = await Customer.findOne({
-      customerId: id,
+      _id: id,  // find and delete the customer with object Id.
       isDeleted: false,
     });
 
@@ -641,6 +636,50 @@ export const deleteCustomer = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Server error',
+      error: error.message,
+    });
+  }
+};
+// Block the Customer 
+export const blockCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await Customer.findOne({
+      _id: id,
+      isDeleted: false,
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+    }
+
+    if (customer.status === "Blocked") {
+      return res.status(400).json({
+        success: false,
+        message: "Customer is already blocked",
+      });
+    }
+
+    customer.status = "Blocked";
+    customer.updatedBy = req.user?._id || null;
+
+    await customer.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Customer blocked successfully",
+      data: customer,
+    });
+  } catch (error) {
+    console.error("Block customer error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to block customer",
       error: error.message,
     });
   }
