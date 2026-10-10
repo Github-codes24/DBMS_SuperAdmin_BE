@@ -241,12 +241,86 @@ export const createCustomer = async (req, res) => {
 };
 // UPDATE CUSTOMER RECORD (STATUS RULES ENFORCED)
 // @desc    Update Customer Record & Status Rules
-// @route   PATCH /api/v1/superadmin/customers/:id
+// @route   PATCH /api/v1/superadmin/customers/customerId
 // @access  Private (SuperAdmin)
 export const updateCustomer = async (req, res) => {
   try {
-    const { id } = req.params;
+    // BULK UPDATE: Update the status of multiple customers
+    if (req.body.customerIds !== undefined) {
+      const { customerIds, status } = req.body;
+      const allowedStatuses = ["Active", "Blocked", "Pending"];
+      // Validate customer IDs
+      if (
+        !Array.isArray(customerIds) ||
+        customerIds.length === 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "customerIds must be a non-empty array",
+        });
+      }
+      if (customerIds.length > 24) {
+        return res.status(400).json({
+          success: false,
+          message: "Maximum 24 customers can be updated at once",
+        });
+      }
 
+      // Validate the requested status
+      if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid status. Allowed: Active, Blocked, Pending",
+        });
+      }
+
+      // Remove duplicate IDs
+      const uniqueIds = [...new Set(customerIds)];
+
+      // Validate MongoDB ObjectIds
+      const mongoose = (await import("mongoose")).default;
+
+      const invalidIds = uniqueIds.filter(
+        (customerId) => !mongoose.isValidObjectId(customerId)
+      );
+
+      if (invalidIds.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "One or more customer IDs are invalid",
+          invalidIds,
+        });
+      }
+      // Update all matching, non-deleted customers
+      const result = await Customer.updateMany(
+        {
+          _id: { $in: uniqueIds },
+          isDeleted: false,
+        },
+        {
+          $set: {
+            status,
+            updatedBy: req.user?._id || null,
+          },
+        },
+        {
+          runValidators: true,
+        }
+      );
+      return res.status(200).json({
+        success: true,
+        message: "Customer statuses updated successfully",
+        data: {
+          requestedCount: uniqueIds.length,
+          matchedCount: result.matchedCount,
+          modifiedCount: result.modifiedCount,
+          notFoundOrDeletedCount:
+            uniqueIds.length - result.matchedCount,
+          status,
+        },
+      });
+    }
+    const { id } = req.params;
     const customer = await Customer.findOne({
       _id: id,
       isDeleted: false,
