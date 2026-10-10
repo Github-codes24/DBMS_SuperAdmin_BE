@@ -302,14 +302,17 @@ export const getTelecallerById = async (req, res) => {
 // @access  Private (SuperAdmin)
 export const updateTelecaller = async (req, res) => {
   const { id } = req.params;
-
   try {
     const telecaller = await findTelecallerByIdOrCustomId(id);
-
     if (!telecaller) {
       return res.status(404).json({ message: 'Telecaller account not found' });
     }
-
+    if (telecaller.status=='Inactive' || telecaller.status=='Blocked'){
+      return res.status(401).
+      json({
+        msg:'Telecaller is Inactive and can not be updated',
+      })
+    }
     const {
       fullName,
       mobileNumber,

@@ -170,13 +170,13 @@ export const createCustomer = async (req, res) => {
     } = req.body;
 
     // Required fields
-    if (!vendorName || !companyName || !registeredPhoneNo) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "vendorName, companyName and registeredPhoneNo are required",
-      });
-    }
+    // if (!vendorName || !companyName || !registeredPhoneNo) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message:
+    //       "vendorName, companyName and registeredPhoneNo are required",
+    //   });
+    // }
 
     // Uploaded image
     const image = req.file
@@ -251,14 +251,19 @@ export const updateCustomer = async (req, res) => {
       _id: id,
       isDeleted: false,
     });
-
     if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "Customer not found",
+        message: "Customer not found or Blocked",
       });
     }
-
+    // check if the Customer is Blocked or not 
+    if (customer.status=='Blocked'){
+      return res.status(401).json({
+        success:false,
+        message:'Customer is Blocked '
+      })
+    }
     // Prevent updating protected/system fields
     const allowedFields = [
       "vendorCode",
