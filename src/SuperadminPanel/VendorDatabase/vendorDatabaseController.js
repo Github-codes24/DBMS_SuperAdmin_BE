@@ -199,6 +199,35 @@ export const createVendor = async (req, res) => {
         });
       }
     }
+    // check for duplicate  vendorName 
+    const normalizedVendorName = vendorName.trim();
+    const existingVendor = await SuperAdminVendor.findOne({
+      vendorName: {
+        $regex: `^${normalizedVendorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+        $options: 'i',
+      },
+      isDeleted: false,
+    });
+    
+    if (existingVendor) {
+      return res.status(409).json({
+        success: false,
+        message: `Vendor name '${normalizedVendorName}' already exists.`,
+      });
+    }
+     // check if the email is unique or not 
+     const cleanEmail = email?.trim().toLowerCase() || "";
+     if (cleanEmail) {
+       const existingVendor = await SuperAdminVendor.findOne({
+         email: cleanEmail,
+       });
+       if (existingVendor) {
+         return res.status(409).json({
+           success: false,
+           message: "This email is already registered.",
+         });
+       }
+     }
     const {
       vendorId: autoVendorId,
       transNo: autoTransNo,
@@ -218,11 +247,6 @@ export const createVendor = async (req, res) => {
         .toString()
         .padStart(2, '0');
     }
-
-    const cleanEmail = email
-      ? email.trim().toLowerCase()
-      : '';
-
     /*
      * IMPORTANT:
      * Do NOT generate a password here.
@@ -1034,7 +1058,6 @@ export const updateVendor = async (req, res) => {
     if (!vendor) {
       return res.status(404).json({ message: 'Vendor record not found' });
     }
-
     const {
       srNo,
       transNo,
