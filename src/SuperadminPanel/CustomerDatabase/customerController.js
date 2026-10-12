@@ -402,6 +402,7 @@ export const updateCustomer = async (req, res) => {
   }
 };
 
+
 // Bulk update selected customer records with their supplied field values.
 export const updateCustomersBulk = async (req, res) => {
   const customers = req.body?.customers;
