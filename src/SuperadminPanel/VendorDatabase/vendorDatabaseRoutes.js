@@ -16,6 +16,8 @@ import {
   deleteVendorFormField,
   changeVendorPassword,
   deleteVendor,
+  bulkUpdateVendorStatuses,
+  bulkDeleteVendors,
   blockVendor,
   unblockVendor
 
@@ -42,6 +44,9 @@ router
   .route('/')
   .get(protectSuperAdmin, getVendors)
   .post(protectSuperAdmin, createVendor);
+
+router.patch('/bulk-status', protectSuperAdmin, bulkUpdateVendorStatuses);
+router.patch('/bulk-delete', protectSuperAdmin, bulkDeleteVendors);
  
   // GENERATE VENDOR ID AND PASSWORD DURING ACTIVATION OF ACCOUNT 
   router.patch(
