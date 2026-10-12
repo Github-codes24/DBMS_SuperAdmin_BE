@@ -248,7 +248,7 @@ export const updateCustomer = async (req, res) => {
     // BULK UPDATE: Update the status of multiple customers
     if (req.body.customerIds !== undefined) {
       const { customerIds, status } = req.body;
-      const allowedStatuses = ["Active", "Blocked", "Pending"];
+      const allowedStatuses = ["Active", "Blocked", "Pending", "Rejected"];
       // Validate customer IDs
       if (
         !Array.isArray(customerIds) ||
@@ -400,6 +400,130 @@ export const updateCustomer = async (req, res) => {
       error: error.message,
     });
   }
+};
+
+// Bulk update selected customer records with their supplied field values.
+export const updateCustomersBulk = async (req, res) => {
+  const customers = req.body?.customers;
+  const maxBulkUpdateCount = 24;
+  const updateFields = [
+    "vendorCode",
+    "vendorId",
+    "srNo",
+    "registrationDate",
+    "vendorName",
+    "name",
+    "fullName",
+    "companyName",
+    "category",
+    "subCategory",
+    "country",
+    "state",
+    "city",
+    "locality",
+    "email",
+    "gstNumber",
+    "address",
+    "image",
+    "registeredPhoneNo",
+    "mobileNumber",
+    "whatsappNo",
+    "whatsapp",
+    "alternateContactNo",
+    "website",
+    "vendorListingType",
+    "isPaidVendor",
+    "packagePaidAmount",
+    "lastPaymentDate",
+    "paymentTerm",
+    "lastPaymentInvoiceNo",
+    "nextPaymentDueDate",
+    "activePackageList",
+    "createdByTelecaller",
+    "primaryBusinessCategory",
+    "serviceSpecialization",
+    "keywordsTags",
+    "assignedTelecaller",
+    "status",
+  ];
+
+  if (!Array.isArray(customers) || customers.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "customers must be a non-empty array",
+    });
+  }
+  if (customers.length > maxBulkUpdateCount) {
+    return res.status(400).json({
+      success: false,
+      message: `Maximum ${maxBulkUpdateCount} customers can be updated at once`,
+    });
+  }
+
+  const seenIds = new Set();
+  const invalidRecords = [];
+  const updates = customers.map((record, index) => {
+    const id = record?._id || record?.id;
+    if (!mongoose.isValidObjectId(id)) {
+      invalidRecords.push({ index, message: "A valid MongoDB customer ID is required" });
+      return null;
+    }
+    const customerId = String(id);
+    if (seenIds.has(customerId)) {
+      invalidRecords.push({ index, customerId, message: "Duplicate customer ID" });
+      return null;
+    }
+    seenIds.add(customerId);
+
+    const fields = {};
+    updateFields.forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(record, field) && record[field] !== undefined) {
+        fields[field] = record[field];
+      }
+    });
+    return { id: customerId, fields };
+  });
+
+  if (invalidRecords.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: "One or more customer records are invalid",
+      data: { failures: invalidRecords },
+    });
+  }
+
+  const results = await Promise.allSettled(updates.map(async ({ id, fields }) => {
+    const customer = await Customer.findOne({ _id: id, isDeleted: false });
+    if (!customer) {
+      throw new Error("Customer not found or already deleted");
+    }
+    Object.assign(customer, fields);
+    customer.updatedBy = req.user?._id || null;
+    await customer.save();
+    return id;
+  }));
+
+  const failures = results.flatMap((result, index) => (
+    result.status === "rejected"
+      ? [{
+          customerId: updates[index].id,
+          message: result.reason?.message || "Failed to update customer",
+        }]
+      : []
+  ));
+  const modifiedCount = results.length - failures.length;
+
+  return res.status(200).json({
+    success: failures.length === 0,
+    message: failures.length === 0
+      ? "Customer records updated successfully"
+      : "Some customer records could not be updated",
+    data: {
+      requestedCount: customers.length,
+      modifiedCount,
+      failures,
+    },
+  });
 };
 // BULK IMPORT CUSTOMERS (DIRECT EXCEL/CSV FILE UPLOAD OR JSON PAYLOAD)
 // @desc    Bulk Import Customers from Excel / CSV Data (.xlsx, .csv, 50MB Limit & Duplicate Check)

@@ -239,6 +239,27 @@ This document provides details for the Frontend team to integrate the **Local Tr
   }
   ```
 
+#### **Bulk Update Customer Records**
+* **URL**: `/api/v1/superadmin/customers/bulk`
+* **Method**: `PATCH`
+* **Request Body**: A `customers` array of records. Each record requires its MongoDB `_id`; supported customer fields included in a record are updated for that customer.
+  ```json
+  {
+    "customers": [
+      {
+        "_id": "65f000000000000000000001",
+        "customerId": "CUST001",
+        "vendorCode": "VEND001",
+        "registeredPhoneNo": "+91 98776 65544",
+        "vendorName": "Ananya Deshmukh",
+        "companyName": "Example Company",
+        "status": "Pending"
+      }
+    ]
+  }
+  ```
+* **Limit**: Up to 24 customer records per request. The response reports updated and failed records.
+
 ---
 
 ### **6. Vendor Database (Inventory)**
