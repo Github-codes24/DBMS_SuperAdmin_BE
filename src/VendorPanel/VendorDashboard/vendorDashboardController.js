@@ -1,7 +1,7 @@
 import Product from '../MyProducts/productSchema.js';
 import Order from '../Orders/orderSchema.js';
 import SupportTicket from '../HelpSupport/supportSchema.js';
-import { State, Category, Subcategory } from './cascadeFilterSchema.js';
+import { State, Category, Subcategory,Project } from './cascadeFilterSchema.js';
 
 // @desc    Get dashboard metrics counters
 // @route   GET /api/dashboard/stats
@@ -124,7 +124,6 @@ export const addCategory = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 // @desc    Add a new Subcategory entry
 // @route   POST /api/dashboard/subcategories
 // @access  Private
@@ -156,3 +155,137 @@ export const addSubcategory = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+// @desc    Get Project's
+// @route   Get /api/dashboard/Projects
+// @access  Private
+export const getProjects = async (req, res) => {
+  try {
+    const projects = await Project.find()
+      .select("projectId name")
+      .sort({ projectId: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: projects.length,
+      projects,
+    });
+  } catch (error) {
+    console.error("Get projects error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch projects",
+    });
+  }
+};
+
+// @desc    Get Categories
+// @route    Get /api/dashboard/Categories
+// @access  Private
+export const getProjectCategories = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.limit, 10) || 10)
+    );
+
+    const skip = (page - 1) * limit;
+
+    // Find the selected project
+    const project = await Project.findOne({ projectId }).lean();
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Get only categories assigned to this project
+    const filter = {
+      categoryId: { $in: project.categories },
+    };
+
+    const [categories, total] = await Promise.all([
+      Category.find(filter)
+        .sort({ name: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Category.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      projectId: project.projectId,
+      projectName: project.name,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+      categories,
+    });
+  } catch (error) {
+    console.error("Get project categories error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch project categories",
+    });
+  }
+};
+// @desc    Get SubCategories
+// @route    Get /api/dashboard/subCategories
+// @access  Private
+
+export const getSubcategoriesByCategory = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.limit, 10) || 10)
+    );
+    const category = await Category.findOne({ categoryId }).lean();
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
+    }
+    const filter = { category: category._id };
+    const skip = (page - 1) * limit;
+    const [subcategories, total] = await Promise.all([
+      Subcategory.find(filter)
+        .sort({ name: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Subcategory.countDocuments(filter),
+    ]);
+    return res.status(200).json({
+      success: true,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+      subcategories,
+    });
+  } catch (error) {
+    console.error("Get subcategories error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch subcategories",
+    });
+  }
+};
+
