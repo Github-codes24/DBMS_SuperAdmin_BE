@@ -4,6 +4,7 @@ import {
   getCustomers,
   createCustomer,
   updateCustomer,
+  updateCustomersBulk,
   importCustomers,
   exportCustomersCSV,
   exportCustomersPDF,
@@ -37,6 +38,10 @@ router
   .post(protectSuperAdmin,
     customerUpload.single("image"),
      createCustomer);
+
+router.patch('/bulk',
+ protectSuperAdmin,
+ updateCustomersBulk);
 
 // Update Customer & Status Protection Rule
 router.patch('/:id',

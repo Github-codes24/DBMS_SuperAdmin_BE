@@ -280,7 +280,7 @@ const customerSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['Active', 'Pending', 'Blocked'],
+      enum: ['Active', 'Pending', 'Blocked', 'Rejected'],
       default: 'Active',
     },
 
