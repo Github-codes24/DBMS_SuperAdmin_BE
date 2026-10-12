@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
+import PDFDocument from 'pdfkit';
 import Customer from './customerSchema.js';
 import {
   parseExcelOrCsvBuffer,
   filterUniqueRecords,
   generateCSVData,
-  generateHTMLPDFReport,
 } from '../../utils/excelCsvHandler.js';
 import { createAuditLog } from '../../utils/auditLogger.js';
 
@@ -755,41 +755,117 @@ export const exportCustomersCSV = async (req, res) => {
 export const exportCustomersPDF = async (req, res) => {
   try {
     const customers = await Customer.find({ isDeleted: false }).sort({ createdAt: 1 });
-
     const headers = ['SR. NO.', 'ID', 'NAME', 'COMPANY NAME', 'STATE', 'CITY', 'PINCODE', 'REG. DATE', 'STATUS', 'TELECALLER'];
+    const columnWidths = [42, 68, 93, 130, 72, 72, 52, 70, 62, 90];
+    const doc = new PDFDocument({
+      size: 'A4',
+      layout: 'landscape',
+      margins: { top: 32, right: 24, bottom: 32, left: 24 },
+    });
+    const chunks = [];
 
-    const tableRowsHtml = customers
-      .map((c, i) => {
-        const regDate = c.registrationDate ? new Date(c.registrationDate).toISOString().split('T')[0] : '';
-        const statusColor = c.status === 'Pending' ? '#d97706' : '#16a34a';
-        return `
-        <tr>
-          <td>${(i + 1).toString().padStart(2, '0')}</td>
-          <td><strong>${c.customerId}</strong></td>
-          <td>${c.name}</td>
-          <td>${c.companyName}</td>
-          <td>${c.state}</td>
-          <td>${c.city}</td>
-          <td>${c.pincode}</td>
-          <td>${regDate}</td>
-          <td style="color: ${statusColor}; font-weight: bold;">${c.status}</td>
-          <td>${c.assignedTelecaller || '-'}</td>
-        </tr>`;
-      })
-      .join('');
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
 
-    // Use reusable generateHTMLPDFReport utility
-    const pdfHtmlReport = generateHTMLPDFReport(
-      'Customer Database Report',
-      'Super Admin Master Customer Directory',
-      headers,
-      tableRowsHtml,
-      customers.length
-    );
+      doc.font('Helvetica-Bold').fontSize(18).fillColor('#ea580c')
+        .text('Customer Database Report', { align: 'center' });
+      doc.moveDown(0.25);
+      doc.font('Helvetica').fontSize(9).fillColor('#64748b')
+        .text(`Super Admin Master Customer Directory | Total Records: ${customers.length}`, { align: 'center' });
+      doc.moveDown(1);
 
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Content-Disposition', 'inline; filename="Customer_Database_Report.pdf"');
-    res.status(200).send(pdfHtmlReport);
+      const tableX = doc.page.margins.left;
+      const tableWidth = columnWidths.reduce((total, width) => total + width, 0);
+      const headerHeight = 24;
+      const bottomY = doc.page.height - doc.page.margins.bottom;
+
+      const drawHeader = () => {
+        let x = tableX;
+        const y = doc.y;
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#ffffff');
+        headers.forEach((header, index) => {
+          const width = columnWidths[index];
+          doc.rect(x, y, width, headerHeight).fill('#334155');
+          doc.fillColor('#ffffff').text(header, x + 3, y + 7, {
+            width: width - 6,
+            height: headerHeight - 8,
+            align: 'left',
+          });
+          doc.rect(x, y, width, headerHeight).stroke('#cbd5e1');
+          x += width;
+        });
+        doc.y = y + headerHeight;
+        doc.x = tableX;
+      };
+
+      drawHeader();
+      customers.forEach((customer, index) => {
+        const registrationDate = customer.registrationDate
+          ? new Date(customer.registrationDate).toISOString().slice(0, 10)
+          : '-';
+        const values = [
+          String(index + 1).padStart(2, '0'),
+          customer.customerId || '-',
+          customer.name || customer.vendorName || '-',
+          customer.companyName || '-',
+          customer.state || '-',
+          customer.city || '-',
+          customer.pincode || '-',
+          registrationDate,
+          customer.status || '-',
+          customer.assignedTelecaller || '-',
+        ].map((value) => String(value));
+
+        doc.font('Helvetica').fontSize(7);
+        const rowHeight = Math.max(
+          22,
+          ...values.map((value, columnIndex) =>
+            doc.heightOfString(value, { width: columnWidths[columnIndex] - 8, fontSize: 7 }) + 8
+          )
+        );
+
+        if (doc.y + rowHeight > bottomY) {
+          doc.addPage();
+          doc.y = doc.page.margins.top;
+          drawHeader();
+        }
+
+        const y = doc.y;
+        let x = tableX;
+        values.forEach((value, columnIndex) => {
+          const width = columnWidths[columnIndex];
+          doc.rect(x, y, width, rowHeight)
+            .fill(index % 2 === 0 ? '#ffffff' : '#f8fafc');
+          doc.rect(x, y, width, rowHeight).stroke('#e2e8f0');
+          doc.font(columnIndex === 1 || columnIndex === 8 ? 'Helvetica-Bold' : 'Helvetica')
+            .fontSize(7)
+            .fillColor(columnIndex === 8 && value === 'Pending' ? '#b45309' : '#334155')
+            .text(value, x + 4, y + 4, {
+              width: width - 8,
+              height: rowHeight - 8,
+            });
+          x += width;
+        });
+        doc.y = y + rowHeight;
+        doc.x = tableX;
+      });
+
+      if (customers.length === 0) {
+        doc.font('Helvetica').fontSize(10).fillColor('#64748b')
+          .text('No customer records found.', tableX, doc.y + 12, {
+            width: tableWidth,
+            align: 'center',
+          });
+      }
+
+      doc.end();
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="Customer_Database_Report.pdf"');
+    res.status(200).send(pdfBuffer);
   } catch (error) {
     res.status(500).json({ message: 'Server error during PDF export', error: error.message });
   }
