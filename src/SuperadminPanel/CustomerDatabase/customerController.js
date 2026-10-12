@@ -136,9 +136,7 @@ export const getCustomers = async (req, res) => {
 // @access  Private (SuperAdmin)
 export const createCustomer = async (req, res) => {
   try {
-    console.log("BODY:", req.body);
-    console.log("FILE:", req.file);
-
+  
     const {
       vendorCode,
       registrationDate,
@@ -172,13 +170,13 @@ export const createCustomer = async (req, res) => {
     } = req.body;
 
     // Required fields
-    if (!vendorName || !companyName || !registeredPhoneNo) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "vendorName, companyName and registeredPhoneNo are required",
-      });
-    }
+    // if (!vendorName || !companyName || !registeredPhoneNo) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message:
+    //       "vendorName, companyName and registeredPhoneNo are required",
+    //   });
+    // }
 
     // Uploaded image
     const image = req.file
@@ -327,14 +325,19 @@ export const updateCustomer = async (req, res) => {
       _id: id,
       isDeleted: false,
     });
-
     if (!customer) {
       return res.status(404).json({
         success: false,
-        message: "Customer not found",
+        message: "Customer not found or Blocked",
       });
     }
-
+    // check if the Customer is Blocked or not 
+    if (customer.status=='Blocked'){
+      return res.status(401).json({
+        success:false,
+        message:'Customer is Blocked '
+      })
+    }
     // Prevent updating protected/system fields
     const allowedFields = [
       "vendorCode",
@@ -963,3 +966,49 @@ export const blockCustomer = async (req, res) => {
     });
   }
 };
+//-----------unblock customer 
+
+export const unblockCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await Customer.findOne({
+      _id: id,
+      isDeleted: false,
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+    }
+
+    if (customer.status !== "Blocked") {
+      return res.status(400).json({
+        success: false,
+        message: "Customer is not blocked",
+      });
+    }
+
+    customer.status = "Active";
+    customer.updatedBy = req.user?._id || null;
+
+    await customer.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Customer unblocked successfully",
+      data: customer,
+    });
+  } catch (error) {
+    console.error("Unblock customer error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to unblock customer",
+      error: error.message,
+    });
+  }
+};
+

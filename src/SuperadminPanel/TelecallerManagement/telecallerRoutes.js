@@ -8,6 +8,8 @@ import {
   importTelecallers,
   exportTelecallersCSV,
   exportTelecallersPDF,
+  blockTelecaller,
+  unblockTelecaller
 } from './telecallerController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
 
@@ -38,4 +40,8 @@ router
   .get(protectSuperAdmin, getTelecallerById)
   .patch(protectSuperAdmin, updateTelecaller);
 
+  // block  Telecaller from superAdmin
+  router.patch('/:id/block',protectSuperAdmin,blockTelecaller);
+  //unblock Telecaller from superAdmin
+  router.patch('/:id/unblock',protectSuperAdmin,unblockTelecaller);
 export default router;
