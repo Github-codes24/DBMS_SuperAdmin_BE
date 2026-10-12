@@ -23,3 +23,10 @@ yarn-error.log*
 *.sln
 *.sw?
 .DS_Store
+uploads
+
+# Category seed data
+category.js
+data/
+# Project seed script
+seeds/project.seed.js

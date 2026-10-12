@@ -5,6 +5,9 @@ import {
   addState,
   addCategory,
   addSubcategory,
+getProjectCategories,
+  getSubcategoriesByCategory,
+  getProjects,
 } from './vendorDashboardController.js';
 import { protect } from '../Authentication/authMiddleware.js';
 
@@ -15,5 +18,8 @@ router.get('/cascade-data', protect, getCascadeData);
 router.post('/states', protect, addState);
 router.post('/categories', protect, addCategory);
 router.post('/subcategories', protect, addSubcategory);
+router.get("/projects",getProjects);
+router.get('/projects/:projectId/categories',protect,getProjectCategories);
+router.get("/categories/:categoryId/subcategories",protect,getSubcategoriesByCategory);
 
 export default router;
