@@ -5,6 +5,7 @@ import {
   getTelecallerById,
   createTelecaller,
   updateTelecaller,
+  bulkUpdateTelecallerStatus,
   importTelecallers,
   exportTelecallersCSV,
   exportTelecallersPDF,
@@ -33,6 +34,8 @@ router
   .route('/')
   .get(protectSuperAdmin, getTelecallers)
   .post(protectSuperAdmin, createTelecaller);
+
+router.patch('/bulk-status', protectSuperAdmin, bulkUpdateTelecallerStatus);
 
 // Single Telecaller Profile & Manage Update Modal (Accepts MongoDB _id, custom userId 'TC014', email, or mobileNumber)
 router

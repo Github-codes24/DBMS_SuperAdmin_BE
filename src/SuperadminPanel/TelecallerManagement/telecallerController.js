@@ -398,6 +398,109 @@ export const updateTelecaller = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+export const bulkUpdateTelecallerStatus = async (req, res) => {
+  const { telecallers: telecallerRecords, telecallerIds, status: sharedStatus } = req.body || {};
+  const allowedStatuses = ['Active', 'Disabled', 'Blocked'];
+  const maxBulkUpdateCount = 24;
+  const usesRecordPayload = Array.isArray(telecallerRecords);
+  const records = usesRecordPayload
+    ? telecallerRecords
+    : Array.isArray(telecallerIds)
+      ? telecallerIds.map((id) => ({ _id: id, status: sharedStatus }))
+      : null;
+
+  if (!records || records.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'telecallers must be a non-empty array of telecaller records',
+    });
+  }
+  if (records.length > maxBulkUpdateCount) {
+    return res.status(400).json({
+      success: false,
+      message: `Maximum ${maxBulkUpdateCount} telecallers can be updated at once`,
+    });
+  }
+
+  const recordsWithIds = records.map((record) => ({
+    record,
+    id: String(record?._id || record?.mongoId || record?.id || ''),
+    status: record?.status || sharedStatus,
+  }));
+  const invalidIds = recordsWithIds
+    .filter(({ id, status }) => !mongoose.Types.ObjectId.isValid(id) || !allowedStatuses.includes(status))
+    .map(({ id }) => id || '(missing ID)');
+  if (invalidIds.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'One or more telecaller records have an invalid ID or status',
+      invalidIds,
+    });
+  }
+
+  try {
+    const uniqueIds = [...new Set(recordsWithIds.map(({ id }) => id))];
+    const telecallers = await Telecaller.find({
+      _id: { $in: uniqueIds },
+      isDeleted: false,
+    });
+    const telecallersById = new Map(
+      telecallers.map((telecaller) => [String(telecaller._id), telecaller])
+    );
+    const failures = [];
+    const updateResults = await Promise.allSettled(recordsWithIds.map(async ({ id, status: recordStatus }) => {
+      const telecaller = telecallersById.get(id);
+      if (!telecaller) {
+        throw new Error('Telecaller not found or deleted');
+      }
+      telecaller.status = recordStatus;
+      telecaller.updatedBy = req.superAdmin?._id;
+      await telecaller.save();
+      await createAuditLog({
+        user: req.superAdmin?.adminId || 'SUPER',
+        userName: req.superAdmin?.name || 'Super Admin',
+        userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+        action: `Bulk status update to ${recordStatus}`,
+        record: telecaller.userId,
+        module: 'Telecaller Management',
+      });
+      return id;
+    }));
+    const updatedIds = [];
+    updateResults.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        updatedIds.push(result.value);
+      } else {
+        failures.push({
+          telecallerId: recordsWithIds[index].id,
+          message: result.reason?.message || 'Failed to update telecaller status',
+        });
+      }
+    });
+
+    return res.status(200).json({
+      success: failures.length === 0,
+      message: failures.length === 0
+        ? `Status updated for ${updatedIds.length} telecaller${updatedIds.length === 1 ? '' : 's'}`
+        : `Status updated for ${updatedIds.length} telecaller${updatedIds.length === 1 ? '' : 's'}; ${failures.length} failed`,
+      data: {
+        requestedCount: records.length,
+        updatedCount: updatedIds.length,
+        updatedIds,
+        failures,
+        status: sharedStatus || null,
+      },
+    });
+  } catch (error) {
+    console.error('Bulk telecaller status update failed:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update selected telecaller statuses',
+      error: error.message,
+    });
+  }
+};
 // 5. BULK IMPORT TELECALLERS (DIRECT EXCEL/CSV FILE OR JSON PAYLOAD)
 // @desc    Bulk Import Telecallers from Excel / CSV Data (.xlsx, .csv, 50MB Limit & Validation)
 // @route   POST /api/v1/superadmin/telecallers/import
@@ -718,4 +821,3 @@ export const unblockTelecaller = async (req, res) => {
     });
   }
 };
-
