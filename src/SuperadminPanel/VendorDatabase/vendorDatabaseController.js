@@ -1114,6 +1114,209 @@ export const updateVendor = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+export const bulkUpdateVendorStatuses = async (req, res) => {
+  const records = req.body?.vendors;
+  const allowedStatuses = ['Active', 'Pending', 'Blocked'];
+  const maxBulkCount = 100;
+
+  if (!Array.isArray(records) || records.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'vendors must be a non-empty array of vendor records',
+    });
+  }
+  if (records.length > maxBulkCount) {
+    return res.status(400).json({
+      success: false,
+      message: `Maximum ${maxBulkCount} vendors can be updated at once`,
+    });
+  }
+
+  const normalizedRecords = records.map((record) => ({
+    id: String(record?._id || ''),
+    status: record?.status,
+  }));
+  const invalidRecords = normalizedRecords.filter(({ id, status }) =>
+    !mongoose.Types.ObjectId.isValid(id) || !allowedStatuses.includes(status)
+  );
+  if (invalidRecords.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Each vendor record must include a valid MongoDB ID and status',
+      invalidIds: invalidRecords.map(({ id }) => id || '(missing ID)'),
+    });
+  }
+  if (new Set(normalizedRecords.map(({ id }) => id)).size !== normalizedRecords.length) {
+    return res.status(400).json({
+      success: false,
+      message: 'Duplicate vendor IDs are not allowed',
+    });
+  }
+
+  try {
+    const vendorIds = normalizedRecords.map(({ id }) => id);
+    const vendors = await SuperAdminVendor.find({
+      _id: { $in: vendorIds },
+      isDeleted: false,
+    });
+    const vendorsById = new Map(vendors.map((vendor) => [String(vendor._id), vendor]));
+    const results = await Promise.allSettled(normalizedRecords.map(async ({ id, status }) => {
+      const vendor = vendorsById.get(id);
+      if (!vendor) {
+        throw new Error('Vendor not found or deleted');
+      }
+
+      const currentStatus = String(vendor.status || 'Pending').trim().toLowerCase();
+      if (currentStatus === 'active' && status === 'Pending') {
+        throw new Error('Active vendors cannot be changed back to Pending');
+      }
+      if (currentStatus === 'pending' && status === 'Active') {
+        throw new Error('Pending vendors must be activated individually to provision login credentials');
+      }
+
+      vendor.status = status;
+      vendor.updatedBy = req.superAdmin?._id || null;
+      await vendor.save();
+      await createAuditLog({
+        user: req.superAdmin?.adminId || 'SUPER',
+        userName: req.superAdmin?.name || 'Super Admin',
+        userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+        action: `Bulk vendor status update to ${status}`,
+        record: vendor.transNo || vendor.vendorId,
+        module: 'Vendor Database',
+      });
+      return id;
+    }));
+
+    const updatedIds = [];
+    const failures = [];
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        updatedIds.push(result.value);
+      } else {
+        failures.push({
+          vendorId: normalizedRecords[index].id,
+          message: result.reason?.message || 'Failed to update vendor status',
+        });
+      }
+    });
+
+    return res.status(200).json({
+      success: failures.length === 0,
+      message: failures.length === 0
+        ? `Status updated for ${updatedIds.length} vendor${updatedIds.length === 1 ? '' : 's'}`
+        : `Status updated for ${updatedIds.length} vendor${updatedIds.length === 1 ? '' : 's'}; ${failures.length} failed`,
+      data: {
+        requestedCount: normalizedRecords.length,
+        updatedCount: updatedIds.length,
+        updatedIds,
+        failures,
+      },
+    });
+  } catch (error) {
+    console.error('Bulk vendor status update failed:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update selected vendor statuses',
+      error: error.message,
+    });
+  }
+};
+
+export const bulkDeleteVendors = async (req, res) => {
+  const vendorIds = req.body?.vendorIds;
+  const maxBulkCount = 100;
+
+  if (!Array.isArray(vendorIds) || vendorIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'vendorIds must be a non-empty array',
+    });
+  }
+  if (vendorIds.length > maxBulkCount) {
+    return res.status(400).json({
+      success: false,
+      message: `Maximum ${maxBulkCount} vendors can be deleted at once`,
+    });
+  }
+
+  const ids = vendorIds.map((id) => String(id));
+  const invalidIds = ids.filter((id) => !mongoose.Types.ObjectId.isValid(id));
+  if (invalidIds.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'One or more vendor IDs are invalid',
+      invalidIds,
+    });
+  }
+  if (new Set(ids).size !== ids.length) {
+    return res.status(400).json({
+      success: false,
+      message: 'Duplicate vendor IDs are not allowed',
+    });
+  }
+
+  try {
+    const results = await Promise.allSettled(ids.map(async (id) => {
+      const vendor = await SuperAdminVendor.findOne({ _id: id, isDeleted: false });
+      if (!vendor) {
+        throw new Error('Vendor not found or already deleted');
+      }
+      vendor.isDeleted = true;
+      vendor.updatedBy = req.superAdmin?._id || null;
+      await vendor.save();
+
+      await Vendor.findOneAndUpdate(
+        { vendorId: vendor.vendorId },
+        { storeStatus: 'Deleted' },
+        { returnDocument: 'after' }
+      );
+      await createAuditLog({
+        user: req.superAdmin?.adminId || 'SUPER',
+        userName: req.superAdmin?.name || 'Super Admin',
+        userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+        action: 'Bulk Deleted Vendor',
+        record: vendor.transNo || vendor.vendorId,
+        module: 'Vendor Database',
+      });
+      return id;
+    }));
+
+    const deletedIds = [];
+    const failures = [];
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        deletedIds.push(result.value);
+      } else {
+        failures.push({
+          vendorId: ids[index],
+          message: result.reason?.message || 'Failed to delete vendor',
+        });
+      }
+    });
+
+    return res.status(200).json({
+      success: failures.length === 0,
+      message: failures.length === 0
+        ? `Deleted ${deletedIds.length} vendor${deletedIds.length === 1 ? '' : 's'}`
+        : `Deleted ${deletedIds.length} vendor${deletedIds.length === 1 ? '' : 's'}; ${failures.length} failed`,
+      data: {
+        requestedCount: ids.length,
+        deletedCount: deletedIds.length,
+        deletedIds,
+        failures,
+      },
+    });
+  } catch (error) {
+    console.error('Bulk vendor deletion failed:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete selected vendors',
+      error: error.message,
+    });
+  }
+};
 // BULK IMPORT VENDORS (DIRECT FILE UPLOAD OR JSON PAYLOAD)
 // @desc    Bulk Import Vendors from Excel / CSV Data (.xlsx, .csv, 50MB Limit & Duplicate Check)
 // @route   POST /api/v1/superadmin/vendors/import
@@ -1474,4 +1677,3 @@ export const unblockVendor = async (req, res) => {
     });
   }
 };
-
