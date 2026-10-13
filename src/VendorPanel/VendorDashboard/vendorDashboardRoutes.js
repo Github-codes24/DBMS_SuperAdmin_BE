@@ -10,6 +10,7 @@ getProjectCategories,
   getProjects,
 } from './vendorDashboardController.js';
 import { protect } from '../Authentication/authMiddleware.js';
+import { protectSuperAdmin } from '../../SuperadminPanel/Authentication/authMiddleware.js';
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.post('/states', protect, addState);
 router.post('/categories', protect, addCategory);
 router.post('/subcategories', protect, addSubcategory);
 router.get("/projects",getProjects);
-router.get('/projects/:projectId/categories',protect,getProjectCategories);
-router.get("/categories/:categoryId/subcategories",protect,getSubcategoriesByCategory);
+router.get('/projects/:projectId/categories', protectSuperAdmin, getProjectCategories);
+router.get('/categories/:categoryId/subcategories', protectSuperAdmin, getSubcategoriesByCategory);
 
 export default router;
