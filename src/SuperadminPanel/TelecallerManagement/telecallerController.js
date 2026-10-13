@@ -58,16 +58,17 @@ const findTelecallerByIdOrCustomId = async (identifier) => {
 
   return await Telecaller.findOne(query);
 };
-
 // Normalize status string for consistent formatting
-const normalizeStatus = (statusStr) => {
-  if (!statusStr) return 'Active';
-  const str = statusStr.toString().trim().toLowerCase();
-  if (str === 'disabled') return 'Disabled';
-  return 'Active';
+const normalizeStatus = (status) => {
+  if (!status) return 'Active';
+  const normalized = status.trim().toLowerCase();
+  const statusMap = {
+    active: 'Active',
+    blocked: 'Blocked',
+    disabled: 'Disabled',
+  };
+  return statusMap[normalized] || 'Active';
 };
-
-
 // 1. GET ALL TELECALLERS DIRECTORY
 // @desc    Get All Telecallers Directory (Search, Filter, Pagination, Assigned Customers Count)
 // @route   GET /api/v1/superadmin/telecallers
@@ -307,12 +308,6 @@ export const updateTelecaller = async (req, res) => {
     if (!telecaller) {
       return res.status(404).json({ message: 'Telecaller account not found' });
     }
-    if (telecaller.status=='Inactive' || telecaller.status=='Blocked'){
-      return res.status(401).
-      json({
-        msg:'Telecaller is Inactive and can not be updated',
-      })
-    }
     const {
       fullName,
       mobileNumber,
@@ -321,6 +316,28 @@ export const updateTelecaller = async (req, res) => {
       status,
       password, // Password reset field
     } = req.body;
+    // Allow status changes even when the telecaller is blocked or inactive.
+    const isInactiveOrBlocked = [
+      // 'INACTIVE',
+      // 'Inactive',
+      'DISABLED',
+      'Disabled',
+      'BLOCKED',
+      'Blocked',
+    ].includes(telecaller.status);
+    const isUpdatingProfile =
+      fullName !== undefined ||
+      mobileNumber !== undefined ||
+      email !== undefined ||
+      assignedRegion !== undefined ||
+      (password !== undefined && password.trim());
+
+    if (isInactiveOrBlocked && isUpdatingProfile) {
+      return res.status(403).json({
+        message:
+          'Disabled or blocked telecallers cannot have their profile details updated',
+      });
+    }
 
     if (mobileNumber !== undefined && mobileNumber.trim()) {
       if (!validateMobileNumber(mobileNumber)) {
