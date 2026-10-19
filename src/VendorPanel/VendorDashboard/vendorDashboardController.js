@@ -30,6 +30,7 @@ export const generateSubcategoryId = async () => {
       setDefaultsOnInsert: true,
     }
   );
+
   return `SUBCAT-${String(counter.sequence).padStart(3, '0')}`;
 };
 // @desc    Get dashboard metrics counters
@@ -80,7 +81,6 @@ export const getDashboardStats = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 // @desc    Get cascade filter lists (States, Categories, Subcategories)
 // @route   GET /api/dashboard/cascade-data
 // @access  Private
@@ -130,31 +130,97 @@ export const addState = async (req, res) => {
 // @desc    Add a new Category entry
 // @route   POST /api/dashboard/categories
 // @access  Private
+// export const addCategory = async (req, res) => {
+//   const { name, vendorCount } = req.body;
+
+//   try {
+//     if (!name) {
+//       return res.status(400).json({ message: 'Category name is required' });
+//     }
+
+//     const categoryExists = await Category.findOne({ name: name.trim() });
+//     if (categoryExists) {
+//       return res.status(400).json({ message: 'Category already exists' });
+//     }
+//     const categoryId = await generateCategoryId();
+
+//     const category = await Category.create({
+//       categoryId,
+//       name: name.trim(),
+//       vendorCount: vendorCount || 0,
+//     });
+
+//     res.status(201).json(category);
+//   } catch (error) {
+//     res.status(500).json({ message: 'Server error', error: error.message });
+//   }
+// };
+
 export const addCategory = async (req, res) => {
-  const { name, vendorCount } = req.body;
+  const { name, projectId } = req.body;
 
   try {
-    if (!name) {
-      return res.status(400).json({ message: 'Category name is required' });
+    if (!name?.trim()) {
+      return res.status(400).json({
+        message: "Category name is required",
+      });
     }
 
-    const categoryExists = await Category.findOne({ name: name.trim() });
-    if (categoryExists) {
-      return res.status(400).json({ message: 'Category already exists' });
+    if (!projectId?.trim()) {
+      return res.status(400).json({
+        message: "Project ID is required",
+      });
     }
+
+    const project = await Project.findOne({ projectId: projectId.trim() });
+
+    if (!project) {
+      return res.status(404).json({
+        message: "Project not found",
+      });
+    }
+
+    const normalizedName = name.trim();
+
+    const categoryExists = await Category.findOne({
+      name: { $regex: `^${normalizedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+      projectId: projectId.trim(),
+    });
+
+    if (categoryExists) {
+      return res.status(400).json({
+        message: "Category already exists in this project",
+      });
+    }
+
     const categoryId = await generateCategoryId();
 
     const category = await Category.create({
       categoryId,
-      name: name.trim(),
-      vendorCount: vendorCount || 0,
+      name: normalizedName,
+      projectId: projectId.trim(),
     });
 
-    res.status(201).json(category);
+    await Project.updateOne(
+      { projectId },
+      { $addToSet: { categories: category.categoryId } }
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "Category created successfully",
+      data: category,
+    });
+
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
+
 // @desc    Add a new Subcategory entry
 // @route   POST /api/dashboard/subcategories
 // @access  Private
@@ -299,67 +365,66 @@ export const getProjects = async (req, res) => {
 // @desc    Get Categories
 // @route    Get /api/dashboard/Categories
 // @access  Private
-// export const getProjectCategories = async (req, res) => {
-//   try {
-//     const { projectId } = req.params;
+export const getProjectCategories = async (req, res) => {
+  try {
+    const { projectId } = req.params;
 
-//     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-//     const limit = Math.min(
-//       100,
-//       Math.max(1, parseInt(req.query.limit, 10) || 10)
-//     );
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.limit, 10) || 10)
+    );
 
-//     const skip = (page - 1) * limit;
+    const skip = (page - 1) * limit;
 
-//     // Find the selected project
-//     const project = await Project.findOne({ projectId }).lean();
+    // Find the selected project
+    const project = await Project.findOne({ projectId }).lean();
 
-//     if (!project) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Project not found",
-//       });
-//     }
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
 
-//     // Get only categories assigned to this project
-//     const filter = {
-//       categoryId: { $in: project.categories },
-//     };
+    // Get only categories assigned to this project
+    const filter = {
+      categoryId: { $in: project.categories },
+    };
 
-//     const [categories, total] = await Promise.all([
-//       Category.find(filter)
-//         .sort({ name: 1 })
-//         .skip(skip)
-//         .limit(limit)
-//         .lean(),
-//       Category.countDocuments(filter),
-//     ]);
+    const [categories, total] = await Promise.all([
+      Category.find(filter)
+        .sort({ name: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Category.countDocuments(filter),
+    ]);
 
-//     return res.status(200).json({
-//       success: true,
-//       projectId: project.projectId,
-//       projectName: project.name,
-//       pagination: {
-//         total,
-//         page,
-//         limit,
-//         totalPages: Math.ceil(total / limit),
-//       },
-//       categories,
-//     });
-//   } catch (error) {
-//     console.error("Get project categories error:", error);
+    return res.status(200).json({
+      success: true,
+      projectId: project.projectId,
+      projectName: project.name,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+      categories,
+    });
+  } catch (error) {
+    console.error("Get project categories error:", error);
 
-//     return res.status(500).json({
-//       success: false,
-//       message: "Failed to fetch project categories",
-//     });
-//   }
-// };
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch project categories",
+    });
+  }
+};
 // @desc    Get SubCategories
 // @route    Get /api/dashboard/subCategories
 // @access  Private
-
 export const getSubcategoriesByCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
@@ -404,58 +469,57 @@ export const getSubcategoriesByCategory = async (req, res) => {
     });
   }
 };
+// export const getProjectCategories = async (req, res) => {
+//   try {
+//     const { projectId } = req.params;
 
-export const getProjectCategories = async (req, res) => {
-  try {
-    const { projectId } = req.params;
+//     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+//     const limit = Math.min(
+//       100,
+//       Math.max(1, parseInt(req.query.limit, 10) || 10)
+//     );
 
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(
-      100,
-      Math.max(1, parseInt(req.query.limit, 10) || 10)
-    );
+//     const skip = (page - 1) * limit;
 
-    const skip = (page - 1) * limit;
+//     // Validate the selected project
+//     const project = await Project.findOne({ projectId }).lean();
 
-    // Validate the selected project
-    const project = await Project.findOne({ projectId }).lean();
+//     if (!project) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Project not found",
+//       });
+//     }
+//     // Return all shared categories, without subcategories
+//     const filter = {};
 
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        message: "Project not found",
-      });
-    }
-    // Return all shared categories, without subcategories
-    const filter = {};
+//     const [categories, total] = await Promise.all([
+//       Category.find(filter)
+//         .sort({ name: 1 })
+//         .skip(skip)
+//         .limit(limit)
+//         .lean(),
+//       Category.countDocuments(filter),
+//     ]);
 
-    const [categories, total] = await Promise.all([
-      Category.find(filter)
-        .sort({ name: 1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Category.countDocuments(filter),
-    ]);
+//     return res.status(200).json({
+//       success: true,
+//       projectId: project.projectId,
+//       projectName: project.name,
+//       pagination: {
+//         total,
+//         page,
+//         limit,
+//         totalPages: Math.ceil(total / limit),
+//       },
+//       categories,
+//     });
+//   } catch (error) {
+//     console.error("Get project categories error:", error);
 
-    return res.status(200).json({
-      success: true,
-      projectId: project.projectId,
-      projectName: project.name,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-      categories,
-    });
-  } catch (error) {
-    console.error("Get project categories error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch project categories",
-    });
-  }
-};
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch project categories",
+//     });
+//   }
+// };

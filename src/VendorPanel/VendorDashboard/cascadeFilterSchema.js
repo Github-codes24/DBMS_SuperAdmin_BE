@@ -42,9 +42,13 @@ const categorySchema = new mongoose.Schema({
     unique: true,
     required: true,
   },
+  projectId: {
+    type: String,
+    required: true,
+    index: true,
+  },
   name: {
     type: String,
-    unique: true,
     required: true,
     trim: true,
   },
@@ -57,6 +61,10 @@ const categorySchema = new mongoose.Schema({
     default: 0,
   },
 });
+categorySchema.index(
+  { name: 1, projectId: 1 },
+  { unique: true }
+);
 
 const subcategorySchema = new mongoose.Schema({
   subCategoryId: {
