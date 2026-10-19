@@ -90,6 +90,20 @@ const subcategorySchema = new mongoose.Schema({
 });
 
 
+const counterSchema = new mongoose.Schema({
+  _id: {
+    type: String,
+    required: true,
+  },
+  sequence: {
+    type: Number,
+    default: 0,
+  },
+});
+
+export default mongoose.model('Counter', counterSchema);
+
+
 // Indexes for unique composite index on name + parentCategory
 subcategorySchema.index({ name: 1, parentCategory: 1 }, { unique: true });
 
