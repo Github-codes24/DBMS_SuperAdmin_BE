@@ -9,6 +9,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { apiManager } from "./utils/apiManager.js";
 import authRoutes from "./routes/authRoutes.js";
 import testRoutes from "./routes/testRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/test", testRoutes);
+app.use("/api/users", userRoutes);
 
 // Register feature routes above these two handlers.
 app.use(notFound);
