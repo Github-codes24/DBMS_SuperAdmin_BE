@@ -47,7 +47,48 @@ const userSchema = new Schema(
     collection: "users",
   },
 );
+const refreshSessionSchema = new Schema(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    tokenHash: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
+    revokedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+    collection: "refreshSessions",
+  },
+);
 
+refreshSessionSchema.index(
+  { expiresAt: 1 },
+  { expireAfterSeconds: 0 },
+);
+
+
+
+export type RefreshSessionDocument =
+  InferSchemaType<typeof refreshSessionSchema>;
+
+export const RefreshSession = mongoose.model(
+  "RefreshSession",
+  refreshSessionSchema,
+);
 export type UserDocument = InferSchemaType<typeof userSchema>;
 
 export const User = mongoose.model("User", userSchema);
