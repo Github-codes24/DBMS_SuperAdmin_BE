@@ -12,6 +12,7 @@ const errorHandler_js_1 = require("./middleware/errorHandler.js");
 const apiManager_js_1 = require("./utils/apiManager.js");
 const authRoutes_js_1 = __importDefault(require("./routes/authRoutes.js"));
 const testRoutes_js_1 = __importDefault(require("./routes/testRoutes.js"));
+const userRoutes_js_1 = __importDefault(require("./routes/userRoutes.js"));
 const app = (0, express_1.default)();
 app.disable("x-powered-by");
 app.use((0, helmet_1.default)());
@@ -29,6 +30,7 @@ app.get("/api/health", (_req, res) => {
 });
 app.use("/api/auth", authRoutes_js_1.default);
 app.use("/api/test", testRoutes_js_1.default);
+app.use("/api/users", userRoutes_js_1.default);
 // Register feature routes above these two handlers.
 app.use(notFound_js_1.notFound);
 app.use(errorHandler_js_1.errorHandler);
