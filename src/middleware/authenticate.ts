@@ -42,7 +42,8 @@ export const authenticate: RequestHandler = (req, res, next) => {
     };
 
     next();
-  } catch {
+  }
+  catch {
     return apiManager.failure(
       res,
       "Invalid or expired access token",
@@ -50,4 +51,12 @@ export const authenticate: RequestHandler = (req, res, next) => {
       "INVALID_ACCESS_TOKEN",
     );
   }
+  // for more specific error 
+//   catch (error: unknown) {
+//     if (error instanceof Error) {
+//       console.error("Access token verification failed:", {
+//         name: error.name,
+//         message: error.message,
+//       });
+//     }
 };
