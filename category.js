@@ -23,57 +23,57 @@ function slugify(value) {
 
 
 function parseMarkdownTable(content) {
-    const categoryNames = [
-      "Home Applicances & Repair Service",
-      "Software Development Service",
-      "Computer Training Institute",
-      "Hospitals and Clinics",
-      "Water Purifier Service",
-      "Electrician Service",
-      "Carpenter Service",
-      "Pest Control Service",
-      "Hotels & Resorts",
-      "Travel & Tours",
-      "Car Repair Service",
-      "Mobile Service",
-      "Plumber Service",
-      "AC Service",
-      "Grocery Stores",
-      "Saloons",
-      "Doctors",
-      "Gym",
-      "plumber",
-      "test category",
-    ].sort((a, b) => b.length - a.length);
-  
-    const rows = [];
-  
-    for (const line of content.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (!trimmed || /^category\s+subcategory$/i.test(trimmed)) {
-        continue;
-      }
-  
-      const categoryName = categoryNames.find(
-        (name) =>
-          trimmed.startsWith(name) &&
-          /\s/.test(trimmed[name.length] ?? "")
-      );
-  
-      if (!categoryName) continue;
-  
-      const subCategoryName = trimmed
-        .slice(categoryName.length)
-        .trim();
-  
-      if (!subCategoryName) continue;
-  
-      rows.push({ categoryName, subCategoryName });
+  const categoryNames = [
+    "Home Applicances & Repair Service",
+    "Software Development Service",
+    "Computer Training Institute",
+    "Hospitals and Clinics",
+    "Water Purifier Service",
+    "Electrician Service",
+    "Carpenter Service",
+    "Pest Control Service",
+    "Hotels & Resorts",
+    "Travel & Tours",
+    "Car Repair Service",
+    "Mobile Service",
+    "Plumber Service",
+    "AC Service",
+    "Grocery Stores",
+    "Saloons",
+    "Doctors",
+    "Gym",
+    "plumber",
+    "test category",
+  ].sort((a, b) => b.length - a.length);
+
+  const rows = [];
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || /^category\s+subcategory$/i.test(trimmed)) {
+      continue;
     }
-  
-    return rows;
+
+    const categoryName = categoryNames.find(
+      (name) =>
+        trimmed.startsWith(name) &&
+        /\s/.test(trimmed[name.length] ?? "")
+    );
+
+    if (!categoryName) continue;
+
+    const subCategoryName = trimmed
+      .slice(categoryName.length)
+      .trim();
+
+    if (!subCategoryName) continue;
+
+    rows.push({ categoryName, subCategoryName });
   }
-  
+
+  return rows;
+}
+
 async function seedCategories() {
   if (!MONGO_URI) {
     throw new Error("Set MONGO_URI or MONGODB_URI in your .env file.");
