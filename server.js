@@ -62,6 +62,7 @@ const allowedOrigins = [
   "http://localhost:5175",
   "http://localhost:5176",
   "https://dbms.telecaller.localtradestreet.com",
+  "https://local-trade-street-be-2.onrender.com",
 ];
 
 //middleware
