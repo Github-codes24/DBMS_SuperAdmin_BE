@@ -20,6 +20,7 @@ app.use(helmet());
 const allowedOrigins = [
   "http://localhost:5173",
   "https://dbms-develop.netlify.app",
+  "https://dbms-live.netlify.app",
   "https://dbms-superadmin.netlify.app",
   "https://dbms-superadmin-be.onrender.com",
   // Add your production Netlify URL here.
