@@ -29,7 +29,8 @@ const superAdminVendorSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      required: true,
+      required: false,
+      default: '',
       trim: true,
     },
     gstin: {
