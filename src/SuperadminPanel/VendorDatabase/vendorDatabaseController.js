@@ -181,12 +181,7 @@ export const createVendor = async (req, res) => {
         message: 'Vendor Name is required',
       });
     }
-    if (!category || !category.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Category is required',
-      });
-    }
+
     // Check explicitly provided transaction number
     if (transNo && transNo.trim()) {
       const existingTrans = await SuperAdminVendor.findOne({
@@ -264,7 +259,7 @@ export const createVendor = async (req, res) => {
 
       vendorName: vendorName.trim(),
       ownerName: ownerName ? ownerName.trim() : '',
-      category: category.trim(),
+      category: category ? category.trim() : '',
 
       verificationDateTime: verificationDateTime
         ? new Date(verificationDateTime)
@@ -1086,7 +1081,7 @@ export const updateVendor = async (req, res) => {
 
     if (vendorName) vendor.vendorName = vendorName.trim();
     if (transNo) vendor.transNo = transNo.trim();
-    if (category) vendor.category = category.trim();
+    if (category !== undefined) vendor.category = category ? category.trim() : '';
     if (verificationDateTime) vendor.verificationDateTime = new Date(verificationDateTime);
     if (contactNo !== undefined) vendor.contactNo = contactNo.trim();
     if (state !== undefined) vendor.state = state.trim();
