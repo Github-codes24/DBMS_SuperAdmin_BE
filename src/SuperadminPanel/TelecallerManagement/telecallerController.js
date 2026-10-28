@@ -526,6 +526,8 @@ export const importTelecallers = async (req, res) => {
   try {
     let telecallersPayload = req.body?.telecallers || req.body?.data;
 
+    console.log('Import route reached');
+
     // Direct Binary Excel / CSV file upload via multer (req.file or req.files)
     const uploadedFile = req.file || (Array.isArray(req.files) && req.files.length > 0 ? req.files[0] : null);
     if (uploadedFile && uploadedFile.buffer) {
@@ -606,15 +608,29 @@ export const importTelecallers = async (req, res) => {
     }
 
     // Determine starting numeric part for custom TCxxx ID generation
-    let maxNum = 0;
-    existingRecords.forEach((tc) => {
-      if (tc.userId) {
-        const num = parseInt(tc.userId.replace(/^TC/i, ''), 10);
-        if (!isNaN(num) && num > maxNum) maxNum = num;
-      }
-    });
+    // let maxNum = 0;
+    // existingRecords.forEach((tc) => {
+    //   if (tc.userId) {
+    //     const num = parseInt(tc.userId.replace(/^TC/i, ''), 10);
+    //     if (!isNaN(num) && num > maxNum) maxNum = num;
+    //   }
+    // });
 
-    let currentTcNum = maxNum > 0 ? maxNum + 1 : 1;
+    // let currentTcNum = maxNum > 0 ? maxNum + 1 : 1;
+
+let maxNum = 0;
+existingTcs.forEach((tc) => {
+  if (tc.userId) {
+    const num = parseInt(tc.userId.replace(/^TC/i, ''), 10);
+
+    if (!isNaN(num) && num > maxNum) {
+      maxNum = num;
+    }
+  }
+});
+
+let currentTcNum = maxNum + 1;
+
 
     const defaultSalt = await bcrypt.genSalt(10);
     const defaultHashedPassword = await bcrypt.hash('Telecaller@123', defaultSalt);
