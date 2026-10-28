@@ -61,6 +61,7 @@ const allowedOrigins = [
   "https://dbms.vendor.localtradestreet.com",
   "https://local-trade-street-be-2.onrender.com",
   "https://lts-dbms-backend.onrender.com",
+  "https://lts-dbms-vendor-panel.netlify.app/"
 ];
 
 //middleware
