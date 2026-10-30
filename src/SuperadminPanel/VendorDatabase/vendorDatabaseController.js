@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import SuperAdminVendor, { VendorFormField} from './vendorDatabaseSchema.js';
 import Vendor from '../../VendorPanel/Authentication/authSchema.js';
+import Customer from '../CustomerDatabase/customerSchema.js';
 import {
   parseExcelOrCsvBuffer,
   filterUniqueRecords,
@@ -72,8 +73,14 @@ const findVendorByIdOrCustomId = async (identifier) => {
 const normalizeStatus = (statusStr) => {
   if (!statusStr) return 'Pending';
   const str = statusStr.toString().trim().toLowerCase();
-  if (str === 'active') return 'Active';
-  return 'Pending';
+  const statusMap = {
+    active: 'Active',
+    pending: 'Pending',
+    blocked: 'Blocked',
+    disabled: 'Disabled',
+    rejected: 'Rejected',
+  };
+  return statusMap[str] || 'Pending';
 };
 // 1. GET ALL VENDORS DIRECTORY
 // @desc    Get All Vendors Directory (Search, Filter, Pagination)
@@ -356,13 +363,17 @@ export const createVendor = async (req, res) => {
 // Active the Account and Send Id and Password 
 export const activateVendor = async (req, res) => {
   try {
-    const { vendorId } = req.params;
+    const identifier = req.params.vendorId || req.params.id;
 
-    // Find vendor
-    const vendor = await SuperAdminVendor.findOne({
-      vendorId,
-      isDeleted: false,
-    });
+    if (!identifier) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vendor identifier is required',
+      });
+    }
+
+    // Find vendor by Mongo _id, custom vendorId ('VEN001'), or transNo
+    const vendor = await findVendorByIdOrCustomId(identifier);
 
     if (!vendor) {
       return res.status(404).json({
@@ -371,8 +382,8 @@ export const activateVendor = async (req, res) => {
       });
     }
 
-    // Prevent activating an already active vendor
-    if (vendor.status === 'Active') {
+    // Prevent activating an already active vendor unless force is provided
+    if (vendor.status === 'Active' && !req.body?.force) {
       return res.status(400).json({
         success: false,
         message: 'Vendor is already active',
@@ -380,64 +391,91 @@ export const activateVendor = async (req, res) => {
     }
 
     // Make sure vendor has an email
-    if (!vendor.email) {
+    if (!vendor.email || !vendor.email.trim()) {
       return res.status(400).json({
         success: false,
         message:
           'Vendor cannot be activated because no email address is available.',
       });
     }
-    /*
-     * Generate password ONLY during activation.
-     */
-    const rawPassword = generateRandomPassword();
 
-    const hashedPassword = await bcrypt.hash(
-      rawPassword,
-      10
-    );
+    // Ensure valid vendorId and transNo exist
+    if (!vendor.vendorId || !vendor.transNo) {
+      const generated = await generateVendorIdAndTransNo();
+      if (!vendor.vendorId) vendor.vendorId = generated.vendorId;
+      if (!vendor.transNo) vendor.transNo = generated.transNo;
+    }
+
+    /*
+     * Generate password ONLY during activation (or use SuperAdmin specified password)
+     */
+    const rawPassword = req.body?.password?.trim() || generateRandomPassword();
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
     // Update master vendor
     vendor.status = 'Active';
     vendor.password = hashedPassword;
-
+    vendor.updatedBy = req.superAdmin?._id || req.user?._id || null;
     await vendor.save();
 
-    // Update authentication record
-    const vendorAuth = await Vendor.findOneAndUpdate(
-      { vendorId },
-
+    // Update authentication record in VendorPanel auth
+    const cleanEmail = vendor.email.toLowerCase().trim();
+    await Vendor.findOneAndUpdate(
       {
-        email: vendor.email,
+        $or: [
+          { vendorId: vendor.vendorId },
+          { email: cleanEmail },
+        ],
+      },
+      {
+        vendorId: vendor.vendorId,
+        email: cleanEmail,
         password: hashedPassword,
         storeStatus: 'Active & Verified',
+        fullName: vendor.ownerName || vendor.vendorName,
+        storeName: vendor.vendorName,
+        phone: vendor.contactNo || '',
+        state: vendor.state || '',
+        city: vendor.city || '',
+        address: vendor.completeAddress || '',
       },
-
       {
+        upsert: true,
         returnDocument: 'after',
+        setDefaultsOnInsert: true,
       }
     );
 
-    if (!vendorAuth) {
-      // Important: don't silently continue
-      return res.status(500).json({
-        success: false,
-        message: 'Vendor authentication record not found.',
-      });
+    // Sync Customer collection if record exists
+    try {
+      await Customer.findOneAndUpdate(
+        {
+          $or: [
+            { vendorId: vendor.vendorId },
+            { customerId: vendor.vendorId },
+            { email: cleanEmail },
+          ],
+        },
+        {
+          status: 'Active',
+          password: hashedPassword,
+        }
+      );
+    } catch (custErr) {
+      console.error('Customer sync error on vendor activate:', custErr.message);
     }
 
     /*
      * Send credentials AFTER successful activation.
      */
-    const emailResult =
-      await sendVendorCredentialsEmail({
-        toEmail: vendor.email,
-        vendorName: vendor.vendorName,
-        vendorId: vendor.vendorId,
-        password: rawPassword,
-      });
+    const emailResult = await sendVendorCredentialsEmail({
+      toEmail: vendor.email,
+      vendorName: vendor.vendorName || vendor.ownerName || 'Vendor Partner',
+      vendorId: vendor.vendorId,
+      password: rawPassword,
+    });
 
-    // Audit
+    // Audit log
     await createAuditLog({
       user: req.superAdmin?.adminId || 'SUPER',
       userName: req.superAdmin?.name || 'Super Admin',
@@ -450,11 +488,11 @@ export const activateVendor = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: emailResult.success
-        ? 'Vendor activated and credentials sent successfully.'
+        ? 'Vendor activated and login credentials sent successfully via email.'
         : 'Vendor activated, but credentials email could not be sent.',
-
       data: {
         vendorId: vendor.vendorId,
+        transNo: vendor.transNo,
         email: vendor.email,
         status: vendor.status,
         emailSent: emailResult.success,
@@ -463,10 +501,8 @@ export const activateVendor = async (req, res) => {
         }),
       },
     });
-
   } catch (error) {
     console.error('Activate vendor error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error',
@@ -477,10 +513,9 @@ export const activateVendor = async (req, res) => {
 // Change Password of the Vendor
 export const changeVendorPassword = async (req, res) => {
   try {
-    const { vendorId } = req.params;
+    const identifier = req.params.vendorId || req.params.id;
     const { newPassword } = req.body;
 
-    // 1. Validate password
     if (!newPassword || !newPassword.trim()) {
       return res.status(400).json({
         success: false,
@@ -495,11 +530,7 @@ export const changeVendorPassword = async (req, res) => {
       });
     }
 
-    // 2. Find vendor
-    const vendor = await SuperAdminVendor.findOne({
-      vendorId,
-      isDeleted: false,
-    });
+    const vendor = await findVendorByIdOrCustomId(identifier);
 
     if (!vendor) {
       return res.status(404).json({
@@ -508,68 +539,58 @@ export const changeVendorPassword = async (req, res) => {
       });
     }
 
-    // 3. Make sure vendor is active
-    if (
-      vendor.status !== 'Active' &&
-      vendor.status !== 'ACTIVE'
-    ) {
+    if (vendor.status !== 'Active' && vendor.status !== 'ACTIVE') {
       return res.status(400).json({
         success: false,
         message: 'Password can only be changed for an active vendor',
       });
     }
 
-    // 4. Make sure vendor has registered email
     if (!vendor.email) {
       return res.status(400).json({
         success: false,
-        message:
-          'Vendor cannot receive password because no registered email address is available.',
+        message: 'Vendor cannot receive password because no registered email address is available.',
       });
     }
 
-    // 5. Hash new password
-    const hashedPassword = await bcrypt.hash(
-      newPassword.trim(),
-      10
-    );
-
-    // 6. Update SuperAdminVendor password
+    const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
     vendor.password = hashedPassword;
-    vendor.updatedBy = req.superAdmin?._id || null;
-
+    vendor.updatedBy = req.superAdmin?._id || req.user?._id || null;
     await vendor.save();
 
-    // 7. Update Vendor authentication record
-    const vendorAuth = await Vendor.findOneAndUpdate(
-      { vendorId },
-
+    await Vendor.findOneAndUpdate(
       {
-        password: hashedPassword,
+        $or: [
+          { vendorId: vendor.vendorId },
+          { email: vendor.email.toLowerCase().trim() },
+        ],
       },
-
-      {
-        returnDocument: 'after',
-      }
+      { password: hashedPassword },
+      { returnDocument: 'after' }
     );
 
-    if (!vendorAuth) {
-      return res.status(500).json({
-        success: false,
-        message: 'Vendor authentication record not found.',
-      });
+    try {
+      await Customer.findOneAndUpdate(
+        {
+          $or: [
+            { vendorId: vendor.vendorId },
+            { customerId: vendor.vendorId },
+            { email: vendor.email.toLowerCase().trim() },
+          ],
+        },
+        { password: hashedPassword }
+      );
+    } catch (custErr) {
+      console.error('Customer sync error on vendor password change:', custErr.message);
     }
 
-    // 8. Send new credentials to registered email
-    const emailResult =
-      await sendVendorCredentialsEmail({
-        toEmail: vendor.email,
-        vendorName: vendor.vendorName,
-        vendorId: vendor.vendorId,
-        password: newPassword.trim(),
-      });
+    const emailResult = await sendVendorCredentialsEmail({
+      toEmail: vendor.email,
+      vendorName: vendor.vendorName,
+      vendorId: vendor.vendorId,
+      password: newPassword.trim(),
+    });
 
-    // 9. Audit log
     await createAuditLog({
       user: req.superAdmin?.adminId || 'SUPER',
       userName: req.superAdmin?.name || 'Super Admin',
@@ -579,13 +600,11 @@ export const changeVendorPassword = async (req, res) => {
       module: 'Vendor Database',
     });
 
-    // 10. Response
     return res.status(200).json({
       success: true,
       message: emailResult.success
         ? 'Vendor password changed and credentials sent successfully.'
         : 'Vendor password changed, but credentials email could not be sent.',
-
       data: {
         vendorId: vendor.vendorId,
         email: vendor.email,
@@ -595,13 +614,8 @@ export const changeVendorPassword = async (req, res) => {
         }),
       },
     });
-
   } catch (error) {
-    console.error(
-      'Change vendor password error:',
-      error
-    );
-
+    console.error('Change vendor password error:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error',
@@ -612,13 +626,9 @@ export const changeVendorPassword = async (req, res) => {
 //Delete Vendor's
 export const deleteVendor = async (req, res) => {
   try {
-    const { vendorId } = req.params;
+    const identifier = req.params.vendorId || req.params.id;
 
-    // 1. Find vendor
-    const vendor = await SuperAdminVendor.findOne({
-      vendorId,
-      isDeleted: false,
-    });
+    const vendor = await findVendorByIdOrCustomId(identifier);
 
     if (!vendor) {
       return res.status(404).json({
@@ -627,26 +637,36 @@ export const deleteVendor = async (req, res) => {
       });
     }
 
-    // 2. Soft delete vendor
     vendor.isDeleted = true;
-    vendor.updatedBy = req.superAdmin?._id || null;
-
+    vendor.updatedBy = req.superAdmin?._id || req.user?._id || null;
     await vendor.save();
 
-    // 3. Disable vendor authentication
-    const vendorAuth = await Vendor.findOneAndUpdate(
-      { vendorId },
-
+    await Vendor.findOneAndUpdate(
       {
-        storeStatus: 'Deleted',
+        $or: [
+          { vendorId: vendor.vendorId },
+          { email: vendor.email?.toLowerCase().trim() },
+        ],
       },
-
-      {
-        returnDocument: 'after',
-      }
+      { storeStatus: 'Deleted' },
+      { returnDocument: 'after' }
     );
 
-    // 4. Audit log
+    try {
+      await Customer.findOneAndUpdate(
+        {
+          $or: [
+            { vendorId: vendor.vendorId },
+            { customerId: vendor.vendorId },
+            { email: vendor.email?.toLowerCase().trim() },
+          ],
+        },
+        { isDeleted: true }
+      );
+    } catch (custErr) {
+      console.error('Customer sync error on delete vendor:', custErr.message);
+    }
+
     await createAuditLog({
       user: req.superAdmin?.adminId || 'SUPER',
       userName: req.superAdmin?.name || 'Super Admin',
@@ -664,13 +684,8 @@ export const deleteVendor = async (req, res) => {
         deleted: true,
       },
     });
-
   } catch (error) {
-    console.error(
-      'Delete vendor error:',
-      error
-    );
-
+    console.error('Delete vendor error:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error',
@@ -714,6 +729,9 @@ export const searchVendors = async (req, res) => {
 
     const filter = {
       isDeleted: false,
+      status: req.query?.status
+        ? normalizeStatus(req.query.status)
+        : { $nin: ['Blocked', 'BLOCKED', 'blocked'] },
     };
 
     // Vendor name search
@@ -1570,12 +1588,9 @@ export const exportVendorsPDF = async (req, res) => {
 // -----------------Block Vendor ------------------------------------------
 export const blockVendor = async (req, res) => {
   try {
-    const { id } = req.params;
+    const identifier = req.params.vendorId || req.params.id;
 
-    const vendor = await SuperAdminVendor.findOne({
-      _id: id,
-      isDeleted: false,
-    });
+    const vendor = await findVendorByIdOrCustomId(identifier);
 
     if (!vendor) {
       return res.status(404).json({
@@ -1593,8 +1608,31 @@ export const blockVendor = async (req, res) => {
 
     vendor.status = "Blocked";
     vendor.updatedBy = req.user?._id || null;
-
     await vendor.save();
+
+    try {
+      await Vendor.findOneAndUpdate(
+        {
+          $or: [
+            { vendorId: vendor.vendorId },
+            { email: vendor.email?.toLowerCase().trim() },
+          ],
+        },
+        { storeStatus: "Blocked" }
+      );
+      await Customer.findOneAndUpdate(
+        {
+          $or: [
+            { vendorId: vendor.vendorId },
+            { customerId: vendor.vendorId },
+            { email: vendor.email?.toLowerCase().trim() },
+          ],
+        },
+        { status: "Blocked" }
+      );
+    } catch (syncErr) {
+      console.error("Block vendor sync error:", syncErr.message);
+    }
 
     await createAuditLog({
       user: req.superAdmin?.adminId || 'SUPER',
@@ -1620,15 +1658,13 @@ export const blockVendor = async (req, res) => {
     });
   }
 };
+
 // -------------------- Unblock Vendor----------------------------------
 export const unblockVendor = async (req, res) => {
   try {
-    const { id } = req.params;
+    const identifier = req.params.vendorId || req.params.id;
 
-    const vendor = await SuperAdminVendor.findOne({
-      _id: id,
-      isDeleted: false,
-    });
+    const vendor = await findVendorByIdOrCustomId(identifier);
 
     if (!vendor) {
       return res.status(404).json({
@@ -1646,8 +1682,32 @@ export const unblockVendor = async (req, res) => {
 
     vendor.status = "Active";
     vendor.updatedBy = req.user?._id || null;
-
     await vendor.save();
+
+    try {
+      await Vendor.findOneAndUpdate(
+        {
+          $or: [
+            { vendorId: vendor.vendorId },
+            { email: vendor.email?.toLowerCase().trim() },
+          ],
+        },
+        { storeStatus: "Active & Verified" }
+      );
+      await Customer.findOneAndUpdate(
+        {
+          $or: [
+            { vendorId: vendor.vendorId },
+            { customerId: vendor.vendorId },
+            { email: vendor.email?.toLowerCase().trim() },
+          ],
+        },
+        { status: "Active" }
+      );
+    } catch (syncErr) {
+      console.error("Unblock vendor sync error:", syncErr.message);
+    }
+
     await createAuditLog({
       user: req.superAdmin?.adminId || 'SUPER',
       userName: req.superAdmin?.name || 'Super Admin',
@@ -1672,5 +1732,3 @@ export const unblockVendor = async (req, res) => {
     });
   }
 };
-
-
