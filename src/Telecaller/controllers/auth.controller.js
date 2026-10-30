@@ -16,20 +16,27 @@ export const signup = asyncHandler(async (req, res) => {
     password,
   } = req.body;
 
-  const { token, telecaller } = await authService.signup({
-    name,
-    employeeId,
-    email,
-    phone,
-    password,
-  });
+  try {
+    const result = await authService.signup({
+      name,
+      employeeId,
+      email,
+      phone,
+      password,
+    });
 
-  return res.status(201).json({
-    success: true,
-    message: 'Telecaller registered successfully',
-    token,
-    data: telecaller,
-  });
+    return res.status(201).json({
+      success: true,
+      message: result.message || 'Telecaller registered successfully. Account pending Super Admin activation.',
+      data: result.telecaller,
+    });
+  } catch (error) {
+    const statusCode = error.statusCode || 400;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message,
+    });
+  }
 });
 
 // ─── POST /api/telecaller/auth/login ──────────────────────────────────────────
@@ -45,17 +52,25 @@ export const login = asyncHandler(async (req, res) => {
     password,
   } = req.body;
 
-  const { token, telecaller } = await authService.login({
-    email,
-    password,
-  });
+  try {
+    const { token, telecaller } = await authService.login({
+      email,
+      password,
+    });
 
-  return res.status(200).json({
-    success: true,
-    message: 'Login successful',
-    token,
-    data: telecaller,
-  });
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      token,
+      data: telecaller,
+    });
+  } catch (error) {
+    const statusCode = error.statusCode || (error.message.includes('pending activation') || error.message.includes('blocked') ? 403 : 401);
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message,
+    });
+  }
 });
 
 // ─── GET /api/telecaller/auth/me ──────────────────────────────────────────────

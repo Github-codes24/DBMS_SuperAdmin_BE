@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
@@ -42,8 +41,8 @@ const telecallerSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["ACTIVE", "INACTIVE"],
-      default: "ACTIVE",
+      enum: ["ACTIVE", "INACTIVE", "PENDING", "Pending", "Active", "Inactive", "BLOCKED", "Blocked", "Disabled", "DISABLED"],
+      default: "PENDING",
     },
     profileImage: {
       type: String,
