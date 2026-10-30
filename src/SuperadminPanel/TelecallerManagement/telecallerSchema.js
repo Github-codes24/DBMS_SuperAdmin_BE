@@ -38,12 +38,28 @@ const telecallerSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['ACTIVE', 'DISABLED', 'Active', 'Disabled','BLOCKED','Blocked'],
-      default: 'Active',
+      enum: [
+        'ACTIVE',
+        'DISABLED',
+        'Active',
+        'Disabled',
+        'BLOCKED',
+        'Blocked',
+        'Pending',
+        'PENDING',
+        'INACTIVE',
+        'Inactive',
+      ],
+      default: 'Pending',
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'SuperAdmin',
+      default: null,
+    },
+    createdByVendor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vendor',
       default: null,
     },
     updatedBy: {

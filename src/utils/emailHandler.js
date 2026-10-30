@@ -257,9 +257,14 @@ export const sendTelecallerCredentialsEmail = async ({ toEmail, telecallerName, 
     templateId: templateId,
     variables: {
       name: telecallerName,
+      telecallerName: telecallerName,
       email: toEmail,
+      username: telecallerId || toEmail,
+      telecallerId: telecallerId || toEmail,
+      telecaller_id: telecallerId || toEmail,
       password: password,
       link: loginUrl,
+      loginUrl: loginUrl,
     },
   });
 };

@@ -10,7 +10,8 @@ import {
   exportTelecallersCSV,
   exportTelecallersPDF,
   blockTelecaller,
-  unblockTelecaller
+  unblockTelecaller,
+  activateTelecaller,
 } from './telecallerController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
 
@@ -37,14 +38,19 @@ router
 
 router.patch('/bulk-status', protectSuperAdmin, bulkUpdateTelecallerStatus);
 
+// Activate Telecaller from Super Admin
+router.patch('/:id/activate', protectSuperAdmin, activateTelecaller);
+
+// Block Telecaller from Super Admin
+router.patch('/:id/block', protectSuperAdmin, blockTelecaller);
+
+// Unblock Telecaller from Super Admin
+router.patch('/:id/unblock', protectSuperAdmin, unblockTelecaller);
+
 // Single Telecaller Profile & Manage Update Modal (Accepts MongoDB _id, custom userId 'TC014', email, or mobileNumber)
 router
   .route('/:id')
   .get(protectSuperAdmin, getTelecallerById)
   .patch(protectSuperAdmin, updateTelecaller);
 
-  // block  Telecaller from superAdmin
-  router.patch('/:id/block',protectSuperAdmin,blockTelecaller);
-  //unblock Telecaller from superAdmin
-  router.patch('/:id/unblock',protectSuperAdmin,unblockTelecaller);
 export default router;
