@@ -1,150 +1,95 @@
-
-import mongoose from "mongoose";
-import { Project } from "../models/Project.js";
-import {Role} from "../models/roles.js"
-import {User} from "../models/User.js"
 import { Types } from "mongoose";
-
-interface CreateProjectInput {
-  name: string;
-  description?: string;
-  createdBy: string;
-}
-
-const COUNTER_ID = new mongoose.Types.ObjectId();
-const COUNTER_PROJECT_ID = "__PROJECT_COUNTER__";
+import { Project } from "../models/Project.js";
+import { Role } from "../models/roles.js";
+import { User } from "../models/User.js";
+import { Counter } from "../models/counter.js";
+import { httpError } from "../utils/httpError.js";
+import { audit } from "./audit.service.js";
 
 async function getNextProjectId(): Promise<string> {
-  // Find the internal counter document.
-  let counter = await Project.collection.findOne({
-    projectId: COUNTER_PROJECT_ID,
-  });
-
-  if (!counter) {
-    // Find the highest existing project ID.
-    const projects = await Project.find({
-      projectId: /^PID-\d+$/,
-    })
-      .select("projectId")
-      .lean();
-
-    const maxId = projects.reduce((max, project) => {
-      const match = project.projectId.match(/^PID-(\d+)$/);
-      return match ? Math.max(max, Number(match[1])) : max;
-    }, 0);
-
-    try {
-      await Project.collection.insertOne({
-        _id: COUNTER_ID,
-        projectId: COUNTER_PROJECT_ID,
-        seq: maxId,
-      });
-    } catch (error: unknown) {
-      const duplicateKey =
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        error.code === 11000;
-
-      if (!duplicateKey) {
-        throw error;
-      }
-    }
+  // First use: start from the highest existing PID-xxx so numbering continues
+  const exists = await Counter.exists({ _id: "project" });
+  if (!exists) {
+    const all = await Project.find({ projectId: /^PID-\d+$/ }).select("projectId").lean();
+    const max = all.reduce((m, p) => Math.max(m, Number(p.projectId.slice(4))), 0);
+    await Counter.updateOne({ _id: "project" }, { $setOnInsert: { seq: max } }, { upsert: true }).catch(() => {});
   }
-
-  // Read the counter's actual ObjectId.
-  counter = await Project.collection.findOne({
-    projectId: COUNTER_PROJECT_ID,
-  });
-
-  if (!counter) {
-    throw new Error("Project ID counter not found");
-  }
-
-  // Atomically increment the counter.
-  const result = await Project.collection.findOneAndUpdate(
-    { _id: counter._id },
-    { $inc: { seq: 1 } },
-    { returnDocument: "after" },
-  );
-
-  // Compatible with MongoDB driver versions returning ModifyResult.
-  const updatedCounter =
-    result && "value" in result ? result.value : result;
-
-  if (
-    !updatedCounter ||
-    typeof updatedCounter.seq !== "number"
-  ) {
-    throw new Error("Could not generate project ID");
-  }
-
-  return `PID-${String(updatedCounter.seq).padStart(3, "0")}`;
+  const c = await Counter.findOneAndUpdate({ _id: "project" }, { $inc: { seq: 1 } }, { new: true });
+  return `PID-${String(c!.seq).padStart(3, "0")}`;
 }
 
-export async function createProject(input: CreateProjectInput) {
+export async function createProject(input: { name: string; description?: string; createdBy: string }) {
   const projectId = await getNextProjectId();
-
-  return Project.create({
+  const project = await Project.create({
     projectId,
     name: input.name.trim(),
     description: input.description?.trim() ?? "",
+    type: "tenant",                     // set here, never from the request body
     createdBy: input.createdBy,
   });
+  await audit("project.created",{ 
+actorId: input.createdBy,
+     projectId: project._id, after:{
+       projectId,
+         name: project.name
+         } 
+        });
+  return project;
 }
 
-// export async function getProjects() {
-//   return Project.find({
-//     projectId: /^PID-\d+$/,
-//   })
-//     .sort({ createdAt: -1 })
-//     .lean();
-// }
-// import { User } from "../models/User";
-// import { Project } from "../models/Project";
-// import { Role } from "../models/Role";
+/** Project management list: tenants only. */
+export async function getProjects() {
+  return Project.find({ type: "tenant" }).
+  sort({ createdAt: -1 }).
+  lean();
+}
+
+/** Feeds the "Platform > SuperAdmin" dropdown: every project with its roles. */
+export async function getProjectsWithRoles() {
+  const [projects, roles] = await Promise.all([
+    Project.find().
+    select("projectId name type status").lean(),
+    Role.find().select("name projectId isSystem isActive").
+    sort({ name: 1 }).lean(),
+  ]);
+  return projects
+    .map((p) => ({
+      ...p,
+      roles: roles.filter((r) => String(r.projectId) === String(p._id)).map((r) => ({ _id: r._id, name: r.name, isSystem: r.isSystem, isActive: r.isActive })),
+    }))
+    .sort((a, b) => (a.type === "platform" ? -1 : b.type === "platform" ? 1 : a.name.localeCompare(b.name)));
+}
+
+export async function updateProject(
+  projectId: string,
+  data: { name?: string; description?: string; status?: "active" | "inactive" },
+  actorId: string,
+) {
+  const project = await Project.findById(projectId);
+  if (!project) throw httpError(404, "PROJECT_NOT_FOUND", "Project not found");
+  if (project.type === "platform" && data.status === "inactive") throw httpError(403, "PLATFORM_LOCKED", "The platform project cannot be deactivated");
+
+  if (data.name !== undefined) project.name = data.name.trim();
+  if (data.description !== undefined) project.description = data.description.trim();
+  if (data.status !== undefined) project.status = data.status;
+  await project.save();
+  await audit("project.updated", { actorId, projectId, after: data });
+  return project;
+}
 
 export async function getMyProjects(userId: string, userRole: string) {
-
-  // SuperAdmin can see all projects
   if (userRole === "superadmin") {
-    const projects = await Project.find()
-      .select("name description isActive createdAt updatedAt")
-      .sort({ createdAt: -1 });
-
-    return projects;
+    return Project.find({ type: "tenant" }).
+    select("projectId name description status createdAt updatedAt").
+    sort({ createdAt: -1 });
   }
- // Project Admin / normal user → only their projects
-  const user = await User.findById(userId).select("projectIds");
+  const user = await User.findById(userId).select("projectRoles");
+  if (!user) throw httpError(404, "USER_NOT_FOUND", "User not found");
 
-  if (!user) {
-    throw Object.assign(new Error("User not found"), {
-      statusCode: 404,
-      code: "USER_NOT_FOUND",
-    });
-  }
-  
-
-  const objectIds = user.projectIds
-    .filter((id) => Types.ObjectId.isValid(id))
-    .map((id) => new Types.ObjectId(id));
-
-  if (objectIds.length === 0) {
-    return [];
-  }
-
-  console.log("User projectIds →", user.projectIds);
-  console.log("Converted ObjectIds →", objectIds);
-
-  if (!user.projectIds || user.projectIds.length === 0) {
-    return [];
-  }
-
-
-  const projects = await Project.find({
-    _id: { $in: user.projectIds },
-  }).select("name description isActive createdAt updatedAt");
-
-  return projects;
+  const ids = user.projectRoles.filter((pr) => pr.isActive).map((pr) => pr.projectId);
+  if (ids.length === 0) return [];
+  return Project.find({ _id: { $in: ids },
+     status: "active",
+      type: "tenant" })
+    .select("projectId name description status createdAt updatedAt");
 }
-

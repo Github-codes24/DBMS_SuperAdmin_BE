@@ -1,37 +1,37 @@
-import { Router } from "express";
-import {
-  createProject,
-  getMyProjects,
-} from "../controllers/projectController.js";
-import { authenticate } from "../middleware/authenticate.js";
-import { requireSuperAdmin } from "../middleware/requireSuperAdmin.js";
-import { validate } from "../middleware/validate.js";
-import { createProjectAdminSchema } from "../validators/projectAdminValidator.js";
-import {
-  createProjectAdminController,
-} from "../controllers/projectAdminController.js";
+// import { Router } from "express";
+// import {
+//   createProject,
+//   getMyProjects,
+// } from "../controllers/projectController.js";
+// import { authenticate } from "../middleware/authenticate.js";
+// import { requireSuperAdmin } from "../middleware/requireSuperAdmin.js";
+// import { validate } from "../middleware/validate.js";
+// import { createProjectAdminSchema } from "../validators/projectAdminValidator.js";
+// import {
+//   createProjectAdminController,
+// } from "../controllers/projectAdminController.js";
 
-const router = Router();
-
-
-// --------------------------------------------------
-// Routes accessible by Project Admin + SuperAdmin
-// --------------------------------------------------
-router.get("/me/projects", authenticate, getMyProjects);
+// const router = Router();
 
 
-// --------------------------------------------------
-// SuperAdmin only routes
-// --------------------------------------------------
+// // --------------------------------------------------
+// // Routes accessible by Project Admin + SuperAdmin
+// // --------------------------------------------------
+// router.get("/me/projects", authenticate, getMyProjects);
 
-router.use(authenticate, requireSuperAdmin);
 
-router.post("/create", createProject);
+// // --------------------------------------------------
+// // SuperAdmin only routes
+// // --------------------------------------------------
 
-router.post(
-  "/:projectId/admins",
-  validate(createProjectAdminSchema),
-  createProjectAdminController,
-);
+// router.use(authenticate, requireSuperAdmin);
 
-export default router;
+// router.post("/create", createProject);
+
+// router.post(
+//   "/:projectId/admins",
+//   validate(createProjectAdminSchema),
+//   createProjectAdminController,
+// );
+
+// export default router;
