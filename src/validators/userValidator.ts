@@ -2,26 +2,51 @@ import { z } from "zod";
 
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 
+// export const listUsersSchema = z.object({
+//   body: z.object({}),
+//   params: z.object({}),
+//   query: z.object({
+//     page: z.coerce.number().int().min(1).default(1),
+//     limit: z.coerce.number().int().min(1).max(100).default(10),
+//     search: z.string().trim().max(100).optional(),
+//     role: z.enum(["superadmin", "admin", "manager", "user"]).optional(),
+//     isActive: z
+//       .enum(["true", "false"])
+//       .transform((val) => val === "true")
+//       .optional(),
+//     projectId: z.string().trim().optional(),
+//     sortBy: z
+//       .enum(["createdAt", "name", "email", "lastLoginAt"])
+//       .default("createdAt"),
+//     sortOrder: z.enum(["asc", "desc"]).default("desc"),
+//   }),
+// });
+
+const emptyToUndefined = (v: unknown) => (v === "" || v === null ? undefined : v);
+const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
+
+const projectRolesField = z
+  .array(z.object({ projectId: objectId, roleId: objectId }))
+  .max(50)
+  .optional();
+  
 export const listUsersSchema = z.object({
-  body: z.object({}),
-  params: z.object({}),
+  body: z.any().optional(),          // GET has no body (undefined in Express 5)
+  params: z.any().optional(),
   query: z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(10),
-    search: z.string().trim().max(100).optional(),
-    role: z.enum(["superadmin", "admin", "manager", "user"]).optional(),
-    isActive: z
-      .enum(["true", "false"])
-      .transform((val) => val === "true")
-      .optional(),
-    projectId: z.string().trim().optional(),
-    sortBy: z
-      .enum(["createdAt", "name", "email", "lastLoginAt"])
-      .default("createdAt"),
+    search: z.preprocess(emptyToUndefined, z.string().trim().max(100).optional()),
+    role: z.preprocess(emptyToUndefined, z.enum(["superadmin", "user"]).optional()),
+    isActive: z.preprocess(
+      emptyToUndefined,
+      z.enum(["true", "false"]).transform((val) => val === "true").optional(),
+    ),
+    projectId: z.preprocess(emptyToUndefined, objectId.optional()),
+    sortBy: z.enum(["createdAt", "name", "email", "lastLoginAt"]).default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
   }),
 });
-
 export const createUserSchema = z.object({
   body: z
     .object({
@@ -40,8 +65,8 @@ export const createUserSchema = z.object({
         .string()
         .min(8, "Password must be at least 8 characters")
         .max(128, "Password cannot exceed 128 characters"),
-      role: z.enum(["superadmin", "admin", "manager", "user"]).default("user"),
-      projectIds: z.array(z.string().trim()).default([]),
+        role: z.enum(["superadmin", "user"]).default("user"), 
+      projectRoles: projectRolesField,  
       isActive: z.boolean().default(true),
     })
     .strict(),
@@ -75,8 +100,8 @@ export const updateUserSchema = z.object({
         .max(254)
         .transform((email) => email.toLowerCase())
         .optional(),
-      role: z.enum(["superadmin", "admin", "manager", "user"]).optional(),
-      projectIds: z.array(z.string().trim()).optional(),
+        role: z.enum(["superadmin", "user"]).default("user").optional(),
+      projectRoles: projectRolesField,
       isActive: z.boolean().optional(),
     })
     .strict(),

@@ -28,7 +28,13 @@ router.use(authenticate);
 router.use(authorize("superadmin", "admin"));
 
 // List users with filtering, searching, and pagination
-router.get("/", validate(listUsersSchema), getUsers);
+console.log("Registering user routes");
+router.get("/", (req, res, next) => {
+  console.log("GET /api/users route matched");
+  next();
+}, validate(listUsersSchema), getUsers);
+
+// router.get("/", validate(listUsersSchema), getUsers);
 
 // Create new user
 router.post("/", validate(createUserSchema), createUser);
