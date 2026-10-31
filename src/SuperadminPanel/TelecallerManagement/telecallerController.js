@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import Telecaller from './telecallerSchema.js';
+import TelecallerAuthModel from '../../Telecaller/models/Telecaller.js';
 import User from '../UserManagement/userSchema.js';
 import Customer from '../CustomerDatabase/customerSchema.js';
 import {
@@ -47,6 +48,16 @@ const generateTelecallerId = async () => {
 };
 
 // Helper to safely find Telecaller by Mongo _id, custom userId ('TC014'), email, or mobileNumber
+// Helper to generate secure random password for activation
+const generateRandomPassword = () => {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#%';
+  let pass = '';
+  for (let i = 0; i < 8; i++) {
+    pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return pass;
+};
+
 const findTelecallerByIdOrCustomId = async (identifier) => {
   if (!identifier) return null;
   const str = identifier.toString().trim();
@@ -56,19 +67,53 @@ const findTelecallerByIdOrCustomId = async (identifier) => {
     ? { $or: [{ _id: str }, { userId: str }, { email: str.toLowerCase() }, { mobileNumber: str }], isDeleted: false }
     : { $or: [{ userId: str }, { email: str.toLowerCase() }, { mobileNumber: str }], isDeleted: false };
 
-  return await Telecaller.findOne(query);
+  let telecaller = await Telecaller.findOne(query);
+
+  if (!telecaller) {
+    const authQuery = isObjId
+      ? { $or: [{ _id: str }, { employeeId: str }, { email: str.toLowerCase() }, { phone: str }] }
+      : { $or: [{ employeeId: str }, { email: str.toLowerCase() }, { phone: str }] };
+
+    const authTc = await TelecallerAuthModel.findOne(authQuery);
+    if (authTc) {
+      telecaller = await Telecaller.findOne({
+        $or: [
+          { email: authTc.email.toLowerCase() },
+          { mobileNumber: authTc.phone },
+          { userId: authTc.employeeId },
+        ],
+        isDeleted: false,
+      });
+
+      if (!telecaller) {
+        telecaller = await Telecaller.create({
+          userId: authTc.employeeId,
+          fullName: authTc.name,
+          mobileNumber: authTc.phone,
+          email: authTc.email.toLowerCase(),
+          password: authTc.password,
+          assignedRegion: '',
+          status: authTc.status === 'ACTIVE' || authTc.status === 'Active' ? 'Active' : 'Pending',
+          createdBy: null,
+        });
+      }
+    }
+  }
+
+  return telecaller;
 };
+
 // Normalize status string for consistent formatting
 const normalizeStatus = (status) => {
-  if (!status) return 'Active';
-  const normalized = status.trim().toLowerCase();
-  const statusMap = {
-    active: 'Active',
-    blocked: 'Blocked',
-    disabled: 'Disabled',
-  };
-  return statusMap[normalized] || 'Active';
+  if (!status) return 'Pending';
+  const s = String(status).trim().toLowerCase();
+  if (s === 'active') return 'Active';
+  if (s === 'pending') return 'Pending';
+  if (s === 'blocked') return 'Blocked';
+  if (s === 'disabled') return 'Disabled';
+  return 'Pending';
 };
+
 // 1. GET ALL TELECALLERS DIRECTORY
 // @desc    Get All Telecallers Directory (Search, Filter, Pagination, Assigned Customers Count)
 // @route   GET /api/v1/superadmin/telecallers
@@ -157,7 +202,7 @@ export const createTelecaller = async (req, res) => {
     email,
     password,
     assignedRegion,
-    status = 'Active',
+    status = 'Pending',
   } = req.body;
 
   try {
@@ -225,35 +270,84 @@ export const createTelecaller = async (req, res) => {
       createdBy: req.superAdmin._id,
     });
 
+    // Dual-schema creation: Also create in Telecaller auth model (telecallers collection)
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanMobile = mobileNumber.trim();
+      const initialAuthStatus = normalizeStatus(status) === 'Active' ? 'ACTIVE' : 'PENDING';
+
+      await TelecallerAuthModel.findOneAndUpdate(
+        {
+          $or: [
+            { email: cleanEmail },
+            { phone: cleanMobile },
+            { employeeId: autoUserId },
+          ],
+        },
+        {
+          name: fullName.trim(),
+          employeeId: autoUserId,
+          email: cleanEmail,
+          phone: cleanMobile,
+          password: password.trim(),
+          role: 'TELECALLER',
+          status: initialAuthStatus,
+          createdByVendor: null,
+        },
+        {
+          upsert: true,
+          returnDocument: 'after',
+          setDefaultsOnInsert: true,
+        }
+      );
+    } catch (authCreateErr) {
+      console.error('TelecallerAuthModel dual creation error:', authCreateErr.message);
+    }
+
     const resultObj = telecaller.toObject();
     delete resultObj.password;
     resultObj.assignedCustomersCount = 0;
 
-    // Trigger Credentials Email Service
+    // Audit Log Recording for Super Admin creation
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      actorType: 'SUPER_ADMIN',
+      action: 'Created Telecaller',
+      record: telecaller.userId,
+      module: 'Telecaller Management',
+      message: `Telecaller ${telecaller.userId} (${telecaller.fullName}) created by Super Admin: ${req.superAdmin?.name || 'Super Admin'} (${req.superAdmin?.adminId || 'SUPER'}) with status ${telecaller.status}.`,
+    });
+
+    // Trigger Credentials Email Service ONLY if activated immediately
     let emailSent = false;
     let emailError = null;
 
-    if (telecaller.email) {
-      const emailResult = await sendTelecallerCredentialsEmail({
-        toEmail: telecaller.email,
-        telecallerName: telecaller.fullName,
-        telecallerId: telecaller.userId,
-        password: password.trim(),
-      });
+    if (telecaller.status === 'Active') {
+      if (telecaller.email) {
+        const emailResult = await sendTelecallerCredentialsEmail({
+          toEmail: telecaller.email,
+          telecallerName: telecaller.fullName,
+          telecallerId: telecaller.userId,
+          password: password.trim(),
+        });
 
-      if (emailResult.success) {
-        emailSent = true;
+        if (emailResult.success) {
+          emailSent = true;
+        } else {
+          emailError = emailResult.error || 'Failed to dispatch email';
+        }
       } else {
-        emailSent = false;
-        emailError = emailResult.error || 'Failed to dispatch email';
+        emailError = 'Telecaller email address was not provided.';
       }
-    } else {
-      emailError = 'Telecaller email address was not provided.';
     }
 
-    const responseMessage = emailSent
-      ? 'Telecaller account created successfully'
-      : 'Telecaller account created successfully, but credentials email could not be sent.';
+    const responseMessage = telecaller.status === 'Active'
+      ? (emailSent
+          ? 'Telecaller account created and login credentials sent successfully.'
+          : 'Telecaller account created, but credentials email could not be sent.')
+      : 'Telecaller account created successfully with Pending status. Login credentials will be dispatched upon activation.';
 
     res.status(201).json({
       success: true,
@@ -261,6 +355,7 @@ export const createTelecaller = async (req, res) => {
       data: {
         telecallerId: telecaller.userId,
         email: telecaller.email || '',
+        status: telecaller.status,
         emailSent: emailSent,
         ...(emailError && { emailError: emailError }),
         telecaller: resultObj,
@@ -388,6 +483,37 @@ export const updateTelecaller = async (req, res) => {
     telecaller.updatedBy = req.superAdmin._id;
     await telecaller.save();
 
+    // Sync update to Telecaller auth model (telecallers collection)
+    try {
+      const mappedStatus =
+        telecaller.status === 'Active'
+          ? 'ACTIVE'
+          : telecaller.status === 'Blocked'
+            ? 'BLOCKED'
+            : telecaller.status === 'Disabled'
+              ? 'INACTIVE'
+              : 'PENDING';
+
+      const authUpdates = { status: mappedStatus };
+      if (fullName) authUpdates.name = fullName.trim();
+      if (passwordWasReset) authUpdates.password = password.trim();
+      if (telecaller.email) authUpdates.email = telecaller.email.toLowerCase();
+      if (telecaller.mobileNumber) authUpdates.phone = telecaller.mobileNumber;
+
+      await TelecallerAuthModel.findOneAndUpdate(
+        {
+          $or: [
+            { email: telecaller.email.toLowerCase() },
+            { phone: telecaller.mobileNumber },
+            { employeeId: telecaller.userId },
+          ],
+        },
+        authUpdates
+      );
+    } catch (syncErr) {
+      console.error('TelecallerAuthModel sync error on update:', syncErr.message);
+    }
+
     // Automatic Audit Log Recording
     await createAuditLog({
       user: req.superAdmin?.adminId || 'SUPER',
@@ -474,6 +600,24 @@ export const bulkUpdateTelecallerStatus = async (req, res) => {
       telecaller.status = recordStatus;
       telecaller.updatedBy = req.superAdmin?._id;
       await telecaller.save();
+
+      try {
+        const mappedBulkStatus =
+          recordStatus === 'Active' ? 'ACTIVE' : recordStatus === 'Blocked' ? 'BLOCKED' : 'INACTIVE';
+
+        await TelecallerAuthModel.findOneAndUpdate(
+          {
+            $or: [
+              { email: telecaller.email.toLowerCase() },
+              { phone: telecaller.mobileNumber },
+              { employeeId: telecaller.userId },
+            ],
+          },
+          { status: mappedBulkStatus }
+        );
+      } catch (bulkSyncErr) {
+        console.error('TelecallerAuthModel bulk sync error:', bulkSyncErr.message);
+      }
       await createAuditLog({
         user: req.superAdmin?.adminId || 'SUPER',
         userName: req.superAdmin?.name || 'Super Admin',
@@ -618,18 +762,18 @@ export const importTelecallers = async (req, res) => {
 
     // let currentTcNum = maxNum > 0 ? maxNum + 1 : 1;
 
-let maxNum = 0;
-existingTcs.forEach((tc) => {
-  if (tc.userId) {
-    const num = parseInt(tc.userId.replace(/^TC/i, ''), 10);
+    let maxNum = 0;
+    existingTcs.forEach((tc) => {
+      if (tc.userId) {
+        const num = parseInt(tc.userId.replace(/^TC/i, ''), 10);
 
-    if (!isNaN(num) && num > maxNum) {
-      maxNum = num;
-    }
-  }
-});
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    });
 
-let currentTcNum = maxNum + 1;
+    let currentTcNum = maxNum + 1;
 
 
     const defaultSalt = await bcrypt.genSalt(10);
@@ -764,7 +908,22 @@ export const blockTelecaller = async (req, res) => {
       });
     }
 
-    if (telecaller.status === "Blocked") {
+    // Check status in both schemas
+    const authRecord = await TelecallerAuthModel.findOne({
+      $or: [
+        { email: telecaller.email.toLowerCase() },
+        { phone: telecaller.mobileNumber },
+        { employeeId: telecaller.userId },
+      ],
+    });
+
+    const isAlreadyBlocked =
+      telecaller.status === "Blocked" ||
+      telecaller.status === "BLOCKED" ||
+      authRecord?.status === "BLOCKED" ||
+      authRecord?.status === "Blocked";
+
+    if (isAlreadyBlocked) {
       return res.status(400).json({
         success: false,
         message: "Telecaller is already blocked",
@@ -772,9 +931,20 @@ export const blockTelecaller = async (req, res) => {
     }
 
     telecaller.status = "Blocked";
-    telecaller.updatedBy = req.superAdmin._id;
-
+    telecaller.updatedBy = req.superAdmin?._id || req.user?._id || null;
     await telecaller.save();
+
+    // Sync block status to Telecaller auth model in telecallers collection
+    await TelecallerAuthModel.findOneAndUpdate(
+      {
+        $or: [
+          { email: telecaller.email.toLowerCase() },
+          { phone: telecaller.mobileNumber },
+          { employeeId: telecaller.userId },
+        ],
+      },
+      { status: "BLOCKED" }
+    );
 
     await createAuditLog({
       user: req.superAdmin?.adminId || "SUPER",
@@ -787,7 +957,7 @@ export const blockTelecaller = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Telecaller blocked successfully",
+      message: "Telecaller blocked successfully in both schemas",
       telecaller: {
         userId: telecaller.userId,
         fullName: telecaller.fullName,
@@ -802,6 +972,7 @@ export const blockTelecaller = async (req, res) => {
     });
   }
 };
+
 //---------------------- unblock the telecaller -------------------------------------------------------
 export const unblockTelecaller = async (req, res) => {
   const { id } = req.params;
@@ -816,7 +987,21 @@ export const unblockTelecaller = async (req, res) => {
       });
     }
 
-    if (telecaller.status !== "Blocked") {
+    const authRecord = await TelecallerAuthModel.findOne({
+      $or: [
+        { email: telecaller.email.toLowerCase() },
+        { phone: telecaller.mobileNumber },
+        { employeeId: telecaller.userId },
+      ],
+    });
+
+    const isNotBlocked =
+      telecaller.status !== "Blocked" &&
+      telecaller.status !== "BLOCKED" &&
+      authRecord?.status !== "BLOCKED" &&
+      authRecord?.status !== "Blocked";
+
+    if (isNotBlocked) {
       return res.status(400).json({
         success: false,
         message: "Telecaller is not blocked",
@@ -824,9 +1009,20 @@ export const unblockTelecaller = async (req, res) => {
     }
 
     telecaller.status = "Active";
-    telecaller.updatedBy = req.superAdmin._id;
-
+    telecaller.updatedBy = req.superAdmin?._id || req.user?._id || null;
     await telecaller.save();
+
+    // Sync active status to Telecaller auth model in telecallers collection
+    await TelecallerAuthModel.findOneAndUpdate(
+      {
+        $or: [
+          { email: telecaller.email.toLowerCase() },
+          { phone: telecaller.mobileNumber },
+          { employeeId: telecaller.userId },
+        ],
+      },
+      { status: "ACTIVE" }
+    );
 
     await createAuditLog({
       user: req.superAdmin?.adminId || "SUPER",
@@ -839,7 +1035,7 @@ export const unblockTelecaller = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Telecaller unblocked successfully",
+      message: "Telecaller unblocked successfully in both schemas",
       telecaller: {
         userId: telecaller.userId,
         fullName: telecaller.fullName,
@@ -850,6 +1046,253 @@ export const unblockTelecaller = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to unblock telecaller",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Activate Telecaller account by SuperAdmin (Pending -> Active) & send login credentials via email
+// @route   PATCH /api/v1/superadmin/telecallers/:id/activate or /:telecallerId/activate
+// @access  Private (SuperAdmin)
+export const activateTelecaller = async (req, res) => {
+  try {
+    const identifier = req.params.telecallerId || req.params.id;
+
+    if (!identifier) {
+      return res.status(400).json({
+        success: false,
+        message: 'Telecaller identifier is required',
+      });
+    }
+
+    const { name, employeeId, email, phone, password } = req.body || {};
+
+    const cleanId = identifier.toString().trim();
+    const isObjectId = mongoose.Types.ObjectId.isValid(cleanId);
+
+    // 1. Search in SuperAdminTelecaller
+    const superAdminQuery = isObjectId
+      ? {
+          $or: [
+            { _id: cleanId },
+            { userId: cleanId },
+            { email: cleanId.toLowerCase() },
+            { mobileNumber: cleanId },
+          ],
+          isDeleted: false,
+        }
+      : {
+          $or: [
+            { userId: cleanId },
+            { email: cleanId.toLowerCase() },
+            { mobileNumber: cleanId },
+          ],
+          isDeleted: false,
+        };
+
+    let superAdminTelecaller = await Telecaller.findOne(superAdminQuery);
+
+    // 2. Search in TelecallerAuthModel (telecallers collection)
+    const authQuery = isObjectId
+      ? {
+          $or: [
+            { _id: cleanId },
+            { employeeId: cleanId },
+            { email: cleanId.toLowerCase() },
+            { phone: cleanId },
+          ],
+        }
+      : {
+          $or: [
+            { employeeId: cleanId },
+            { email: cleanId.toLowerCase() },
+            { phone: cleanId },
+          ],
+        };
+
+    let authTelecaller = await TelecallerAuthModel.findOne(authQuery);
+
+    // If not found by identifier alone, check if email/phone/employeeId are in req.body
+    if (!superAdminTelecaller && !authTelecaller) {
+      const fallbackEmail = email ? email.trim().toLowerCase() : null;
+      const fallbackPhone = phone ? phone.trim() : null;
+      const fallbackEmpId = employeeId ? employeeId.trim().toUpperCase() : null;
+
+      if (fallbackEmail || fallbackPhone || fallbackEmpId) {
+        const fallbackSuper = [];
+        const fallbackAuth = [];
+        if (fallbackEmail) {
+          fallbackSuper.push({ email: fallbackEmail });
+          fallbackAuth.push({ email: fallbackEmail });
+        }
+        if (fallbackPhone) {
+          fallbackSuper.push({ mobileNumber: fallbackPhone });
+          fallbackAuth.push({ phone: fallbackPhone });
+        }
+        if (fallbackEmpId) {
+          fallbackSuper.push({ userId: fallbackEmpId });
+          fallbackAuth.push({ employeeId: fallbackEmpId });
+        }
+
+        if (fallbackSuper.length > 0) {
+          superAdminTelecaller = await Telecaller.findOne({ $or: fallbackSuper, isDeleted: false });
+        }
+        if (fallbackAuth.length > 0) {
+          authTelecaller = await TelecallerAuthModel.findOne({ $or: fallbackAuth });
+        }
+      }
+    }
+
+    if (!superAdminTelecaller && !authTelecaller) {
+      return res.status(404).json({
+        success: false,
+        message: 'Telecaller account not found',
+      });
+    }
+
+    // Cross-link models if only one was found
+    if (superAdminTelecaller && !authTelecaller) {
+      authTelecaller = await TelecallerAuthModel.findOne({
+        $or: [
+          { email: superAdminTelecaller.email?.toLowerCase() },
+          { phone: superAdminTelecaller.mobileNumber },
+          { employeeId: superAdminTelecaller.userId },
+        ],
+      });
+    }
+
+    if (authTelecaller && !superAdminTelecaller) {
+      superAdminTelecaller = await Telecaller.findOne({
+        $or: [
+          { email: authTelecaller.email?.toLowerCase() },
+          { mobileNumber: authTelecaller.phone },
+          { userId: authTelecaller.employeeId },
+        ],
+        isDeleted: false,
+      });
+    }
+
+    // Harmonize common data
+    const resolvedName = (name && name.trim()) || superAdminTelecaller?.fullName || authTelecaller?.name || 'Telecaller';
+    const resolvedEmail = (email && email.trim().toLowerCase()) || superAdminTelecaller?.email?.toLowerCase() || authTelecaller?.email?.toLowerCase();
+    const resolvedPhone = (phone && phone.trim()) || superAdminTelecaller?.mobileNumber || authTelecaller?.phone || '';
+    const resolvedEmployeeId = (employeeId && employeeId.trim().toUpperCase()) || superAdminTelecaller?.userId || authTelecaller?.employeeId || (await generateTelecallerId());
+
+    if (!resolvedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Telecaller cannot be activated because no email address is available.',
+      });
+    }
+
+    // Password resolution
+    const rawPassword = (password && password.trim()) || generateRandomPassword();
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+    // Sync or update SuperAdminTelecaller
+    if (!superAdminTelecaller) {
+      superAdminTelecaller = await Telecaller.create({
+        userId: resolvedEmployeeId,
+        fullName: resolvedName,
+        mobileNumber: resolvedPhone,
+        email: resolvedEmail,
+        password: hashedPassword,
+        status: 'Active',
+        assignedRegion: '',
+        createdBy: req.superAdmin?._id || null,
+        updatedBy: req.superAdmin?._id || null,
+      });
+    } else {
+      superAdminTelecaller.status = 'Active';
+      superAdminTelecaller.fullName = resolvedName;
+      superAdminTelecaller.email = resolvedEmail;
+      if (resolvedPhone) superAdminTelecaller.mobileNumber = resolvedPhone;
+      superAdminTelecaller.password = hashedPassword;
+      superAdminTelecaller.updatedBy = req.superAdmin?._id || null;
+      await superAdminTelecaller.save();
+    }
+
+    // Sync or update TelecallerAuthModel
+    if (!authTelecaller) {
+      authTelecaller = await TelecallerAuthModel.create({
+        name: resolvedName,
+        employeeId: resolvedEmployeeId,
+        email: resolvedEmail,
+        phone: resolvedPhone,
+        password: hashedPassword,
+        role: 'TELECALLER',
+        status: 'ACTIVE',
+        createdByVendor: null,
+      });
+    } else {
+      authTelecaller.name = resolvedName;
+      authTelecaller.email = resolvedEmail;
+      if (resolvedPhone) authTelecaller.phone = resolvedPhone;
+      authTelecaller.status = 'ACTIVE';
+      authTelecaller.password = hashedPassword;
+      await authTelecaller.save();
+    }
+
+    // Dispatch credentials email
+    let emailSent = false;
+    let emailError = null;
+
+    try {
+      const emailResult = await sendTelecallerCredentialsEmail({
+        toEmail: resolvedEmail,
+        telecallerName: resolvedName,
+        telecallerId: resolvedEmployeeId,
+        password: rawPassword,
+      });
+
+      if (emailResult.success) {
+        emailSent = true;
+      } else {
+        emailError = emailResult.error || 'Failed to dispatch email';
+      }
+    } catch (mailErr) {
+      emailError = mailErr.message;
+    }
+
+    // Audit Log (Updater identity: SUPER_ADMIN)
+    await createAuditLog({
+      user: req.superAdmin?.adminId || 'SUPER',
+      userName: req.superAdmin?.name || 'Super Admin',
+      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
+      actorType: 'SUPER_ADMIN',
+      action: 'Activated Telecaller',
+      record: resolvedEmployeeId,
+      module: 'Telecaller Management',
+      message: `Telecaller ${resolvedEmployeeId} (${resolvedName}) activated by Super Admin: ${req.superAdmin?.name || 'Super Admin'} (${req.superAdmin?.adminId || 'SUPER'}). Status set to Active in both schemas and credentials dispatched.`,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: emailSent
+        ? 'Telecaller activated and login credentials sent successfully via email.'
+        : 'Telecaller activated, but credentials email could not be sent.',
+      data: {
+        telecallerId: resolvedEmployeeId,
+        email: resolvedEmail,
+        status: 'Active',
+        emailSent,
+        ...(emailError && { emailError }),
+        telecaller: {
+          _id: superAdminTelecaller._id,
+          authId: authTelecaller._id,
+          userId: resolvedEmployeeId,
+          fullName: resolvedName,
+          email: resolvedEmail,
+          mobileNumber: resolvedPhone,
+          status: 'Active',
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Activate telecaller error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to activate telecaller',
       error: error.message,
     });
   }

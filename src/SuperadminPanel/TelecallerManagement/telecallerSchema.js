@@ -38,12 +38,17 @@ const telecallerSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['ACTIVE', 'DISABLED', 'Active', 'Disabled','BLOCKED','Blocked'],
-      default: 'Active',
+      enum: ['ACTIVE', 'DISABLED', 'BLOCKED', 'PENDING', 'Active', 'Disabled', 'Blocked', 'Pending', 'Inactive'],
+      default: 'Pending',
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'SuperAdmin',
+      default: null,
+    },
+    createdByVendor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vendor',
       default: null,
     },
     updatedBy: {
@@ -59,11 +64,11 @@ const telecallerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Encrypt password before saving
+// Encrypt password before saving (skip if already hashed with bcrypt)
 telecallerSchema.pre('save', async function () {
-  if (!this.isModified('password')) {
-    return;
-  }
+  if (!this.isModified('password') || !this.password) return;
+  if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) return;
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
 });

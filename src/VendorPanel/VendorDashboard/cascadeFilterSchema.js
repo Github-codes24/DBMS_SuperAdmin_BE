@@ -37,29 +37,29 @@ const projectSchema = new mongoose.Schema(
 );
 
 const categorySchema = new mongoose.Schema({
-  categoryId: {
-    type: String,
-    unique: true,
-    required: true,
-  },
-  projectId: {
-    type: String,
-    required: true,
-    index: true,
-  },
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  url: {
-    type: String,
-    default: "",
-  },
-  vendorCount: {
-    type: Number,
-    default: 0,
-  },
+    categoryId: {
+      type: String,
+      unique: true,
+      required: true,
+    },
+    projectId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    url: {
+      type: String,
+      default: "",
+    },
+    vendorCount: {
+      type: Number,
+      default: 0,
+    },
 });
 categorySchema.index(
   { name: 1, projectId: 1 },
@@ -118,4 +118,4 @@ subcategorySchema.index({ name: 1, parentCategory: 1 }, { unique: true });
 export const State = mongoose.model('State', stateSchema);
 export const Category = mongoose.model('Category', categorySchema);
 export const Subcategory = mongoose.model('Subcategory', subcategorySchema);
-export const  Project = mongoose.model("Project", projectSchema);
+export const Project = mongoose.model("Project", projectSchema);
