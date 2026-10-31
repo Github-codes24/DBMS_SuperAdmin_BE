@@ -22,12 +22,20 @@ export const loginVendor = async (req, res) => {
     // Find vendor by email OR vendorId (case-insensitive)
     const vendor = await Vendor.findOne({
       $or: [
-        { email: identifier.toLowerCase() },
-        { vendorId: identifier.trim() }
-      ]
+        { email: identifier.toLowerCase().trim() },
+        { vendorId: identifier.trim() },
+      ],
     });
 
-    if (vendor && (await bcrypt.compare(password, vendor.password))) {
+    if (vendor && vendor.password && (await bcrypt.compare(password, vendor.password))) {
+      // Check if vendor has been activated by Super Admin
+      if (vendor.storeStatus !== 'Active & Verified') {
+        return res.status(403).json({
+          message: 'Your account is pending verification and approval by Super Admin. Please wait for Super Admin activation.',
+          storeStatus: vendor.storeStatus,
+        });
+      }
+
       res.json({
         _id: vendor._id,
         vendorId: vendor.vendorId,
@@ -67,4 +75,3 @@ export const getVendorProfile = async (req, res) => {
 export const logoutVendor = async (req, res) => {
   res.json({ message: 'Logged out successfully' });
 };
-

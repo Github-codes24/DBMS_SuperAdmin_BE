@@ -12,11 +12,13 @@ import { getProfile, updateProfile } from '../controllers/profile.controller.js'
 
 const router = express.Router();
 
-// Single-file upload for profile image
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadDir = path.join(__dirname, '../../../../uploads/vendors');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// Single-file upload for profile image inside workspace uploads
+const uploadDir = path.join(process.cwd(), 'uploads/vendors');
+try {
+  if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+} catch (e) {
+  // Graceful
+}
 
 const profileImageUpload = multer({
   storage: multer.diskStorage({
@@ -46,4 +48,3 @@ router.put('/',  protectTelecaller, (req, res, next) => {
 }, updateProfile);
 
 export default router;
-
