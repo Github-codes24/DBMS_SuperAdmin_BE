@@ -62,7 +62,7 @@ async function bootstrapSuperAdmin(): Promise<void> {
     email,
     passwordHash,
     role: "superadmin",
-    projectIds: [],
+    // projectIds: [],
     isActive: true,
   });
 
