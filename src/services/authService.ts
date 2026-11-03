@@ -396,7 +396,13 @@ export async function refreshUserTokens(refreshToken: string) {
 
   let userId: string;
   try {
-    const decoded = jwt.verify(refreshToken, secret, { issuer: ISSUER, audience: AUDIENCE });
+    const decoded = jwt.verify(
+      refreshToken,
+       secret,
+        {
+           issuer: ISSUER,
+            audience: AUDIENCE
+           });
     if (typeof decoded === "string" || decoded.tokenUse !== "refresh" || typeof decoded.sub !== "string") {
       throw new Error("Invalid refresh token");
     }
@@ -418,9 +424,20 @@ export async function refreshUserTokens(refreshToken: string) {
 
   // Atomic rotation: a reused, revoked, or expired session will not match
   const session = await RefreshSession.findOneAndUpdate(
-    { userId: user._id, tokenHash: oldTokenHash, revokedAt: null, expiresAt: { $gt: now } },
-    { $set: { tokenHash: newTokenHash, expiresAt: new Date(now.getTime() + REFRESH_TTL_MS) } },
-    { new: true },
+    {
+       userId: user._id,
+        tokenHash: oldTokenHash,
+         revokedAt: null, 
+         expiresAt: {
+           $gt: now }
+           },
+    { $set: {
+       tokenHash: newTokenHash,
+        expiresAt: new Date(now.getTime() + REFRESH_TTL_MS) }
+       },
+    { 
+      new: true 
+    },
   );
   if (!session) {
     throw new AuthServiceError("Invalid, expired, or revoked refresh session", 401, "INVALID_REFRESH_SESSION");
@@ -433,13 +450,17 @@ export async function refreshUserTokens(refreshToken: string) {
 
 export async function loginUser(email: string, password: string): Promise<LoginResult> {
   // CHANGED: normalise the email, and select projectRoles + tokenVersion
-  const user = await User.findOne({ email: email.trim().toLowerCase() }).select("+passwordHash");
+  const user = await User.findOne({
+     email: email.trim().toLowerCase() }).
+     select("+passwordHash");
 
   if (!user) {
     throw new AuthServiceError("Invalid email or password", 401, "INVALID_CREDENTIALS");
   }
 
-  const passwordMatches = await verifyPassword(password, user.passwordHash);
+  const passwordMatches = await verifyPassword(
+    password, user.passwordHash
+    );
   if (!passwordMatches || !user.isActive) {
     throw new AuthServiceError("Invalid email or password", 401, "INVALID_CREDENTIALS");
   }

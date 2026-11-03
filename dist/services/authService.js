@@ -80,7 +80,7 @@ async function refreshUserTokens(refreshToken) {
     if (!accessSecret || accessSecret.length < 32) {
         throw new Error("JWT_ACCESS_SECRET is not configured correctly");
     }
-    const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+    const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "60m";
     const accessToken = jsonwebtoken_1.default.sign({
         role: user.role,
         projectIds: user.projectIds,
