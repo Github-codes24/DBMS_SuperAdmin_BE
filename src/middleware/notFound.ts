@@ -12,12 +12,11 @@ import { apiManager } from "../utils/apiManager.js";
 // };
 
 export const notFound: RequestHandler = (req, res) => {
-  console.log("[NOT FOUND]", {
-    requestId: res.locals.requestId,
-    method: req.method,
-    url: req.originalUrl,
-  });
-
+  // console.log("[NOT FOUND]", {
+  //   requestId: res.locals.requestId,
+  //   method: req.method,
+  //   url: req.originalUrl,
+  // });
   return apiManager.failure(
     res,
     `Route not found: ${req.method} ${req.path}`,
