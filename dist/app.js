@@ -12,12 +12,19 @@ const errorHandler_js_1 = require("./middleware/errorHandler.js");
 const apiManager_js_1 = require("./utils/apiManager.js");
 const authRoutes_js_1 = __importDefault(require("./routes/authRoutes.js"));
 const testRoutes_js_1 = __importDefault(require("./routes/testRoutes.js"));
+// import userRoutes from "./routes/userRoutes.js";
 const userRoutes_js_1 = __importDefault(require("./routes/userRoutes.js"));
+const rolesRoutes_js_1 = __importDefault(require("./routes/rolesRoutes.js"));
+const permissionRoutes_js_1 = __importDefault(require("./routes/permissionRoutes.js"));
+const projectRoutes_js_1 = __importDefault(require("./routes/projectRoutes.js"));
 const app = (0, express_1.default)();
 app.disable("x-powered-by");
 app.use((0, helmet_1.default)());
 const allowedOrigins = [
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:5176",
     "https://dbms-develop.netlify.app",
     "https://dbms-live.netlify.app",
     "https://dbms-superadmin.netlify.app",
@@ -47,6 +54,9 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes_js_1.default);
 app.use("/api/test", testRoutes_js_1.default);
 app.use("/api/users", userRoutes_js_1.default);
+app.use("/api/roles", rolesRoutes_js_1.default);
+app.use("/api/permissions", permissionRoutes_js_1.default);
+app.use("/api/projects", projectRoutes_js_1.default);
 // Register feature routes above these two handlers.
 app.use(notFound_js_1.notFound);
 app.use(errorHandler_js_1.errorHandler);

@@ -33,11 +33,16 @@ function handleUserError(error: unknown, res: any, next: any) {
 
 export const getUsers: RequestHandler = async (_req, res, next) => {
   try {
+
+    console.log("4. Controller started");
+
+    
     const validated = res.locals.validated as { query: ListUsersQuery };
     const auth = res.locals.auth as CurrentAuth;
 
     const result = await listUsers(validated.query, auth);
 
+    console.log("Before success:", res.headersSent);
     return apiManager.success(res, "Users retrieved successfully", result);
   } catch (error: unknown) {
     return handleUserError(error, res, next);

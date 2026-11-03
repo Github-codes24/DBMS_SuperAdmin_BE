@@ -9,7 +9,12 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { apiManager } from "./utils/apiManager.js";
 import authRoutes from "./routes/authRoutes.js";
 import testRoutes from "./routes/testRoutes.js";
+// import userRoutes from "./routes/userRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+// import roleRoutes from "./routes/rolesRoutes.js";
+import permissionRoutes from "./routes/permissionRoutes.js";
+import platformRoutes from "./routes/platformRoutes.js";
+// import projectRoutes from "./routes/projectRoutes.js";
 
 const app = express();
 
@@ -45,6 +50,28 @@ app.use(
   }),
 );
 
+
+app.use((req, res, next) => {
+  console.log("[REQUEST START]", {
+    requestId: res.locals.requestId,
+    method: req.method,
+    url: req.originalUrl,
+  });
+
+  const originalJson = res.json.bind(res);
+
+  res.json = ((...args: any[]) => {
+    console.trace("[RESPONSE SENT]", {
+      requestId: res.locals.requestId,
+      method: req.method,
+      url: req.originalUrl,
+    });
+
+    return originalJson(...args);
+  }) as typeof res.json;
+
+  next();
+});
 app.use(requestContext);
 app.use(express.json({ limit: "1mb" }));
 
@@ -58,9 +85,16 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/users", userRoutes);
+// app.use("/api/roles", roleRoutes);
+app.use("/api/permissions", permissionRoutes);
+// app.use("/api/projects", projectRoutes);
+app.use("/api/platform", platformRoutes);
 
 // Register feature routes above these two handlers.
 app.use(notFound);
 app.use(errorHandler);
+
+
+
 
 export default app;
