@@ -31,7 +31,7 @@ const telecallerSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      minlength: 8,
+      minlength: 6,
       select: false,
     },
     role: {
@@ -61,9 +61,10 @@ const telecallerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Hash password before save
+// Hash password before save (skip if already hashed with bcrypt)
 telecallerSchema.pre("save", async function () {
-  if (!this.isModified("password")) return;
+  if (!this.isModified("password") || !this.password) return;
+  if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) return;
 
   this.password = await bcrypt.hash(this.password, 10);
 });

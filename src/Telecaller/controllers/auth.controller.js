@@ -3,9 +3,9 @@ import * as authService from '../services/auth.service.js';
 
 // ─── POST /api/telecaller/auth/signup ─────────────────────────────────────────
 /**
- * @desc   Register a new telecaller account
+ * @desc   Public registration endpoint disabled
  * @route  POST /api/telecaller/auth/signup
- * @access Public
+ * @access Disabled (Super Admin and Vendor Panel Only)
  */
 export const signup = asyncHandler(async (req, res) => {
   const {
@@ -42,7 +42,7 @@ export const signup = asyncHandler(async (req, res) => {
 // ─── POST /api/telecaller/auth/login ──────────────────────────────────────────
 
 /**
- * @desc   Login with email and password
+ * @desc   Login with email and password (enforces active status in both schemas)
  * @route  POST /api/telecaller/auth/login
  * @access Public
  */
@@ -103,11 +103,12 @@ export const changePassword = asyncHandler(async (req, res) => {
     newPassword,
   } = req.body;
 
-  await authService.changePassword(
-    req.telecaller,
-    oldPassword,
-    newPassword
-  );
+  try {
+    await authService.changePassword(
+      req.telecaller,
+      oldPassword,
+      newPassword
+    );
 
   return res.status(200).json({
     success: true,

@@ -120,7 +120,7 @@ export const createVendorTelecaller = async (req, res) => {
     // Note: Credentials email is intentionally NOT sent here.
     // Vendor creates the account, but access is only granted when Super Admin activates it.
 
-    // 5. Return success
+    // 6. Return response (No email sent until Super Admin activates)
     const result = newTelecaller.toObject();
     delete result.password;
 

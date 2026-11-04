@@ -75,11 +75,11 @@ const telecallerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Encrypt password before saving
+// Encrypt password before saving (skip if already hashed with bcrypt)
 telecallerSchema.pre('save', async function () {
-  if (!this.isModified('password')) {
-    return;
-  }
+  if (!this.isModified('password') || !this.password) return;
+  if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) return;
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
 });

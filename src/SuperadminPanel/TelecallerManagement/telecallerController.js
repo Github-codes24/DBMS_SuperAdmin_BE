@@ -305,11 +305,13 @@ export const createTelecaller = async (req, res) => {
         password: password.trim(),
       });
 
-      if (emailResult.success) {
-        emailSent = true;
+        if (emailResult.success) {
+          emailSent = true;
+        } else {
+          emailError = emailResult.error || 'Failed to dispatch email';
+        }
       } else {
-        emailSent = false;
-        emailError = emailResult.error || 'Failed to dispatch email';
+        emailError = 'Telecaller email address was not provided.';
       }
     }
 
@@ -925,7 +927,22 @@ export const blockTelecaller = async (req, res) => {
       });
     }
 
-    if (telecaller.status === "Blocked") {
+    // Check status in both schemas
+    const authRecord = await TelecallerAuthModel.findOne({
+      $or: [
+        { email: telecaller.email.toLowerCase() },
+        { phone: telecaller.mobileNumber },
+        { employeeId: telecaller.userId },
+      ],
+    });
+
+    const isAlreadyBlocked =
+      telecaller.status === "Blocked" ||
+      telecaller.status === "BLOCKED" ||
+      authRecord?.status === "BLOCKED" ||
+      authRecord?.status === "Blocked";
+
+    if (isAlreadyBlocked) {
       return res.status(400).json({
         success: false,
         message: "Telecaller is already blocked",
@@ -933,8 +950,7 @@ export const blockTelecaller = async (req, res) => {
     }
 
     telecaller.status = "Blocked";
-    telecaller.updatedBy = req.superAdmin._id;
-
+    telecaller.updatedBy = req.superAdmin?._id || req.user?._id || null;
     await telecaller.save();
 
     // Sync to Telecaller auth model in src/Telecaller/models/Telecaller.js
@@ -964,7 +980,7 @@ export const blockTelecaller = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Telecaller blocked successfully",
+      message: "Telecaller blocked successfully in both schemas",
       telecaller: {
         userId: telecaller.userId,
         fullName: telecaller.fullName,
@@ -994,7 +1010,21 @@ export const unblockTelecaller = async (req, res) => {
       });
     }
 
-    if (telecaller.status !== "Blocked") {
+    const authRecord = await TelecallerAuthModel.findOne({
+      $or: [
+        { email: telecaller.email.toLowerCase() },
+        { phone: telecaller.mobileNumber },
+        { employeeId: telecaller.userId },
+      ],
+    });
+
+    const isNotBlocked =
+      telecaller.status !== "Blocked" &&
+      telecaller.status !== "BLOCKED" &&
+      authRecord?.status !== "BLOCKED" &&
+      authRecord?.status !== "Blocked";
+
+    if (isNotBlocked) {
       return res.status(400).json({
         success: false,
         message: "Telecaller is not blocked",
@@ -1002,8 +1032,7 @@ export const unblockTelecaller = async (req, res) => {
     }
 
     telecaller.status = "Active";
-    telecaller.updatedBy = req.superAdmin._id;
-
+    telecaller.updatedBy = req.superAdmin?._id || req.user?._id || null;
     await telecaller.save();
 
     // Sync to Telecaller auth model in src/Telecaller/models/Telecaller.js
@@ -1033,7 +1062,7 @@ export const unblockTelecaller = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Telecaller unblocked successfully",
+      message: "Telecaller unblocked successfully in both schemas",
       telecaller: {
         userId: telecaller.userId,
         fullName: telecaller.fullName,

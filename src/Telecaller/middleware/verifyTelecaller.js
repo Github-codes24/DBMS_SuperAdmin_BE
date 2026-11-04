@@ -2,12 +2,12 @@
  * Telecaller Auth — JWT Verification Middleware
  * Guards all protected telecaller routes.
  * Verifies the Bearer token, loads the telecaller from DB,
- * and enforces role = "TELECALLER".
+ * and enforces role = "TELECALLER" & active status in both schemas.
  */
 import jwt from 'jsonwebtoken';
 import asyncHandler from 'express-async-handler';
 import Telecaller from '../models/Telecaller.js';
-
+import SuperAdminTelecaller from '../../SuperadminPanel/TelecallerManagement/telecallerSchema.js';
 
 const verifyTelecaller = asyncHandler(async (req, res, next) => {
   let token;
@@ -47,10 +47,37 @@ const verifyTelecaller = asyncHandler(async (req, res, next) => {
     throw new Error('Telecaller account not found. Token may be stale.');
   }
 
-  // ── Ensure account is still active ─────────────────────────────────────────
-  if (telecaller.status !== 'ACTIVE') {
+  // ── Ensure account is active in Telecaller auth schema ──────────────────────
+  const authStatus = (telecaller.status || '').toUpperCase();
+  if (authStatus === 'BLOCKED') {
     res.status(403);
-    throw new Error('Your account is inactive. Please contact the administrator.');
+    throw new Error('Your account has been blocked by Super Admin.');
+  }
+  if (authStatus !== 'ACTIVE') {
+    res.status(403);
+    throw new Error('Your account is not active. Please contact Super Admin.');
+  }
+
+  // ── Ensure account is active in SuperAdminTelecaller schema ──────────────────
+  const superAdminTc = await SuperAdminTelecaller.findOne({
+    $or: [
+      { email: telecaller.email.toLowerCase() },
+      { mobileNumber: telecaller.phone },
+      { userId: telecaller.employeeId },
+    ],
+    isDeleted: false,
+  });
+
+  if (superAdminTc) {
+    const superStatus = (superAdminTc.status || '').toUpperCase();
+    if (superStatus === 'BLOCKED') {
+      res.status(403);
+      throw new Error('Your account has been blocked by Super Admin.');
+    }
+    if (superStatus !== 'ACTIVE') {
+      res.status(403);
+      throw new Error('Your account is not active in Super Admin directory. Please contact Super Admin.');
+    }
   }
 
   // ── Attach to request ───────────────────────────────────────────────────────

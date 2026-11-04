@@ -15,7 +15,7 @@ const toPublicProfile = (user) => ({
   lastLogin: user.lastLogin || null,
 });
 
-// ─── SIGNUP ───────────────────────────────────────────────────────────────────
+// ─── SIGNUP (Internal helper, public signup disabled) ─────────────────────────
 
 export const signup = async ({
   name,
@@ -102,6 +102,7 @@ export const signup = async ({
 };
 
 // ─── LOGIN WITH EMAIL + PASSWORD ─────────────────────────────────────────────
+// Enforces active status in both Telecaller and SuperAdminTelecaller schemas
 
 export const login = async ({ email, password }) => {
   const cleanEmail = (email || '').toLowerCase().trim();

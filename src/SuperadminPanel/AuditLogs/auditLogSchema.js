@@ -17,6 +17,16 @@ const auditLogSchema = new mongoose.Schema(
       default: 'SUPER_ADMIN',
       trim: true,
     },
+    actorType: {
+      type: String,
+      enum: ['SUPER_ADMIN', 'VENDOR', 'TELECALLER', 'SYSTEM'],
+      default: 'SUPER_ADMIN',
+    },
+    message: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     action: {
       type: String, // e.g. 'Updated Customer', 'Updated Vendor', 'Disabled Admin', 'Exported CSV', 'Changed Password'
       required: true,
