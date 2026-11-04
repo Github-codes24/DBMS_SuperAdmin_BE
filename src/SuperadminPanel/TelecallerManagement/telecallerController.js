@@ -297,6 +297,7 @@ export const createTelecaller = async (req, res) => {
     let emailSent = false;
     let emailError = null;
 
+    
     if (initialStatus === 'Active' && telecaller.email) {
       const emailResult = await sendTelecallerCredentialsEmail({
         toEmail: telecaller.email,
@@ -313,8 +314,7 @@ export const createTelecaller = async (req, res) => {
       } else {
         emailError = 'Telecaller email address was not provided.';
       }
-    }
-
+    
     const responseMessage = initialStatus === 'Active'
       ? (emailSent ? 'Telecaller account created and activated successfully' : 'Telecaller account created as Active, but credentials email could not be sent.')
       : 'Telecaller account created successfully. Account is pending activation by Super Admin.';
@@ -331,10 +331,12 @@ export const createTelecaller = async (req, res) => {
         telecaller: resultObj,
       },
     });
-  } catch (error) {
+    }
+   catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
-};
+}
+
 
 // 3. GET SINGLE TELECALLER BY ID
 // @desc    Get Single Telecaller by Mongo _id, custom userId ('TC014'), email, or mobileNumber
