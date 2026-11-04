@@ -35,39 +35,52 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Project = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
+// const projectSchema = new Schema(
+//   {
+//     projectId: {
+//       type: String,
+//       required: true,
+//       unique: true,
+//       trim: true,
+//     },
+//     name: {
+//       type: String,
+//       required: true,
+//       trim: true,
+//       minlength: 2,
+//       maxlength: 100,
+//     },
+//     description: {
+//       type: String,
+//       trim: true,
+//       default: "",
+//     },
+//     status: {
+//       type: String,
+//       enum: ["active", "inactive"],
+//       default: "active",
+//       required: true,
+//     },
+//     createdBy: {
+//       type: Schema.Types.ObjectId,
+//       ref: "User",
+//       required: false,
+//     },
+//   },
+//   {
+//     timestamps: true,
+//     collection: "projects",
+//   },
+// );
+// export type ProjectDocument = InferSchemaType<typeof projectSchema>;
+// export const Project = mongoose.model("Project", projectSchema);
 const projectSchema = new mongoose_1.Schema({
-    projectId: {
-        type: String,
-        required: true,
-        unique: true,
-        trim: true,
-    },
-    name: {
-        type: String,
-        required: true,
-        trim: true,
-        minlength: 2,
-        maxlength: 100,
-    },
-    description: {
-        type: String,
-        trim: true,
-        default: "",
-    },
-    status: {
-        type: String,
-        enum: ["active", "inactive"],
-        default: "active",
-        required: true,
-    },
-    createdBy: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: "User",
-        required: false,
-    },
-}, {
-    timestamps: true,
-    collection: "projects",
-});
+    projectId: { type: String, required: true, unique: true, trim: true },
+    name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 },
+    description: { type: String, trim: true, default: "" },
+    status: { type: String, enum: ["active", "inactive"], default: "active", required: true },
+    type: { type: String, enum: ["platform", "tenant"], default: "tenant" }, // set by seed only, never from request body
+    createdBy: { type: mongoose_1.Schema.Types.ObjectId, ref: "User", required: false },
+}, { timestamps: true, collection: "projects" });
 exports.Project = mongoose_1.default.model("Project", projectSchema);
 //# sourceMappingURL=Project.js.map

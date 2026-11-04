@@ -32,97 +32,17 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.assignRoleToUser = exports.getRolesByProject = exports.createRole = void 0;
-const mongoose_1 = __importDefault(require("mongoose"));
-const apiManager_1 = require("../utils/apiManager"); // adjust path
-const roleService = __importStar(require("../services/roleService")); // adjust path
-const createRole = async (req, res, next) => {
-    try {
-        const projectId = Array.isArray(req.params.projectId)
-            ? req.params.projectId[0]
-            : req.params.projectId;
-        const { name, description, permissions } = req.body;
-        const auth = res.locals.auth;
-        if (!mongoose_1.default.isValidObjectId(projectId)) {
-            return apiManager_1.apiManager.failure(res, "Invalid project ID", 400, "INVALID_PROJECT_ID");
-        }
-        if (typeof name !== "string" ||
-            !name.trim() ||
-            (description !== undefined && typeof description !== "string") ||
-            (permissions !== undefined &&
-                (!Array.isArray(permissions) || !permissions.every((k) => typeof k === "string")))) {
-            return apiManager_1.apiManager.failure(res, "A valid name, description, and permissions array are required", 400, "INVALID_ROLE");
-        }
-        // SuperAdmin can create for any project.
-        // Project Admin can create only for their own projects.
-        if (auth.role !== "superadmin") {
-            if (!auth.projectIds?.includes(projectId)) {
-                return apiManager_1.apiManager.failure(res, "You do not have access to this project", 403, "FORBIDDEN");
-            }
-        }
-        const role = await roleService.createRole({
-            name,
-            description,
-            permissions,
-            projectId,
-            createdBy: auth.userId,
-        });
-        return apiManager_1.apiManager.success(res, "Role created successfully", role, 201);
-    }
-    catch (error) {
-        next(error);
-    }
-};
-exports.createRole = createRole;
-const getRolesByProject = async (req, res, next) => {
-    try {
-        const projectId = Array.isArray(req.params.projectId)
-            ? req.params.projectId[0]
-            : req.params.projectId;
-        const auth = res.locals.auth;
-        if (!mongoose_1.default.isValidObjectId(projectId)) {
-            return apiManager_1.apiManager.failure(res, "Invalid project ID", 400, "INVALID_PROJECT_ID");
-        }
-        if (auth.role !== "superadmin" && !auth.projectIds?.includes(projectId)) {
-            return apiManager_1.apiManager.failure(res, "You do not have access to this project", 403, "FORBIDDEN");
-        }
-        const roles = await roleService.getRolesByProject(projectId);
-        return apiManager_1.apiManager.success(res, "Roles fetched successfully", roles);
-    }
-    catch (error) {
-        next(error);
-    }
-};
-exports.getRolesByProject = getRolesByProject;
-const assignRoleToUser = async (req, res, next) => {
-    try {
-        const projectId = Array.isArray(req.params.projectId)
-            ? req.params.projectId[0]
-            : req.params.projectId;
-        const userId = Array.isArray(req.params.userId)
-            ? req.params.userId[0]
-            : req.params.userId;
-        const { roleId } = req.body;
-        const auth = res.locals.auth;
-        if (!mongoose_1.default.isValidObjectId(projectId) || !mongoose_1.default.isValidObjectId(userId)) {
-            return apiManager_1.apiManager.failure(res, "Invalid project or user ID", 400, "INVALID_ID");
-        }
-        if (typeof roleId !== "string" || !mongoose_1.default.isValidObjectId(roleId)) {
-            return apiManager_1.apiManager.failure(res, "Valid roleId is required", 400, "INVALID_ROLE_ID");
-        }
-        if (auth.role !== "superadmin" && !auth.projectIds?.includes(projectId)) {
-            return apiManager_1.apiManager.failure(res, "You do not have access to this project", 403, "FORBIDDEN");
-        }
-        const result = await roleService.assignRoleToUser(userId, projectId, roleId);
-        return apiManager_1.apiManager.success(res, "Role assigned successfully", result);
-    }
-    catch (error) {
-        next(error);
-    }
-};
-exports.assignRoleToUser = assignRoleToUser;
+exports.savePermissions = exports.getMatrix = exports.deleteRole = exports.updateRole = exports.getRole = exports.listRoles = exports.createRole = void 0;
+// controllers/role.controller.ts
+const svc = __importStar(require("../services/roleService"));
+const request_js_1 = require("../utils/request.js");
+const helpers_js_1 = require("./helpers.js");
+exports.createRole = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.createRole((0, request_js_1.param)(req, "projectId"), req.body, (0, request_js_1.actorId)(req)), 201));
+exports.listRoles = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.getRolesByProject((0, request_js_1.param)(req, "projectId"))));
+exports.getRole = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.getRoleById((0, request_js_1.param)(req, "projectId"), (0, request_js_1.param)(req, "roleId"))));
+exports.updateRole = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.updateRole((0, request_js_1.param)(req, "projectId"), (0, request_js_1.param)(req, "roleId"), req.body, (0, request_js_1.actorId)(req))));
+exports.deleteRole = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.deleteRole((0, request_js_1.param)(req, "projectId"), (0, request_js_1.param)(req, "roleId"), (0, request_js_1.actorId)(req))));
+exports.getMatrix = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.getMatrix((0, request_js_1.param)(req, "projectId"), (0, request_js_1.param)(req, "roleId"))));
+exports.savePermissions = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.savePermissions((0, request_js_1.param)(req, "projectId"), (0, request_js_1.param)(req, "roleId"), req.body.permissions, req.body.expectedVersion, (0, request_js_1.actorId)(req))));
 //# sourceMappingURL=roleController.js.map

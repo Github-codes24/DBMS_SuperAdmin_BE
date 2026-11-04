@@ -1,78 +1,97 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createProject = createProject;
 exports.getProjects = getProjects;
-const mongoose_1 = __importDefault(require("mongoose"));
+exports.getProjectsWithRoles = getProjectsWithRoles;
+exports.updateProject = updateProject;
+exports.getMyProjects = getMyProjects;
 const Project_js_1 = require("../models/Project.js");
-const COUNTER_ID = new mongoose_1.default.Types.ObjectId();
-const COUNTER_PROJECT_ID = "__PROJECT_COUNTER__";
+const roles_js_1 = require("../models/roles.js");
+const User_js_1 = require("../models/User.js");
+const counter_js_1 = require("../models/counter.js");
+const httpError_js_1 = require("../utils/httpError.js");
+const audit_service_js_1 = require("./audit.service.js");
 async function getNextProjectId() {
-    // Find the internal counter document.
-    let counter = await Project_js_1.Project.collection.findOne({
-        projectId: COUNTER_PROJECT_ID,
-    });
-    if (!counter) {
-        // Find the highest existing project ID.
-        const projects = await Project_js_1.Project.find({
-            projectId: /^PID-\d+$/,
-        })
-            .select("projectId")
-            .lean();
-        const maxId = projects.reduce((max, project) => {
-            const match = project.projectId.match(/^PID-(\d+)$/);
-            return match ? Math.max(max, Number(match[1])) : max;
-        }, 0);
-        try {
-            await Project_js_1.Project.collection.insertOne({
-                _id: COUNTER_ID,
-                projectId: COUNTER_PROJECT_ID,
-                seq: maxId,
-            });
-        }
-        catch (error) {
-            const duplicateKey = typeof error === "object" &&
-                error !== null &&
-                "code" in error &&
-                error.code === 11000;
-            if (!duplicateKey) {
-                throw error;
-            }
-        }
+    // First use: start from the highest existing PID-xxx so numbering continues
+    const exists = await counter_js_1.Counter.exists({ _id: "project" });
+    if (!exists) {
+        const all = await Project_js_1.Project.find({ projectId: /^PID-\d+$/ }).select("projectId").lean();
+        const max = all.reduce((m, p) => Math.max(m, Number(p.projectId.slice(4))), 0);
+        await counter_js_1.Counter.updateOne({ _id: "project" }, { $setOnInsert: { seq: max } }, { upsert: true }).catch(() => { });
     }
-    // Read the counter's actual ObjectId.
-    counter = await Project_js_1.Project.collection.findOne({
-        projectId: COUNTER_PROJECT_ID,
-    });
-    if (!counter) {
-        throw new Error("Project ID counter not found");
-    }
-    // Atomically increment the counter.
-    const result = await Project_js_1.Project.collection.findOneAndUpdate({ _id: counter._id }, { $inc: { seq: 1 } }, { returnDocument: "after" });
-    // Compatible with MongoDB driver versions returning ModifyResult.
-    const updatedCounter = result && "value" in result ? result.value : result;
-    if (!updatedCounter ||
-        typeof updatedCounter.seq !== "number") {
-        throw new Error("Could not generate project ID");
-    }
-    return `PID-${String(updatedCounter.seq).padStart(3, "0")}`;
+    const c = await counter_js_1.Counter.findOneAndUpdate({ _id: "project" }, { $inc: { seq: 1 } }, { new: true });
+    return `PID-${String(c.seq).padStart(3, "0")}`;
 }
 async function createProject(input) {
     const projectId = await getNextProjectId();
-    return Project_js_1.Project.create({
+    const project = await Project_js_1.Project.create({
         projectId,
         name: input.name.trim(),
         description: input.description?.trim() ?? "",
+        type: "tenant", // set here, never from the request body
         createdBy: input.createdBy,
     });
+    await (0, audit_service_js_1.audit)("project.created", {
+        actorId: input.createdBy,
+        projectId: project._id, after: {
+            projectId,
+            name: project.name
+        }
+    });
+    return project;
 }
+/** Project management list: tenants only. */
 async function getProjects() {
-    return Project_js_1.Project.find({
-        projectId: /^PID-\d+$/,
-    })
-        .sort({ createdAt: -1 })
-        .lean();
+    return Project_js_1.Project.find({ type: "tenant" }).
+        sort({ createdAt: -1 }).
+        lean();
+}
+/** Feeds the "Platform > SuperAdmin" dropdown: every project with its roles. */
+async function getProjectsWithRoles() {
+    const [projects, roles] = await Promise.all([
+        Project_js_1.Project.find().
+            select("projectId name type status").lean(),
+        roles_js_1.Role.find().select("name projectId isSystem isActive").
+            sort({ name: 1 }).lean(),
+    ]);
+    return projects
+        .map((p) => ({
+        ...p,
+        roles: roles.filter((r) => String(r.projectId) === String(p._id)).map((r) => ({ _id: r._id, name: r.name, isSystem: r.isSystem, isActive: r.isActive })),
+    }))
+        .sort((a, b) => (a.type === "platform" ? -1 : b.type === "platform" ? 1 : a.name.localeCompare(b.name)));
+}
+async function updateProject(projectId, data, actorId) {
+    const project = await Project_js_1.Project.findById(projectId);
+    if (!project)
+        throw (0, httpError_js_1.httpError)(404, "PROJECT_NOT_FOUND", "Project not found");
+    if (project.type === "platform" && data.status === "inactive")
+        throw (0, httpError_js_1.httpError)(403, "PLATFORM_LOCKED", "The platform project cannot be deactivated");
+    if (data.name !== undefined)
+        project.name = data.name.trim();
+    if (data.description !== undefined)
+        project.description = data.description.trim();
+    if (data.status !== undefined)
+        project.status = data.status;
+    await project.save();
+    await (0, audit_service_js_1.audit)("project.updated", { actorId, projectId, after: data });
+    return project;
+}
+async function getMyProjects(userId, userRole) {
+    if (userRole === "superadmin") {
+        return Project_js_1.Project.find({ type: "tenant" }).
+            select("projectId name description status createdAt updatedAt").
+            sort({ createdAt: -1 });
+    }
+    const user = await User_js_1.User.findById(userId).select("projectRoles");
+    if (!user)
+        throw (0, httpError_js_1.httpError)(404, "USER_NOT_FOUND", "User not found");
+    const ids = user.projectRoles.filter((pr) => pr.isActive).map((pr) => pr.projectId);
+    if (ids.length === 0)
+        return [];
+    return Project_js_1.Project.find({ _id: { $in: ids },
+        status: "active",
+        type: "tenant" })
+        .select("projectId name description status createdAt updatedAt");
 }
 //# sourceMappingURL=projectService.js.map

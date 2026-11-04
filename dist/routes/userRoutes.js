@@ -11,7 +11,12 @@ const router = (0, express_1.Router)();
 router.use(authenticate_js_1.authenticate);
 router.use((0, authorize_js_1.authorize)("superadmin", "admin"));
 // List users with filtering, searching, and pagination
-router.get("/", (0, validate_js_1.validate)(userValidator_js_1.listUsersSchema), userController_js_1.getUsers);
+console.log("Registering user routes");
+router.get("/", (req, res, next) => {
+    console.log("GET /api/users route matched");
+    next();
+}, (0, validate_js_1.validate)(userValidator_js_1.listUsersSchema), userController_js_1.getUsers);
+// router.get("/", validate(listUsersSchema), getUsers);
 // Create new user
 router.post("/", (0, validate_js_1.validate)(userValidator_js_1.createUserSchema), userController_js_1.createUser);
 // Get specific user by ID

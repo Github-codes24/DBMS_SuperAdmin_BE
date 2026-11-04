@@ -1,4 +1,3 @@
-
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -9,12 +8,9 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { apiManager } from "./utils/apiManager.js";
 import authRoutes from "./routes/authRoutes.js";
 import testRoutes from "./routes/testRoutes.js";
-// import userRoutes from "./routes/userRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
-// import roleRoutes from "./routes/rolesRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
 import platformRoutes from "./routes/platformRoutes.js";
-// import projectRoutes from "./routes/projectRoutes.js";
 
 const app = express();
 
@@ -27,29 +23,40 @@ const allowedOrigins = [
   "http://localhost:5174",
   "http://localhost:5175",
   "http://localhost:5176",
+  "http://localhost:5177",
+  "http://localhost:5178",
   "https://dbms-develop.netlify.app",
   "https://dbms-live.netlify.app",
   "https://dbms-superadmin.netlify.app",
   "https://dbms-superadmin-be.onrender.com",
-  // Add your production Netlify URL here.
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
+
+const isAllowedOrigin = (origin: string): boolean => {
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+  // Allow all localhost and 127.0.0.1 origins on any port for local development
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+};
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests without an Origin header, such as Postman.
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests without an Origin header, such as Postman or server-to-server.
+      if (!origin || isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 
+      console.warn(`[CORS] Blocked request from origin: ${origin}`);
       return callback(new Error(`CORS blocked origin: ${origin}`));
     },
+    credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Project-Id"],
     exposedHeaders: ["X-Request-ID"],
   }),
 );
-
 
 app.use((req, res, next) => {
   console.log("[REQUEST START]", {
@@ -85,16 +92,11 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/users", userRoutes);
-// app.use("/api/roles", roleRoutes);
 app.use("/api/permissions", permissionRoutes);
-// app.use("/api/projects", projectRoutes);
 app.use("/api/platform", platformRoutes);
 
 // Register feature routes above these two handlers.
 app.use(notFound);
 app.use(errorHandler);
-
-
-
 
 export default app;

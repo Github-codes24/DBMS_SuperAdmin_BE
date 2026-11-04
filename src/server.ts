@@ -1,7 +1,10 @@
-
 import "dotenv/config";
+import dns from "node:dns";
 import mongoose from "mongoose";
 import app from "./app.js";
+
+// Fix for Node.js querySrv ETIMEOUT on networks where the default ISP DNS blocks/times out SRV queries
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const PORT = Number(process.env.PORT) || 3007;
 const MONGODB_URI = process.env.MONGODB_URI;

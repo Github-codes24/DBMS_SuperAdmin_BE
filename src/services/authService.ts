@@ -1,4 +1,4 @@
-// import bcrypt from "bcrypt";
+// import bcrypt from "bcryptjs";
 // import jwt, { type SignOptions } from "jsonwebtoken";
 // import { User,RefreshSession } from "../models/User.js";
 // import { verifyPassword } from "../utils/password.js";
@@ -195,9 +195,9 @@
 //     secret,
 //     tokenOptions,
 //   );
-//     // refresh token generation 
+//     // refresh token generation
 //     const refreshToken = generateRefreshToken(user._id.toString());
-//     // save the  hashed refresh token to  the database 
+//     // save the  hashed refresh token to  the database
 //     await RefreshSession.create({
 //       userId: user._id,
 //       tokenHash: hashRefreshToken(refreshToken),
@@ -206,7 +206,6 @@
 
 //   user.lastLoginAt = new Date();
 //   await user.save();
-
 
 //   return {
 //     accessToken,
@@ -228,7 +227,7 @@
 //     const admin = await User.findById(userId).select(
 //       "name email role projectIds isActive lastLoginAt createdAt",
 //     );
-  
+
 //     if (!admin || admin.role !== "superadmin") {
 //       throw new AuthServiceError(
 //         "Platform Super Admin not found",
@@ -252,10 +251,10 @@
 //       lastLoginAt: admin.lastLoginAt,
 //       createdAt: admin.createdAt,
 //     };
-    
+
 //   } catch (error) {
 //     throw error;
-    
+
 //   }
 // }
 // export async function logoutUser(
@@ -328,10 +327,14 @@
 //   );
 // }
 
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt, { type SignOptions } from "jsonwebtoken";
 import { User, RefreshSession } from "../models/User.js";
-import { verifyPassword, generateRefreshToken, hashRefreshToken } from "../utils/password.js";
+import {
+  verifyPassword,
+  generateRefreshToken,
+  hashRefreshToken,
+} from "../utils/password.js";
 
 export class AuthServiceError extends Error {
   constructor(
@@ -354,7 +357,7 @@ export interface LoginResult {
     name: string;
     email: string;
     role: string;
-    projectIds: string[];          // kept so your frontend doesn't break; now derived from projectRoles
+    projectIds: string[]; // kept so your frontend doesn't break; now derived from projectRoles
   };
 }
 
@@ -363,15 +366,21 @@ const AUDIENCE = "dbms-superadmin";
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** CHANGED: one place that signs access tokens. Payload is now sub + role + tv. */
-function signAccessToken(user: { _id: { toString(): string }; role: string; tokenVersion: number }) {
+function signAccessToken(user: {
+  _id: { toString(): string };
+  role: string;
+  tokenVersion: number;
+}) {
   const secret = process.env.JWT_ACCESS_SECRET;
   if (!secret || secret.length < 32) {
-    throw new Error("JWT_ACCESS_SECRET must be configured with at least 32 characters");
+    throw new Error(
+      "JWT_ACCESS_SECRET must be configured with at least 32 characters",
+    );
   }
   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
 
   const token = jwt.sign(
-    { role: user.role, tv: user.tokenVersion ?? 0 },   // informational only: the server re-reads the user on every request
+    { role: user.role, tv: user.tokenVersion ?? 0 }, // informational only: the server re-reads the user on every request
     secret,
     {
       subject: user._id.toString(),
@@ -384,8 +393,12 @@ function signAccessToken(user: { _id: { toString(): string }; role: string; toke
 }
 
 /** NEW: projectIds for the response, derived from projectRoles. */
-function projectIdsOf(user: { projectRoles?: { projectId: { toString(): string }; isActive: boolean }[] }) {
-  return (user.projectRoles ?? []).filter((p) => p.isActive).map((p) => p.projectId.toString());
+function projectIdsOf(user: {
+  projectRoles?: { projectId: { toString(): string }; isActive: boolean }[];
+}) {
+  return (user.projectRoles ?? [])
+    .filter((p) => p.isActive)
+    .map((p) => p.projectId.toString());
 }
 
 export async function refreshUserTokens(refreshToken: string) {
@@ -396,25 +409,34 @@ export async function refreshUserTokens(refreshToken: string) {
 
   let userId: string;
   try {
-    const decoded = jwt.verify(
-      refreshToken,
-       secret,
-        {
-           issuer: ISSUER,
-            audience: AUDIENCE
-           });
-    if (typeof decoded === "string" || decoded.tokenUse !== "refresh" || typeof decoded.sub !== "string") {
+    const decoded = jwt.verify(refreshToken, secret, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+    });
+    if (
+      typeof decoded === "string" ||
+      decoded.tokenUse !== "refresh" ||
+      typeof decoded.sub !== "string"
+    ) {
       throw new Error("Invalid refresh token");
     }
     userId = decoded.sub;
   } catch {
-    throw new AuthServiceError("Invalid or expired refresh token", 401, "INVALID_REFRESH_TOKEN");
+    throw new AuthServiceError(
+      "Invalid or expired refresh token",
+      401,
+      "INVALID_REFRESH_TOKEN",
+    );
   }
 
   // CHANGED: select tokenVersion instead of projectIds
   const user = await User.findById(userId).select("role isActive tokenVersion");
   if (!user || !user.isActive) {
-    throw new AuthServiceError("Account is unavailable", 401, "ACCOUNT_UNAVAILABLE");
+    throw new AuthServiceError(
+      "Account is unavailable",
+      401,
+      "ACCOUNT_UNAVAILABLE",
+    );
   }
 
   const oldTokenHash = hashRefreshToken(refreshToken);
@@ -425,44 +447,65 @@ export async function refreshUserTokens(refreshToken: string) {
   // Atomic rotation: a reused, revoked, or expired session will not match
   const session = await RefreshSession.findOneAndUpdate(
     {
-       userId: user._id,
-        tokenHash: oldTokenHash,
-         revokedAt: null, 
-         expiresAt: {
-           $gt: now }
-           },
-    { $set: {
-       tokenHash: newTokenHash,
-        expiresAt: new Date(now.getTime() + REFRESH_TTL_MS) }
-       },
-    { 
-      new: true 
+      userId: user._id,
+      tokenHash: oldTokenHash,
+      revokedAt: null,
+      expiresAt: {
+        $gt: now,
+      },
+    },
+    {
+      $set: {
+        tokenHash: newTokenHash,
+        expiresAt: new Date(now.getTime() + REFRESH_TTL_MS),
+      },
+    },
+    {
+      new: true,
     },
   );
   if (!session) {
-    throw new AuthServiceError("Invalid, expired, or revoked refresh session", 401, "INVALID_REFRESH_SESSION");
+    throw new AuthServiceError(
+      "Invalid, expired, or revoked refresh session",
+      401,
+      "INVALID_REFRESH_SESSION",
+    );
   }
 
   const { token: accessToken, expiresIn } = signAccessToken(user);
 
-  return { accessToken, refreshToken: newRefreshToken, tokenType: "Bearer" as const, expiresIn };
+  return {
+    accessToken,
+    refreshToken: newRefreshToken,
+    tokenType: "Bearer" as const,
+    expiresIn,
+  };
 }
 
-export async function loginUser(email: string, password: string): Promise<LoginResult> {
+export async function loginUser(
+  email: string,
+  password: string,
+): Promise<LoginResult> {
   // CHANGED: normalise the email, and select projectRoles + tokenVersion
   const user = await User.findOne({
-     email: email.trim().toLowerCase() }).
-     select("+passwordHash");
+    email: email.trim().toLowerCase(),
+  }).select("+passwordHash");
 
   if (!user) {
-    throw new AuthServiceError("Invalid email or password", 401, "INVALID_CREDENTIALS");
+    throw new AuthServiceError(
+      "Invalid email or password",
+      401,
+      "INVALID_CREDENTIALS",
+    );
   }
 
-  const passwordMatches = await verifyPassword(
-    password, user.passwordHash
-    );
+  const passwordMatches = await verifyPassword(password, user.passwordHash);
   if (!passwordMatches || !user.isActive) {
-    throw new AuthServiceError("Invalid email or password", 401, "INVALID_CREDENTIALS");
+    throw new AuthServiceError(
+      "Invalid email or password",
+      401,
+      "INVALID_CREDENTIALS",
+    );
   }
 
   const { token: accessToken, expiresIn } = signAccessToken(user);
@@ -494,10 +537,16 @@ export async function loginUser(email: string, password: string): Promise<LoginR
 
 export async function getAdminProfile(userId: string) {
   // CHANGED: projectRoles instead of projectIds
-  const admin = await User.findById(userId).select("name email role projectRoles isActive lastLoginAt createdAt");
+  const admin = await User.findById(userId).select(
+    "name email role projectRoles isActive lastLoginAt createdAt",
+  );
 
   if (!admin || admin.role !== "superadmin") {
-    throw new AuthServiceError("Platform Super Admin not found", 404, "SUPERADMIN_NOT_FOUND");
+    throw new AuthServiceError(
+      "Platform Super Admin not found",
+      404,
+      "SUPERADMIN_NOT_FOUND",
+    );
   }
   if (!admin.isActive) {
     throw new AuthServiceError("Account is inactive", 403, "ACCOUNT_INACTIVE");
@@ -513,7 +562,10 @@ export async function getAdminProfile(userId: string) {
   };
 }
 
-export async function logoutUser(userId: string, refreshToken: string): Promise<void> {
+export async function logoutUser(
+  userId: string,
+  refreshToken: string,
+): Promise<void> {
   await RefreshSession.updateOne(
     { userId, tokenHash: hashRefreshToken(refreshToken), revokedAt: null },
     { $set: { revokedAt: new Date() } },
@@ -522,7 +574,10 @@ export async function logoutUser(userId: string, refreshToken: string): Promise<
 
 /** NEW: kill every refresh session of a user (used when blocking, deleting, or force-logout). */
 export async function revokeAllSessions(userId: string): Promise<void> {
-  await RefreshSession.updateMany({ userId, revokedAt: null }, { $set: { revokedAt: new Date() } });
+  await RefreshSession.updateMany(
+    { userId, revokedAt: null },
+    { $set: { revokedAt: new Date() } },
+  );
 }
 
 /** NEW: SuperAdmin "log this user out everywhere": access tokens die now, refresh tokens are revoked. */
@@ -531,24 +586,38 @@ export async function logoutAll(userId: string): Promise<void> {
   await revokeAllSessions(userId);
 }
 
-export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
   const user = await User.findById(userId).select("+passwordHash");
   if (!user || !user.isActive) {
-    throw new AuthServiceError("Account is unavailable", 401, "ACCOUNT_UNAVAILABLE");
+    throw new AuthServiceError(
+      "Account is unavailable",
+      401,
+      "ACCOUNT_UNAVAILABLE",
+    );
   }
 
   if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
-    throw new AuthServiceError("Current password is incorrect", 401, "INVALID_CURRENT_PASSWORD");
+    throw new AuthServiceError(
+      "Current password is incorrect",
+      401,
+      "INVALID_CURRENT_PASSWORD",
+    );
   }
   if (await bcrypt.compare(newPassword, user.passwordHash)) {
-    throw new AuthServiceError("New password must differ from the current password", 400, "SAME_PASSWORD");
+    throw new AuthServiceError(
+      "New password must differ from the current password",
+      400,
+      "SAME_PASSWORD",
+    );
   }
 
   user.passwordHash = await bcrypt.hash(newPassword, 12);
-  user.tokenVersion += 1;                       // NEW: existing access tokens stop working immediately
+  user.tokenVersion += 1; // NEW: existing access tokens stop working immediately
   await user.save();
 
   await revokeAllSessions(user._id.toString());
 }
-
-

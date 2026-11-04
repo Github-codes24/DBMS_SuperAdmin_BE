@@ -1,16 +1,31 @@
 "use strict";
+// import { Router } from "express";
+// import {
+//   createProject,
+//   getMyProjects,
+// } from "../controllers/projectController.js";
+// import { authenticate } from "../middleware/authenticate.js";
+// import { requireSuperAdmin } from "../middleware/requireSuperAdmin.js";
+// import { validate } from "../middleware/validate.js";
+// import { createProjectAdminSchema } from "../validators/projectAdminValidator.js";
+// import {
+//   createProjectAdminController,
+// } from "../controllers/projectAdminController.js";
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = require("express");
-const projectController_js_1 = require("../controllers/projectController.js");
-const authenticate_js_1 = require("../middleware/authenticate.js");
-const requireSuperAdmin_js_1 = require("../middleware/requireSuperAdmin.js");
-const validate_js_1 = require("../middleware/validate.js");
-const projectAdminValidator_js_1 = require("../validators/projectAdminValidator.js");
-const projectAdminController_js_1 = require("../controllers/projectAdminController.js");
-const router = (0, express_1.Router)();
-router.use(authenticate_js_1.authenticate, requireSuperAdmin_js_1.requireSuperAdmin);
-router.post("/create", projectController_js_1.createProject);
-router.get("/", projectController_js_1.getProjects);
-router.post("/:projectId/admins", (0, validate_js_1.validate)(projectAdminValidator_js_1.createProjectAdminSchema), projectAdminController_js_1.createProjectAdminController);
-exports.default = router;
+// const router = Router();
+// // --------------------------------------------------
+// // Routes accessible by Project Admin + SuperAdmin
+// // --------------------------------------------------
+// router.get("/me/projects", authenticate, getMyProjects);
+// // --------------------------------------------------
+// // SuperAdmin only routes
+// // --------------------------------------------------
+// router.use(authenticate, requireSuperAdmin);
+// router.post("/create", createProject);
+// router.post(
+//   "/:projectId/admins",
+//   validate(createProjectAdminSchema),
+//   createProjectAdminController,
+// );
+// export default router;
 //# sourceMappingURL=projectRoutes.js.map

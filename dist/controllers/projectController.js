@@ -1,47 +1,51 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getProjects = exports.createProject = void 0;
-const projectService_js_1 = require("../services/projectService.js");
-const apiManager_js_1 = require("../utils/apiManager.js");
-const createProject = async (req, res, next) => {
-    try {
-        const { name, description } = req.body;
-        if (typeof name !== "string" ||
-            name.trim().length < 2 ||
-            name.trim().length > 100 ||
-            (description !== undefined && typeof description !== "string")) {
-            return apiManager_js_1.apiManager.failure(res, "Valid projectId, name, description, and status are required", 400, "INVALID_PROJECT");
-        }
-        const auth = res.locals.auth;
-        if (!auth?.userId || auth.role !== "superadmin") {
-            return apiManager_js_1.apiManager.failure(res, "Only SuperAdmin can create projects", 403, "FORBIDDEN");
-        }
-        const project = await (0, projectService_js_1.createProject)({
-            name,
-            description,
-            createdBy: auth.userId,
-        });
-        return apiManager_js_1.apiManager.success(res, "Project created successfully", project, 201);
-    }
-    catch (error) {
-        if (typeof error === "object" &&
-            error !== null &&
-            "code" in error &&
-            error.code === 11000) {
-            return apiManager_js_1.apiManager.failure(res, "Project ID already exists", 409, "DUPLICATE_PROJECT");
-        }
-        return next(error);
-    }
-};
-exports.createProject = createProject;
-const getProjects = async (_req, res, next) => {
-    try {
-        const projects = await (0, projectService_js_1.getProjects)();
-        return apiManager_js_1.apiManager.success(res, "Projects fetched successfully", projects, 200);
-    }
-    catch (error) {
-        return next(error);
-    }
-};
-exports.getProjects = getProjects;
+exports.updateProject = exports.getProjectsWithRoles = exports.getProjects = exports.createProject = void 0;
+// controllers/project.controller.ts
+const svc = __importStar(require("../services/projectService"));
+const request_js_1 = require("../utils/request.js");
+const helpers_js_1 = require("./helpers.js");
+// create project on the platform 
+exports.createProject = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.createProject({
+    ...req.body, createdBy: (0, request_js_1.actorId)(req)
+}), 201));
+// get your project on the platform 
+exports.getProjects = (0, helpers_js_1.wrap)(async (_req, res) => (0, helpers_js_1.ok)(res, await svc.getProjects()));
+// get project with roles 
+exports.getProjectsWithRoles = (0, helpers_js_1.wrap)(async (_req, res) => (0, helpers_js_1.ok)(res, await svc.getProjectsWithRoles()));
+// update project 
+exports.updateProject = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.updateProject((0, request_js_1.param)(req, "projectId"), req.body, (0, request_js_1.actorId)(req))));
 //# sourceMappingURL=projectController.js.map

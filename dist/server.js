@@ -4,8 +4,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
+const node_dns_1 = __importDefault(require("node:dns"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const app_js_1 = __importDefault(require("./app.js"));
+// Fix for Node.js querySrv ETIMEOUT on networks where the default ISP DNS blocks/times out SRV queries
+node_dns_1.default.setServers(["8.8.8.8", "8.8.4.4"]);
 const PORT = Number(process.env.PORT) || 3007;
 const MONGODB_URI = process.env.MONGODB_URI;
 async function startServer() {

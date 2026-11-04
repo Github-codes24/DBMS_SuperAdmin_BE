@@ -3,22 +3,42 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteUserSchema = exports.resetPasswordSchema = exports.updateUserStatusSchema = exports.updateUserSchema = exports.getUserSchema = exports.createUserSchema = exports.listUsersSchema = void 0;
 const zod_1 = require("zod");
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+// export const listUsersSchema = z.object({
+//   body: z.object({}),
+//   params: z.object({}),
+//   query: z.object({
+//     page: z.coerce.number().int().min(1).default(1),
+//     limit: z.coerce.number().int().min(1).max(100).default(10),
+//     search: z.string().trim().max(100).optional(),
+//     role: z.enum(["superadmin", "admin", "manager", "user"]).optional(),
+//     isActive: z
+//       .enum(["true", "false"])
+//       .transform((val) => val === "true")
+//       .optional(),
+//     projectId: z.string().trim().optional(),
+//     sortBy: z
+//       .enum(["createdAt", "name", "email", "lastLoginAt"])
+//       .default("createdAt"),
+//     sortOrder: z.enum(["asc", "desc"]).default("desc"),
+//   }),
+// });
+const emptyToUndefined = (v) => (v === "" || v === null ? undefined : v);
+const objectId = zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
+const projectRolesField = zod_1.z
+    .array(zod_1.z.object({ projectId: objectId, roleId: objectId }))
+    .max(50)
+    .optional();
 exports.listUsersSchema = zod_1.z.object({
-    body: zod_1.z.object({}),
-    params: zod_1.z.object({}),
+    body: zod_1.z.any().optional(), // GET has no body (undefined in Express 5)
+    params: zod_1.z.any().optional(),
     query: zod_1.z.object({
         page: zod_1.z.coerce.number().int().min(1).default(1),
         limit: zod_1.z.coerce.number().int().min(1).max(100).default(10),
-        search: zod_1.z.string().trim().max(100).optional(),
-        role: zod_1.z.enum(["superadmin", "admin", "manager", "user"]).optional(),
-        isActive: zod_1.z
-            .enum(["true", "false"])
-            .transform((val) => val === "true")
-            .optional(),
-        projectId: zod_1.z.string().trim().optional(),
-        sortBy: zod_1.z
-            .enum(["createdAt", "name", "email", "lastLoginAt"])
-            .default("createdAt"),
+        search: zod_1.z.preprocess(emptyToUndefined, zod_1.z.string().trim().max(100).optional()),
+        role: zod_1.z.preprocess(emptyToUndefined, zod_1.z.enum(["superadmin", "user"]).optional()),
+        isActive: zod_1.z.preprocess(emptyToUndefined, zod_1.z.enum(["true", "false"]).transform((val) => val === "true").optional()),
+        projectId: zod_1.z.preprocess(emptyToUndefined, objectId.optional()),
+        sortBy: zod_1.z.enum(["createdAt", "name", "email", "lastLoginAt"]).default("createdAt"),
         sortOrder: zod_1.z.enum(["asc", "desc"]).default("desc"),
     }),
 });
@@ -40,8 +60,8 @@ exports.createUserSchema = zod_1.z.object({
             .string()
             .min(8, "Password must be at least 8 characters")
             .max(128, "Password cannot exceed 128 characters"),
-        role: zod_1.z.enum(["superadmin", "admin", "manager", "user"]).default("user"),
-        projectIds: zod_1.z.array(zod_1.z.string().trim()).default([]),
+        role: zod_1.z.enum(["superadmin", "user"]).default("user"),
+        projectRoles: projectRolesField,
         isActive: zod_1.z.boolean().default(true),
     })
         .strict(),
@@ -73,8 +93,8 @@ exports.updateUserSchema = zod_1.z.object({
             .max(254)
             .transform((email) => email.toLowerCase())
             .optional(),
-        role: zod_1.z.enum(["superadmin", "admin", "manager", "user"]).optional(),
-        projectIds: zod_1.z.array(zod_1.z.string().trim()).optional(),
+        role: zod_1.z.enum(["superadmin", "user"]).default("user").optional(),
+        projectRoles: projectRolesField,
         isActive: zod_1.z.boolean().optional(),
     })
         .strict(),
