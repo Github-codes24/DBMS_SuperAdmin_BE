@@ -144,7 +144,6 @@ export const getTelecallers = async (req, res) => {
   }
 };
 
-
 // 2. CREATE SINGLE TELECALLER ACCOUNT
 // @desc    Create Single Telecaller Account (Manual "+ Add Telecaller")
 // @route   POST /api/v1/superadmin/telecallers

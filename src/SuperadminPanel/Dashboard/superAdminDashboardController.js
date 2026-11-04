@@ -6,16 +6,91 @@ import Telecaller from '../TelecallerManagement/telecallerSchema.js';
 import User from '../UserManagement/userSchema.js';
 import AuditLog from '../AuditLogs/auditLogSchema.js';
 import SupportTicket from '../../VendorPanel/HelpSupport/supportSchema.js';
+import { getRoleKPI, BLOCKED_STATUSES } from "../../utils/dashboardStats.js"
 
 // Helper to compute real-time dynamic stats from MongoDB collections
+// const getDynamicSuperAdminStats = async () => {
+//   const startOfDay = new Date();
+//   startOfDay.setHours(0, 0, 0, 0);
+
+//   const [
+//     totalVendors,
+//     newVendors,
+//     totalCustomers,
+//     newCustomers,
+//     totalVendorRequests,
+//     newVendorRequests,
+//     totalCustomerQueries,
+//     newCustomerQueries,
+//     todaysVendorAuditCount,
+//     totalAuditLogs,
+//     totalAdminUsers,
+//     totalTelecallers,
+//     activeTelecallers,
+//     activeAdminUsers,
+//   ] = await Promise.all([
+//     SuperAdminVendor.countDocuments({ isDeleted: false }),
+//     SuperAdminVendor.countDocuments({ isDeleted: false, createdAt: { $gte: startOfDay } }),
+//     Customer.countDocuments({ isDeleted: false }),
+//     Customer.countDocuments({ isDeleted: false, createdAt: { $gte: startOfDay } }),
+//     SupportTicket.countDocuments({}),
+//     SupportTicket.countDocuments({ status: 'Pending' }),
+//     SupportTicket.countDocuments({ category: { $ne: 'Vendor' } }),
+//     SupportTicket.countDocuments({ category: { $ne: 'Vendor' }, status: 'Pending' }),
+//     AuditLog.countDocuments({ createdAt: { $gte: startOfDay } }),
+//     AuditLog.countDocuments({}),
+//     User.countDocuments({ isDeleted: false }),
+//     Telecaller.countDocuments({ isDeleted: false }),
+//     Telecaller.countDocuments({ isDeleted: false, status: 'Active' }),
+//     User.countDocuments({ isDeleted: false, status: 'ACTIVE' }),
+//   ]);
+
+//   return {
+//     newVendors: {
+//       count: newVendors,
+//       badgePercentage: '+10%',
+//       totalVendors: totalVendors,
+//     },
+//     newCustomers: {
+//       count: newCustomers,
+//       badgePercentage: '+10%',
+//       totalCustomers: totalCustomers,
+//     },
+//     newVendorRequests: {
+//       count: newVendorRequests,
+//       totalFYRequests: totalVendorRequests,
+//     },
+//     newCustomerQueries: {
+//       count: newCustomerQueries,
+//       totalQueries: totalCustomerQueries,
+//     },
+//     todaysVendorAudit: {
+//       count: todaysVendorAuditCount,
+//       pendingQuality: totalAuditLogs,
+//     },
+//     onlineUsersDMS: {
+//       count: activeAdminUsers + activeTelecallers,
+//       badgePercentage: '+100%',
+//       totalUserCount: totalAdminUsers + totalTelecallers,
+//     },
+//     cascadeFilter: {
+//       selectedState: 'All',
+//       selectedCategory: 'All',
+//       selectedSubCategory: 'All',
+//     },
+//   };
+// };
+
+
 const getDynamicSuperAdminStats = async () => {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
   const [
-    totalVendors,
+    vendorKPI,
+    customerKPI,
+    telecallerKPI,
     newVendors,
-    totalCustomers,
     newCustomers,
     totalVendorRequests,
     newVendorRequests,
@@ -24,13 +99,14 @@ const getDynamicSuperAdminStats = async () => {
     todaysVendorAuditCount,
     totalAuditLogs,
     totalAdminUsers,
-    totalTelecallers,
-    activeTelecallers,
     activeAdminUsers,
   ] = await Promise.all([
-    SuperAdminVendor.countDocuments({ isDeleted: false }),
+    // Role KPIs (total / active / blocked)
+    getRoleKPI(SuperAdminVendor, BLOCKED_STATUSES.vendors),
+    getRoleKPI(Customer, BLOCKED_STATUSES.customers),
+    getRoleKPI(Telecaller, BLOCKED_STATUSES.telecallers),
+
     SuperAdminVendor.countDocuments({ isDeleted: false, createdAt: { $gte: startOfDay } }),
-    Customer.countDocuments({ isDeleted: false }),
     Customer.countDocuments({ isDeleted: false, createdAt: { $gte: startOfDay } }),
     SupportTicket.countDocuments({}),
     SupportTicket.countDocuments({ status: 'Pending' }),
@@ -39,21 +115,26 @@ const getDynamicSuperAdminStats = async () => {
     AuditLog.countDocuments({ createdAt: { $gte: startOfDay } }),
     AuditLog.countDocuments({}),
     User.countDocuments({ isDeleted: false }),
-    Telecaller.countDocuments({ isDeleted: false }),
-    Telecaller.countDocuments({ isDeleted: false, status: 'Active' }),
-    User.countDocuments({ isDeleted: false, status: 'ACTIVE' }),
+    User.countDocuments({ isDeleted: false, status: { $in: ['ACTIVE', 'Active'] } }),
   ]);
 
   return {
+    //  NEW
+    userKPIs: {
+      vendors: vendorKPI,
+      customers: customerKPI,
+      telecallers: telecallerKPI,
+    },
+
     newVendors: {
       count: newVendors,
       badgePercentage: '+10%',
-      totalVendors: totalVendors,
+      totalVendors: vendorKPI.total,
     },
     newCustomers: {
       count: newCustomers,
       badgePercentage: '+10%',
-      totalCustomers: totalCustomers,
+      totalCustomers: customerKPI.total,
     },
     newVendorRequests: {
       count: newVendorRequests,
@@ -68,9 +149,9 @@ const getDynamicSuperAdminStats = async () => {
       pendingQuality: totalAuditLogs,
     },
     onlineUsersDMS: {
-      count: activeAdminUsers + activeTelecallers,
+      count: activeAdminUsers + telecallerKPI.active,
       badgePercentage: '+100%',
-      totalUserCount: totalAdminUsers + totalTelecallers,
+      totalUserCount: totalAdminUsers + telecallerKPI.total,
     },
     cascadeFilter: {
       selectedState: 'All',
