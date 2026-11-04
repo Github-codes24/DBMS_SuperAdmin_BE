@@ -11,9 +11,11 @@ function handleUserError(error, res, next) {
 }
 const getUsers = async (_req, res, next) => {
     try {
+        console.log("4. Controller started");
         const validated = res.locals.validated;
         const auth = res.locals.auth;
         const result = await (0, userService_js_1.listUsers)(validated.query, auth);
+        console.log("Before success:", res.headersSent);
         return apiManager_js_1.apiManager.success(res, "Users retrieved successfully", result);
     }
     catch (error) {

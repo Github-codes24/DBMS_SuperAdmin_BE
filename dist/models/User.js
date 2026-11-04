@@ -33,15 +33,67 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.User = exports.RefreshSession = void 0;
+exports.RefreshSession = exports.User = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
+// const userSchema = new Schema(
+//   {
+//     name: {
+//       type: String,
+//       required: true,
+//       trim: true,
+//       minlength: 2,
+//       maxlength: 100,
+//     },
+//     email: {
+//       type: String,
+//       required: true,
+//       lowercase: true,
+//       trim: true,
+//       unique: true,
+//       index: true,
+//     },
+//     passwordHash: {
+//       type: String,
+//       required: true,
+//       select: false,
+//     },
+//     role: {
+//       type: String,
+//       enum: ["superadmin", "admin", "manager", "user"],
+//       default: "user",
+//       required: true,
+//     },
+//     projectIds: {
+//       type: [String],
+//       default: [],
+//     },
+//     projectRoles: [
+//       {
+//         projectId: { type: String, required: true },
+//         roleId: { type: Schema.Types.ObjectId, ref: "Role", required: true },
+//       },
+//     ],
+//     isActive: {
+//       type: Boolean,
+//       default: true,
+//     },
+//     lastLoginAt: {
+//       type: Date,
+//       default: null,
+//     },
+//   },
+//   {
+//     timestamps: true,
+//     collection: "users",
+//   },
+// );
 const userSchema = new mongoose_1.Schema({
     name: {
         type: String,
         required: true,
         trim: true,
         minlength: 2,
-        maxlength: 100,
+        maxlength: 100
     },
     email: {
         type: String,
@@ -49,41 +101,25 @@ const userSchema = new mongoose_1.Schema({
         lowercase: true,
         trim: true,
         unique: true,
-        index: true,
+        index: true
     },
-    passwordHash: {
-        type: String,
-        required: true,
-        select: false,
-    },
-    role: {
-        type: String,
-        enum: ["superadmin", "admin", "manager", "user"],
-        default: "user",
-        required: true,
-    },
-    projectIds: {
-        type: [String],
-        default: [],
-    },
+    passwordHash: { type: String, required: true, select: false },
+    role: { type: String, enum: ["superadmin", "user"], default: "user", required: true },
     projectRoles: [
         {
-            projectId: { type: String, required: true },
+            _id: false,
+            projectId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Project", required: true },
             roleId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Role", required: true },
+            isActive: { type: Boolean, default: true },
+            assignedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: "User" },
         },
     ],
-    isActive: {
-        type: Boolean,
-        default: true,
-    },
-    lastLoginAt: {
-        type: Date,
-        default: null,
-    },
-}, {
-    timestamps: true,
-    collection: "users",
-});
+    isActive: { type: Boolean, default: true },
+    lastLoginAt: { type: Date, default: null },
+    tokenVersion: { type: Number, default: 0 },
+}, { timestamps: true, collection: "users" });
+userSchema.index({ "projectRoles.projectId": 1, "projectRoles.roleId": 1 });
+exports.User = mongoose_1.default.model("User", userSchema);
 const refreshSessionSchema = new mongoose_1.Schema({
     userId: {
         type: mongoose_1.Schema.Types.ObjectId,
@@ -110,5 +146,4 @@ const refreshSessionSchema = new mongoose_1.Schema({
 });
 refreshSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 exports.RefreshSession = mongoose_1.default.model("RefreshSession", refreshSessionSchema);
-exports.User = mongoose_1.default.model("User", userSchema);
 //# sourceMappingURL=User.js.map

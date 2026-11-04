@@ -1,11 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireSuperAdmin = void 0;
-const apiManager_js_1 = require("../utils/apiManager.js");
-const requireSuperAdmin = (_req, res, next) => {
-    const auth = res.locals.auth;
-    if (auth?.role !== "superadmin") {
-        return apiManager_js_1.apiManager.failure(res, "Only SuperAdmin can manage roles and permissions", 403, "FORBIDDEN");
+const httpError_js_1 = require("../utils/httpError.js");
+const requireSuperAdmin = (req, _res, next) => {
+    if (req.user?.role !== "superadmin") {
+        return next((0, httpError_js_1.httpError)(403, "FORBIDDEN", "Only SuperAdmin can manage roles and permissions"));
     }
     next();
 };

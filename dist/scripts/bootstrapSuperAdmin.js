@@ -44,7 +44,7 @@ async function bootstrapSuperAdmin() {
         email,
         passwordHash,
         role: "superadmin",
-        projectIds: [],
+        // projectIds: [],
         isActive: true,
     });
     console.log("");
