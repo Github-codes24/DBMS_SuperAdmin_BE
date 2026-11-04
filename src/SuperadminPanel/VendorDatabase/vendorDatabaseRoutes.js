@@ -19,8 +19,7 @@ import {
   bulkUpdateVendorStatuses,
   bulkDeleteVendors,
   blockVendor,
-  unblockVendor
-
+  unblockVendor,
 } from './vendorDatabaseController.js';
 import { protectSuperAdmin } from '../Authentication/authMiddleware.js';
 
@@ -39,7 +38,7 @@ router.get('/export/pdf', protectSuperAdmin, exportVendorsPDF);
 // Bulk Import Endpoint (Supports Direct Excel .xlsx/.xls/.csv File Upload OR JSON Payload)
 router.post('/import', protectSuperAdmin, upload.any(), importVendors);
 
-// Directory Listing & Manual Vendor Creation
+// Directory Listing & Manual Vendor Creation (ONLY Super Admin can create vendors)
 router
   .route('/')
   .get(protectSuperAdmin, getVendors)
@@ -47,63 +46,38 @@ router
 
 router.patch('/bulk-status', protectSuperAdmin, bulkUpdateVendorStatuses);
 router.patch('/bulk-delete', protectSuperAdmin, bulkDeleteVendors);
- 
-  // GENERATE VENDOR ID AND PASSWORD DURING ACTIVATION OF ACCOUNT 
-  router.patch(
-    '/:vendorId/activate',
-    protectSuperAdmin,
-    activateVendor
-  );
-  // Change Password Of The Vendor
-  router.patch(
-    '/:vendorId/password',
-    protectSuperAdmin,
-    changeVendorPassword
-  );
-  // Delete Vendor
-  router.delete(
-    '/:vendorId',
-    protectSuperAdmin,
-    deleteVendor
-  );
-  // Search Vendor's Based on state , city and name
-  router.get(
-    '/search',
-    protectSuperAdmin,
-    searchVendors
-  );
-  // block vendor 
-  router.patch('/:id/block',protectSuperAdmin,blockVendor)
-  // unblock vendor 
-  router.patch('/:id/unblock',protectSuperAdmin,unblockVendor)
-  // Dynamic Form Field's
-  router.get(
-    '/form-fields',
-    protectSuperAdmin,
-    getVendorFormFields
-  );
-  router.post(
-    '/form-fields',
-    protectSuperAdmin,
-    createVendorFormField
-  );
-  router.patch(
-    '/form-fields/:fieldId',
-    protectSuperAdmin,
-    updateVendorFormField
-  );
-  router.delete(
-    '/form-fields/:fieldId',
-    protectSuperAdmin,
-    deleteVendorFormField
-  );
+
+// Search Vendors Based on state, city, and name
+router.get('/search', protectSuperAdmin, searchVendors);
+
+// Dynamic Form Fields
+router.get('/form-fields', protectSuperAdmin, getVendorFormFields);
+router.post('/form-fields', protectSuperAdmin, createVendorFormField);
+router.patch('/form-fields/:fieldId', protectSuperAdmin, updateVendorFormField);
+router.delete('/form-fields/:fieldId', protectSuperAdmin, deleteVendorFormField);
+
+// Activate Vendor by SuperAdmin only (Accepts MongoDB _id, custom vendorId 'VEN001', or transNo)
+router.patch('/:vendorId/activate', protectSuperAdmin, activateVendor);
+router.patch('/:id/activate', protectSuperAdmin, activateVendor);
+
+// Change Password Of The Vendor (Accepts :vendorId or :id)
+router.patch('/:vendorId/password', protectSuperAdmin, changeVendorPassword);
+router.patch('/:id/password', protectSuperAdmin, changeVendorPassword);
+
+// Block & Unblock Vendor
+router.patch('/:vendorId/block', protectSuperAdmin, blockVendor);
+router.patch('/:id/block', protectSuperAdmin, blockVendor);
+router.patch('/:vendorId/unblock', protectSuperAdmin, unblockVendor);
+router.patch('/:id/unblock', protectSuperAdmin, unblockVendor);
+
+// Delete Vendor (Soft delete)
+router.delete('/:vendorId', protectSuperAdmin, deleteVendor);
+router.delete('/:id', protectSuperAdmin, deleteVendor);
 
 // Get Single Vendor & Update Vendor (Accepts MongoDB _id, custom vendorId 'VEN002', or transNo 'TRX90102')
 router
   .route('/:id')
   .get(protectSuperAdmin, getVendorById)
   .patch(protectSuperAdmin, updateVendor);
-
-
 
 export default router;

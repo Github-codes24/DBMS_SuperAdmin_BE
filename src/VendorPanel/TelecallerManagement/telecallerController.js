@@ -1,8 +1,9 @@
 import Telecaller from '../../Telecaller/models/Telecaller.js';
-import { sendTelecallerWelcomeEmail } from './mailHelper.js';
+import SuperAdminTelecaller from '../../SuperadminPanel/TelecallerManagement/telecallerSchema.js';
+import { generateTelecallerId } from '../../SuperadminPanel/TelecallerManagement/telecallerController.js';
 
 /**
- * @desc   Create a new Telecaller linked to the Vendor
+ * @desc   Create a new Telecaller linked to the Vendor (Pending Super Admin Activation)
  * @route  POST /api/telecallers
  * @access Private (Vendor)
  */
@@ -12,79 +13,125 @@ export const createVendorTelecaller = async (req, res) => {
   try {
     // 1. Validation
     if (!name || !name.trim()) {
-      return res.status(400).json({ message: 'Name is required' });
-    }
-    if (!employeeId || !employeeId.trim()) {
-      return res.status(400).json({ message: 'Employee ID is required' });
+      return res.status(400).json({ success: false, message: 'Name is required' });
     }
     if (!email || !email.trim()) {
-      return res.status(400).json({ message: 'Email address is required' });
+      return res.status(400).json({ success: false, message: 'Email address is required' });
     }
     if (!phone || !phone.trim()) {
-      return res.status(400).json({ message: 'Phone number is required' });
-    }
-    if (!password || password.trim().length < 8) {
-      return res.status(400).json({ message: 'Password is required and must be at least 8 characters long' });
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
 
-    // 2. Uniqueness Checks
+    // Auto-generate employeeId if not provided
+    const employeeIdUpper = (employeeId && employeeId.trim())
+      ? employeeId.trim().toUpperCase()
+      : await generateTelecallerId();
+
+    // Auto-generate temporary password if not provided
+    const rawPassword = (password && password.trim().length >= 6)
+      ? password.trim()
+      : `Tc@${Math.floor(100000 + Math.random() * 900000)}`;
+
+    // 2. Uniqueness Checks across both Telecaller auth model and SuperAdmin directory
     const emailLower = email.trim().toLowerCase();
-    const employeeIdUpper = employeeId.trim().toUpperCase();
+    const phoneTrimmed = phone.trim();
 
-    const existingTelecaller = await Telecaller.findOne({
+    // Check collision in Telecaller auth collection
+    const existingAuth = await Telecaller.findOne({
       $or: [
         { email: emailLower },
-        { phone: phone.trim() },
-        { employeeId: employeeIdUpper }
-      ]
+        { phone: phoneTrimmed },
+        { employeeId: employeeIdUpper },
+      ],
     });
 
-    if (existingTelecaller) {
-      if (existingTelecaller.email === emailLower) {
-        return res.status(400).json({ message: 'A telecaller with this email already exists' });
+    if (existingAuth) {
+      if (existingAuth.email === emailLower) {
+        return res.status(409).json({ success: false, message: `Telecaller with email '${emailLower}' already exists` });
       }
-      if (existingTelecaller.phone === phone.trim()) {
-        return res.status(400).json({ message: 'A telecaller with this phone number already exists' });
+      if (existingAuth.phone === phoneTrimmed) {
+        return res.status(409).json({ success: false, message: `Telecaller with phone number '${phoneTrimmed}' already exists` });
       }
-      if (existingTelecaller.employeeId === employeeIdUpper) {
-        return res.status(400).json({ message: 'A telecaller with this Employee ID already exists' });
+      if (existingAuth.employeeId === employeeIdUpper) {
+        return res.status(409).json({ success: false, message: `Telecaller with Employee ID '${employeeIdUpper}' already exists` });
       }
     }
 
-    // 3. Create the Telecaller document
+    // Check collision in SuperAdminTelecaller collection
+    const existingMaster = await SuperAdminTelecaller.findOne({
+      $or: [
+        { email: emailLower },
+        { mobileNumber: phoneTrimmed },
+        { userId: employeeIdUpper },
+      ],
+      isDeleted: false,
+    });
+
+    if (existingMaster) {
+      if (existingMaster.email === emailLower) {
+        return res.status(409).json({ success: false, message: `Telecaller with email '${emailLower}' already exists in Super Admin records` });
+      }
+      if (existingMaster.mobileNumber === phoneTrimmed) {
+        return res.status(409).json({ success: false, message: `Telecaller with phone number '${phoneTrimmed}' already exists in Super Admin records` });
+      }
+      if (existingMaster.userId === employeeIdUpper) {
+        return res.status(409).json({ success: false, message: `Telecaller with Employee ID '${employeeIdUpper}' already exists in Super Admin records` });
+      }
+    }
+
+    // 3. Create the Telecaller document with status PENDING (Vendor cannot give access)
     const newTelecaller = await Telecaller.create({
       name: name.trim(),
       employeeId: employeeIdUpper,
       email: emailLower,
-      phone: phone.trim(),
-      password: password.trim(), // Will be hashed by pre-save hook in Telecaller model
+      phone: phoneTrimmed,
+      password: rawPassword, // Will be hashed by pre-save hook in Telecaller model
+      role: 'TELECALLER',
+      status: 'PENDING',
       createdByVendor: req.vendor._id,
     });
 
-    // 4. Send Welcome Email via MSG91
-    // Run asynchronously without blocking the client response
-    sendTelecallerWelcomeEmail(emailLower, name.trim(), password.trim())
-      .then(emailResult => {
-        if (!emailResult.success) {
-          console.error(`[Email Fail] Failed to send welcome email to ${emailLower}:`, emailResult.error);
-        }
-      })
-      .catch(err => {
-        console.error('[Email Exception] Error dispatching mail:', err);
-      });
+    // 4. Sync to SuperAdminTelecaller master directory with status Pending
+    try {
+      await SuperAdminTelecaller.findOneAndUpdate(
+        {
+          $or: [
+            { email: emailLower },
+            { mobileNumber: phoneTrimmed },
+            { userId: employeeIdUpper },
+          ],
+        },
+        {
+          userId: employeeIdUpper,
+          fullName: name.trim(),
+          mobileNumber: phoneTrimmed,
+          email: emailLower,
+          password: rawPassword, // Will be hashed by pre-save hook
+          status: 'Pending',
+          createdByVendor: req.vendor._id,
+          isDeleted: false,
+        },
+        { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+      );
+    } catch (syncErr) {
+      console.error('[Vendor Telecaller Sync Warning] SuperAdminTelecaller sync error:', syncErr.message);
+    }
 
-    // 5. Return success
+    // Note: Credentials email is intentionally NOT sent here.
+    // Vendor creates the account, but access is only granted when Super Admin activates it.
+
+    // 6. Return response (No email sent until Super Admin activates)
     const result = newTelecaller.toObject();
     delete result.password;
 
     return res.status(201).json({
       success: true,
-      message: 'Telecaller account created successfully. Welcome email dispatched.',
+      message: 'Telecaller account created successfully. Account is pending activation by Super Admin. Access will be granted once approved.',
       data: result,
     });
   } catch (error) {
     console.error('[CreateTelecaller Error]', error);
-    return res.status(500).json({ message: 'Server error occurred while creating telecaller', error: error.message });
+    return res.status(500).json({ success: false, message: 'Server error occurred while creating telecaller', error: error.message });
   }
 };
 
@@ -96,6 +143,7 @@ export const createVendorTelecaller = async (req, res) => {
 export const getVendorTelecallers = async (req, res) => {
   try {
     const telecallers = await Telecaller.find({ createdByVendor: req.vendor._id })
+      .select('-password')
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -105,6 +153,6 @@ export const getVendorTelecallers = async (req, res) => {
     });
   } catch (error) {
     console.error('[GetTelecallers Error]', error);
-    return res.status(500).json({ message: 'Server error occurred while fetching telecallers', error: error.message });
+    return res.status(500).json({ success: false, message: 'Server error occurred while fetching telecallers', error: error.message });
   }
 };

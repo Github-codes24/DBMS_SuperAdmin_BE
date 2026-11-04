@@ -20,7 +20,7 @@ const superAdminVendorSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      unique:true
+      unique: true,
     },
     ownerName: {
       type: String,
@@ -79,7 +79,7 @@ const superAdminVendorSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['ACTIVE', 'PENDING', 'Active', 'Pending','Blocked','blocked'],
+      enum: ['ACTIVE', 'PENDING', 'Active', 'Pending', 'Blocked', 'BLOCKED', 'blocked', 'Disabled', 'DISABLED', 'disabled'],
       default: 'Pending',
     },
     createdBy: {
@@ -113,6 +113,7 @@ const superAdminVendorSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 // Search indexes
 superAdminVendorSchema.index(
   { vendorName: 1 },
@@ -126,12 +127,18 @@ superAdminVendorSchema.index({ vendorId: 1, isDeleted: 1 });
 superAdminVendorSchema.index({ category: 1, isDeleted: 1 });
 superAdminVendorSchema.index({ ownerName: 1, isDeleted: 1 });
 superAdminVendorSchema.index({ state: 1, city: 1, isDeleted: 1 });
-superAdminVendorSchema.index({ email: 1 }, { unique: true, partialFilterExpression: {
- email: { $type: "string", $gt: "" },
-  },
+superAdminVendorSchema.index(
+  { email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      email: { $type: "string", $gt: "" },
+    },
   }
 );
+
 const SuperAdminVendor = mongoose.model('SuperAdminVendor', superAdminVendorSchema);
+
 const vendorFormFieldSchema = new mongoose.Schema(
   {
     label: {

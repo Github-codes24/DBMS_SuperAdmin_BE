@@ -32,7 +32,8 @@ const authSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
+      required: false,
+      default: "",
     },
     storeName: {
       type: String,
@@ -40,7 +41,7 @@ const authSchema = new mongoose.Schema(
     },
     storeStatus: {
       type: String,
-      default: "Active & Verified",
+      default: "Pending Verification",
     },
     twoFactorAuth: {
       type: Boolean,

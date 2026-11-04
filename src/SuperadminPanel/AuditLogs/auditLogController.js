@@ -21,11 +21,11 @@ export const getAuditLogs = async (req, res) => {
     const limit = parseInt(req.query.limit, 10) || 20;
     const skip = (page - 1) * limit;
 
-    const { search, user, action, module } = req.query;
+    const { search, user, action, module, actorType } = req.query;
 
     const query = {};
 
-    // Search filter across user, action, record, module, userName
+    // Search filter across user, action, record, module, userName, message, actorType
     if (search && search.trim()) {
       const searchRegex = new RegExp(search.trim(), 'i');
       query.$or = [
@@ -34,6 +34,8 @@ export const getAuditLogs = async (req, res) => {
         { record: searchRegex },
         { module: searchRegex },
         { userName: searchRegex },
+        { message: searchRegex },
+        { actorType: searchRegex },
       ];
     }
 
@@ -47,6 +49,10 @@ export const getAuditLogs = async (req, res) => {
 
     if (module && module.trim()) {
       query.module = new RegExp(module.trim(), 'i');
+    }
+
+    if (actorType && actorType.trim()) {
+      query.actorType = actorType.trim().toUpperCase();
     }
 
     const totalLogs = await AuditLog.countDocuments(query);
@@ -85,14 +91,16 @@ export const exportAuditLogsCSV = async (req, res) => {
   try {
     const logs = await AuditLog.find({}).sort({ timestamp: -1 });
 
-    const headers = ['Time', 'User', 'Action', 'Record', 'Module', 'Date & Time', 'IP Address'];
+    const headers = ['Time', 'User', 'Actor Type', 'Action', 'Record', 'Module', 'Message / Updater', 'Date & Time', 'IP Address'];
 
     const rowsData = logs.map((log) => [
       formatTimeHHMM(log.timestamp),
       log.user || '',
+      log.actorType || 'SUPER_ADMIN',
       log.action || '',
       log.record || '',
       log.module || 'General',
+      log.message || '',
       new Date(log.timestamp).toLocaleString(),
       log.ipAddress || '-',
     ]);
@@ -115,7 +123,7 @@ export const exportAuditLogsPDF = async (req, res) => {
   try {
     const logs = await AuditLog.find({}).sort({ timestamp: -1 });
 
-    const headers = ['TIME', 'USER', 'ACTION', 'RECORD', 'MODULE', 'DATE & TIME'];
+    const headers = ['TIME', 'USER', 'ACTOR TYPE', 'ACTION', 'RECORD', 'UPDATER MESSAGE', 'DATE & TIME'];
 
     const tableRowsHtml = logs
       .map((log) => {
@@ -125,9 +133,10 @@ export const exportAuditLogsPDF = async (req, res) => {
         <tr>
           <td><strong>${timeStr}</strong></td>
           <td><strong style="color: #ea580c;">${log.user}</strong></td>
+          <td>${log.actorType || 'SUPER_ADMIN'}</td>
           <td>${log.action}</td>
           <td><strong>${log.record}</strong></td>
-          <td>${log.module || 'General'}</td>
+          <td>${log.message || '-'}</td>
           <td>${fullDateStr}</td>
         </tr>`;
       })
