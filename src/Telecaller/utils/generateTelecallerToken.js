@@ -12,10 +12,9 @@ import jwt from 'jsonwebtoken';
 const generateToken = (id) => {
   return jwt.sign(
     { id, role: 'TELECALLER' },
-    process.env.JWT_SECRET,
+    process.env.JWT_SECRET || 'lts_default_jwt_secret_key_2026',
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
 };
 
 export default generateToken;
-

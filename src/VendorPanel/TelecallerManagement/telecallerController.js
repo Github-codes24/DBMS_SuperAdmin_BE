@@ -1,9 +1,9 @@
 import Telecaller from '../../Telecaller/models/Telecaller.js';
 import SuperAdminTelecaller from '../../SuperadminPanel/TelecallerManagement/telecallerSchema.js';
-import { createAuditLog } from '../../utils/auditLogger.js';
+import { generateTelecallerId } from '../../SuperadminPanel/TelecallerManagement/telecallerController.js';
 
 /**
- * @desc   Create a new Telecaller linked to the Vendor (Status: PENDING, access requires Super Admin activation)
+ * @desc   Create a new Telecaller linked to the Vendor (Pending Super Admin Activation)
  * @route  POST /api/telecallers
  * @access Private (Vendor)
  */
@@ -15,92 +15,110 @@ export const createVendorTelecaller = async (req, res) => {
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Name is required' });
     }
-    if (!employeeId || !employeeId.trim()) {
-      return res.status(400).json({ success: false, message: 'Employee ID is required' });
-    }
     if (!email || !email.trim()) {
       return res.status(400).json({ success: false, message: 'Email address is required' });
     }
     if (!phone || !phone.trim()) {
       return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
-    if (!password || password.trim().length < 6) {
-      return res.status(400).json({ success: false, message: 'Password is required and must be at least 6 characters long' });
-    }
 
-    // 2. Uniqueness Checks across BOTH collections (Telecaller and SuperAdminTelecaller)
+    // Auto-generate employeeId if not provided
+    const employeeIdUpper = (employeeId && employeeId.trim())
+      ? employeeId.trim().toUpperCase()
+      : await generateTelecallerId();
+
+    // Auto-generate temporary password if not provided
+    const rawPassword = (password && password.trim().length >= 6)
+      ? password.trim()
+      : `Tc@${Math.floor(100000 + Math.random() * 900000)}`;
+
+    // 2. Uniqueness Checks across both Telecaller auth model and SuperAdmin directory
     const emailLower = email.trim().toLowerCase();
-    const employeeIdUpper = employeeId.trim().toUpperCase();
-    const phoneClean = phone.trim();
+    const phoneTrimmed = phone.trim();
 
-    const [existingAuthTc, existingSuperTc] = await Promise.all([
-      Telecaller.findOne({
-        $or: [
-          { email: emailLower },
-          { phone: phoneClean },
-          { employeeId: employeeIdUpper },
-        ],
-      }),
-      SuperAdminTelecaller.findOne({
-        $or: [
-          { email: emailLower },
-          { mobileNumber: phoneClean },
-          { userId: employeeIdUpper },
-        ],
-        isDeleted: false,
-      }),
-    ]);
+    // Check collision in Telecaller auth collection
+    const existingAuth = await Telecaller.findOne({
+      $or: [
+        { email: emailLower },
+        { phone: phoneTrimmed },
+        { employeeId: employeeIdUpper },
+      ],
+    });
 
-    if (existingAuthTc || existingSuperTc) {
-      if (existingAuthTc?.email === emailLower || existingSuperTc?.email === emailLower) {
-        return res.status(400).json({ success: false, message: 'A telecaller with this email already exists' });
+    if (existingAuth) {
+      if (existingAuth.email === emailLower) {
+        return res.status(409).json({ success: false, message: `Telecaller with email '${emailLower}' already exists` });
       }
-      if (existingAuthTc?.phone === phoneClean || existingSuperTc?.mobileNumber === phoneClean) {
-        return res.status(400).json({ success: false, message: 'A telecaller with this phone number already exists' });
+      if (existingAuth.phone === phoneTrimmed) {
+        return res.status(409).json({ success: false, message: `Telecaller with phone number '${phoneTrimmed}' already exists` });
       }
-      if (existingAuthTc?.employeeId === employeeIdUpper || existingSuperTc?.userId === employeeIdUpper) {
-        return res.status(400).json({ success: false, message: 'A telecaller with this Employee ID already exists' });
+      if (existingAuth.employeeId === employeeIdUpper) {
+        return res.status(409).json({ success: false, message: `Telecaller with Employee ID '${employeeIdUpper}' already exists` });
       }
     }
 
-    // 3. Create the Telecaller auth document with status: 'PENDING'
+    // Check collision in SuperAdminTelecaller collection
+    const existingMaster = await SuperAdminTelecaller.findOne({
+      $or: [
+        { email: emailLower },
+        { mobileNumber: phoneTrimmed },
+        { userId: employeeIdUpper },
+      ],
+      isDeleted: false,
+    });
+
+    if (existingMaster) {
+      if (existingMaster.email === emailLower) {
+        return res.status(409).json({ success: false, message: `Telecaller with email '${emailLower}' already exists in Super Admin records` });
+      }
+      if (existingMaster.mobileNumber === phoneTrimmed) {
+        return res.status(409).json({ success: false, message: `Telecaller with phone number '${phoneTrimmed}' already exists in Super Admin records` });
+      }
+      if (existingMaster.userId === employeeIdUpper) {
+        return res.status(409).json({ success: false, message: `Telecaller with Employee ID '${employeeIdUpper}' already exists in Super Admin records` });
+      }
+    }
+
+    // 3. Create the Telecaller document with status PENDING (Vendor cannot give access)
     const newTelecaller = await Telecaller.create({
       name: name.trim(),
       employeeId: employeeIdUpper,
       email: emailLower,
-      phone: phoneClean,
-      password: password.trim(), // Will be hashed by pre-save hook in Telecaller model
+      phone: phoneTrimmed,
+      password: rawPassword, // Will be hashed by pre-save hook in Telecaller model
+      role: 'TELECALLER',
       status: 'PENDING',
       createdByVendor: req.vendor._id,
     });
 
-    // 4. Dual-schema creation: Also create in SuperAdminTelecaller with status: 'Pending'
+    // 4. Sync to SuperAdminTelecaller master directory with status Pending
     try {
-      await SuperAdminTelecaller.create({
-        userId: employeeIdUpper,
-        fullName: name.trim(),
-        mobileNumber: phoneClean,
-        email: emailLower,
-        password: newTelecaller.password, // Uses hashed password from Telecaller pre-save
-        assignedRegion: '',
-        status: 'Pending',
-        createdBy: null,
-      });
-    } catch (superTcErr) {
-      console.error('[Dual-Schema Telecaller Error]', superTcErr.message);
+      await SuperAdminTelecaller.findOneAndUpdate(
+        {
+          $or: [
+            { email: emailLower },
+            { mobileNumber: phoneTrimmed },
+            { userId: employeeIdUpper },
+          ],
+        },
+        {
+          userId: employeeIdUpper,
+          fullName: name.trim(),
+          mobileNumber: phoneTrimmed,
+          email: emailLower,
+          password: rawPassword, // Will be hashed by pre-save hook
+          status: 'Pending',
+          createdByVendor: req.vendor._id,
+          isDeleted: false,
+        },
+        { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+      );
+    } catch (syncErr) {
+      console.error('[Vendor Telecaller Sync Warning] SuperAdminTelecaller sync error:', syncErr.message);
     }
 
-    // 5. Audit Log (Updater identity: VENDOR)
-    await createAuditLog({
-      user: req.vendor?.vendorId || String(req.vendor?._id),
-      userName: req.vendor?.fullName || req.vendor?.storeName || 'Vendor',
-      userRole: 'VENDOR',
-      actorType: 'VENDOR',
-      action: 'Created Telecaller',
-      record: employeeIdUpper,
-      module: 'Telecaller Management',
-      message: `Telecaller ${employeeIdUpper} (${name.trim()}) created by Vendor: ${req.vendor?.storeName || req.vendor?.fullName} (${req.vendor?.vendorId || req.vendor?._id}) with Pending status. Access pending Super Admin activation.`,
-    });
+    // Note: Credentials email is intentionally NOT sent here.
+    // Vendor creates the account, but access is only granted when Super Admin activates it.
 
     // 6. Return response (No email sent until Super Admin activates)
     const result = newTelecaller.toObject();
@@ -108,7 +126,7 @@ export const createVendorTelecaller = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Telecaller account created successfully with Pending status. Activation and login access must be granted by Super Admin.',
+      message: 'Telecaller account created successfully. Account is pending activation by Super Admin. Access will be granted once approved.',
       data: result,
     });
   } catch (error) {
@@ -125,6 +143,7 @@ export const createVendorTelecaller = async (req, res) => {
 export const getVendorTelecallers = async (req, res) => {
   try {
     const telecallers = await Telecaller.find({ createdByVendor: req.vendor._id })
+      .select('-password')
       .sort({ createdAt: -1 });
 
     return res.status(200).json({

@@ -8,10 +8,35 @@ import * as authService from '../services/auth.service.js';
  * @access Disabled (Super Admin and Vendor Panel Only)
  */
 export const signup = asyncHandler(async (req, res) => {
-  return res.status(403).json({
-    success: false,
-    message: 'Public registration is disabled. Telecaller accounts can only be created by Super Admin or Vendor Panel.',
-  });
+  const {
+    name,
+    employeeId,
+    email,
+    phone,
+    password,
+  } = req.body;
+
+  try {
+    const result = await authService.signup({
+      name,
+      employeeId,
+      email,
+      phone,
+      password,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: result.message || 'Telecaller registered successfully. Account pending Super Admin activation.',
+      data: result.telecaller,
+    });
+  } catch (error) {
+    const statusCode = error.statusCode || 400;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message,
+    });
+  }
 });
 
 // ─── POST /api/telecaller/auth/login ──────────────────────────────────────────
@@ -40,7 +65,7 @@ export const login = asyncHandler(async (req, res) => {
       data: telecaller,
     });
   } catch (error) {
-    const statusCode = error.statusCode || (error.message.includes('Invalid') ? 401 : 403);
+    const statusCode = error.statusCode || (error.message.includes('pending activation') || error.message.includes('blocked') ? 403 : 401);
     return res.status(statusCode).json({
       success: false,
       message: error.message,
@@ -85,15 +110,9 @@ export const changePassword = asyncHandler(async (req, res) => {
       newPassword
     );
 
-    return res.status(200).json({
-      success: true,
-      message: 'Password changed successfully',
-      data: null,
-    });
-  } catch (error) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
+  return res.status(200).json({
+    success: true,
+    message: 'Password changed successfully',
+    data: null,
+  });
 });

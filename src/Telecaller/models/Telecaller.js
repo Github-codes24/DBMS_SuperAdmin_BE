@@ -41,7 +41,7 @@ const telecallerSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["ACTIVE", "INACTIVE", "BLOCKED", "PENDING", "Active", "Inactive", "Blocked", "Pending", "Disabled"],
+      enum: ["ACTIVE", "INACTIVE", "PENDING", "Pending", "Active", "Inactive", "BLOCKED", "Blocked", "Disabled", "DISABLED"],
       default: "PENDING",
     },
     profileImage: {
