@@ -1,89 +1,59 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
+
+const durationOptionSchema = new mongoose.Schema(
+  {
+    duration: { type: Number },
+    durationInMonths: { type: Number },
+    price: { type: String },
+    gst: { type: Number, default: 0 },
+    leads: { type: String, default: "0" },
+    totalPayable: { type: Number },
+    features: [{ type: String }],
+  },
+  { _id: true }
+);
 
 const planSchema = new mongoose.Schema(
   {
-    planId: {
-      type: String,
-      unique: true,
-      required: true,
-      trim: true,
-      index: true,
-    },
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    code: {
-      type: String,
-      trim: true,
-      uppercase: true,
-    },
-    description: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-    duration: {
-      type: String,
-      required: true, // e.g. "1 Month", "3 Months", "6 Months", "1 Year"
-      trim: true,
-    },
-    durationInMonths: {
-      type: Number,
-      required: true, // e.g. 1, 3, 6, 12
-    },
-    price: {
-      type: Number,
-      required: true, // base price in INR
-    },
-    originalPrice: {
-      type: Number, // alias/mirror for price
-    },
-    discount: {
-      type: Number,
-      default: 0, // discount percentage, e.g. 10 for 10%
-      min: 0,
-      max: 100,
-    },
-    finalAmount: {
-      type: Number, // calculated discounted amount before GST
-    },
-    features: [
-      {
-        type: String,
-        trim: true,
-      },
-    ],
-    isPopular: {
-      type: Boolean,
-      default: false,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-      index: true,
-    },
-    sortOrder: {
-      type: Number,
-      default: 0,
-    },
+    // Live / exported fields
+    category: { type: String, trim: true },
+    subCategory: { type: String, trim: true },
+    description: { type: String, default: "", trim: true },
+    durations: [durationOptionSchema],
+    features: [{ type: String }],
+    image: { type: String, default: "" },
+    isDelete: { type: Boolean, default: false },
+
+    // Legacy fields (optional, for backwards compatibility)
+    planId: { type: String, trim: true, index: true },
+    name: { type: String, trim: true },
+    code: { type: String, trim: true, uppercase: true },
+    duration: { type: String, trim: true },
+    durationInMonths: { type: Number },
+    price: { type: Number },
+    originalPrice: { type: Number },
+    discount: { type: Number, default: 0 },
+    finalAmount: { type: Number },
+    isPopular: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true, index: true },
+    sortOrder: { type: Number, default: 0 },
   },
   {
+    strict: false,
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
-// Pre-save hook to calculate finalAmount and sync originalPrice
-planSchema.pre('save', function () {
-  if (this.originalPrice === undefined || this.originalPrice === null) {
-    this.originalPrice = this.price;
+// Virtual: provide a unified name for the plan (e.g., "PLAN Silver" or "Silver")
+planSchema.virtual("displayName").get(function () {
+  if (this.name) return this.name;
+  if (this.subCategory && this.category) {
+    return `${this.category} ${this.subCategory}`;
   }
-  const disc = this.discount || 0;
-  this.finalAmount = parseFloat((this.price - (this.price * disc) / 100).toFixed(2));
+  return this.subCategory || this.category || "Subscription Plan";
 });
 
-const Plan = mongoose.model('Plan', planSchema);
+const Plan = mongoose.models.Plan || mongoose.model("Plan", planSchema);
 export default Plan;
