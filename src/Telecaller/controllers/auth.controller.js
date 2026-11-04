@@ -109,10 +109,14 @@ export const changePassword = asyncHandler(async (req, res) => {
       oldPassword,
       newPassword
     );
-
+    
   return res.status(200).json({
     success: true,
     message: 'Password changed successfully',
     data: null,
   });
+} catch (error) {
+  throw error;
+}
 });
+
