@@ -128,6 +128,14 @@ const customerSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+// pin code 
+    pinCode: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+
 
     // ==========================================
     // 2. UPLOAD IMAGE
