@@ -62,7 +62,13 @@ router.patch('/:id/activate', protectSuperAdmin, activateVendor);
 
 // Change Password Of The Vendor (Accepts :vendorId or :id)
 router.patch('/:vendorId/password', protectSuperAdmin, changeVendorPassword);
-router.patch('/:id/password', protectSuperAdmin, changeVendorPassword);
+/**
+ * @desc    Change a vendor's password (Super Admin only)
+ * @route   PATCH /api/v1/superadmin/vendors/:id/password
+ * @example https://lts-dbms-backend.onrender.com/api/v1/superadmin/vendors/VendorId/change-password
+ * @access  Private (Super Admin token required)
+ * **/
+router.patch('/:id/change-password', protectSuperAdmin, changeVendorPassword);
 
 // Block & Unblock Vendor
 router.patch('/:vendorId/block', protectSuperAdmin, blockVendor);

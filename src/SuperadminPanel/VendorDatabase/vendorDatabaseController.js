@@ -502,6 +502,123 @@ export const activateVendor = async (req, res) => {
   }
 };
 // Change Password of the Vendor
+// export const changeVendorPassword = async (req, res) => {
+//   try {
+//     const identifier = req.params.vendorId || req.params.id;
+//     const { newPassword } = req.body;
+
+//     if (!newPassword || !newPassword.trim()) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "New password is required",
+//       });
+//     }
+
+//     if (newPassword.trim().length < 6) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Password must be at least 6 characters long",
+//       });
+//     }
+
+//     const vendor = await findVendorByIdOrCustomId(identifier);
+
+//     if (!vendor) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Vendor not found",
+//       });
+//     }
+
+//     if (vendor.status !== "Active" && vendor.status !== "ACTIVE") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Password can only be changed for an active vendor",
+//       });
+//     }
+
+//     if (!vendor.email) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Vendor cannot receive password because no registered email address is available.",
+//       });
+//     }
+
+//     const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
+//     vendor.password = hashedPassword;
+//     vendor.updatedBy = req.superAdmin?._id || req.user?._id || null;
+//     await vendor.save();
+
+//     await Vendor.findOneAndUpdate(
+//       {
+//         $or: [
+//           { vendorId: vendor.vendorId },
+//           { email: vendor.email.toLowerCase().trim() },
+//         ],
+//       },
+//       { password: hashedPassword },
+//       { returnDocument: "after" },
+//     );
+
+//     try {
+//       await Customer.findOneAndUpdate(
+//         {
+//           $or: [
+//             { vendorId: vendor.vendorId },
+//             { customerId: vendor.vendorId },
+//             { email: vendor.email.toLowerCase().trim() },
+//           ],
+//         },
+//         { password: hashedPassword },
+//       );
+//     } catch (custErr) {
+//       console.error(
+//         "Customer sync error on vendor password change:",
+//         custErr.message,
+//       );
+//     }
+
+//     const emailResult = await sendVendorCredentialsEmail({
+//       toEmail: vendor.email,
+//       vendorName: vendor.vendorName,
+//       vendorId: vendor.vendorId,
+//       password: newPassword.trim(),
+//     });
+
+//     await createAuditLog({
+//       user: req.superAdmin?.adminId || "SUPER",
+//       userName: req.superAdmin?.name || "Super Admin",
+//       userRole: req.superAdmin?.role || "SUPER_ADMIN",
+//       action: "Changed Vendor Password",
+//       record: vendor.transNo || vendor.vendorId,
+//       module: "Vendor Database",
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: emailResult.success
+//         ? "Vendor password changed and credentials sent successfully."
+//         : "Vendor password changed, but credentials email could not be sent.",
+//       data: {
+//         vendorId: vendor.vendorId,
+//         email: vendor.email,
+//         emailSent: emailResult.success,
+//         ...(emailResult.error && {
+//           emailError: emailResult.error,
+//         }),
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Change vendor password error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//       error: error.message,
+//     });
+//   }
+// };
+// plain change password 
 export const changeVendorPassword = async (req, res) => {
   try {
     const identifier = req.params.vendorId || req.params.id;
@@ -545,8 +662,9 @@ export const changeVendorPassword = async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
-    vendor.password = hashedPassword;
+    // CHANGED: store plain password instead of bcrypt hash
+    const plainPassword = newPassword.trim();
+    vendor.password = plainPassword;
     vendor.updatedBy = req.superAdmin?._id || req.user?._id || null;
     await vendor.save();
 
@@ -557,7 +675,7 @@ export const changeVendorPassword = async (req, res) => {
           { email: vendor.email.toLowerCase().trim() },
         ],
       },
-      { password: hashedPassword },
+      { password: plainPassword }, // CHANGED
       { returnDocument: "after" },
     );
 
@@ -570,7 +688,7 @@ export const changeVendorPassword = async (req, res) => {
             { email: vendor.email.toLowerCase().trim() },
           ],
         },
-        { password: hashedPassword },
+        { password: plainPassword }, // CHANGED
       );
     } catch (custErr) {
       console.error(
@@ -583,7 +701,7 @@ export const changeVendorPassword = async (req, res) => {
       toEmail: vendor.email,
       vendorName: vendor.vendorName,
       vendorId: vendor.vendorId,
-      password: newPassword.trim(),
+      password: plainPassword,
     });
 
     await createAuditLog({
@@ -618,6 +736,7 @@ export const changeVendorPassword = async (req, res) => {
     });
   }
 };
+
 //Delete Vendor's
 export const deleteVendor = async (req, res) => {
   try {
