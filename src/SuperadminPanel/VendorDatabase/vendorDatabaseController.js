@@ -1,24 +1,23 @@
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
-import SuperAdminVendor, { VendorFormField} from './vendorDatabaseSchema.js';
-import Vendor from '../../VendorPanel/Authentication/authSchema.js';
-import Customer from '../CustomerDatabase/customerSchema.js';
+import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
+import SuperAdminVendor, { VendorFormField } from "./vendorDatabaseSchema.js";
+import Vendor from "../../VendorPanel/Authentication/authSchema.js";
+import Customer from "../CustomerDatabase/customerSchema.js";
 import {
   parseExcelOrCsvBuffer,
   filterUniqueRecords,
   generateCSVData,
   generateHTMLPDFReport,
-} from '../../utils/excelCsvHandler.js';
-import { createAuditLog } from '../../utils/auditLogger.js';
-import {
-  validateAndPrepareCustomFields,
-} from '../../utils/vendorCustomFieldService.js';
-import { sendVendorCredentialsEmail } from '../../utils/emailHandler.js';
+} from "../../utils/excelCsvHandler.js";
+import { createAuditLog } from "../../utils/auditLogger.js";
+import { validateAndPrepareCustomFields } from "../../utils/vendorCustomFieldService.js";
+import { sendVendorCredentialsEmail } from "../../utils/emailHandler.js";
 
 // Helper to generate a random 8-character password if not provided
 const generateRandomPassword = () => {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$';
-  let pass = '';
+  const chars =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$";
+  let pass = "";
   for (let i = 0; i < 8; i++) {
     pass += chars.charAt(Math.floor(Math.random() * chars.length));
   }
@@ -27,20 +26,22 @@ const generateRandomPassword = () => {
 
 // Helper to generate auto-increment Vendor ID (VEN001, VEN002...) and Trans No (TRX90101, TRX90102...)
 const generateVendorIdAndTransNo = async () => {
-  const existingVendors = await SuperAdminVendor.find({}).select('vendorId transNo');
+  const existingVendors = await SuperAdminVendor.find({}).select(
+    "vendorId transNo",
+  );
 
   let maxVenNum = 0;
   let maxTrxNum = 100; // Base index so TRX90101 is 101
 
   existingVendors.forEach((v) => {
     if (v.vendorId) {
-      const num = parseInt(v.vendorId.replace(/^VEN/i, ''), 10);
+      const num = parseInt(v.vendorId.replace(/^VEN/i, ""), 10);
       if (!isNaN(num) && num > maxVenNum) {
         maxVenNum = num;
       }
     }
     if (v.transNo) {
-      const num = parseInt(v.transNo.replace(/^TRX90/i, ''), 10);
+      const num = parseInt(v.transNo.replace(/^TRX90/i, ""), 10);
       if (!isNaN(num) && num > maxTrxNum) {
         maxTrxNum = num;
       }
@@ -51,8 +52,8 @@ const generateVendorIdAndTransNo = async () => {
   const nextTrxNum = maxTrxNum + 1;
 
   return {
-    vendorId: `VEN${nextVenNum.toString().padStart(3, '0')}`,
-    transNo: `TRX90${nextTrxNum.toString().padStart(3, '0')}`,
+    vendorId: `VEN${nextVenNum.toString().padStart(3, "0")}`,
+    transNo: `TRX90${nextTrxNum.toString().padStart(3, "0")}`,
   };
 };
 
@@ -63,7 +64,10 @@ const findVendorByIdOrCustomId = async (identifier) => {
   const isObjId = mongoose.Types.ObjectId.isValid(str);
 
   const query = isObjId
-    ? { $or: [{ _id: str }, { vendorId: str }, { transNo: str }], isDeleted: false }
+    ? {
+        $or: [{ _id: str }, { vendorId: str }, { transNo: str }],
+        isDeleted: false,
+      }
     : { $or: [{ vendorId: str }, { transNo: str }], isDeleted: false };
 
   return await SuperAdminVendor.findOne(query);
@@ -71,16 +75,16 @@ const findVendorByIdOrCustomId = async (identifier) => {
 
 // Normalize status string for consistent formatting (Default: Pending)
 const normalizeStatus = (statusStr) => {
-  if (!statusStr) return 'Pending';
+  if (!statusStr) return "Pending";
   const str = statusStr.toString().trim().toLowerCase();
   const statusMap = {
-    active: 'Active',
-    pending: 'Pending',
-    blocked: 'Blocked',
-    disabled: 'Disabled',
-    rejected: 'Rejected',
+    active: "Active",
+    pending: "Pending",
+    blocked: "Blocked",
+    disabled: "Disabled",
+    rejected: "Rejected",
   };
-  return statusMap[str] || 'Pending';
+  return statusMap[str] || "Pending";
 };
 // 1. GET ALL VENDORS DIRECTORY
 // @desc    Get All Vendors Directory (Search, Filter, Pagination)
@@ -94,14 +98,13 @@ export const getVendors = async (req, res) => {
 
     const { search, status, state, city, category } = req.query;
 
-     const query = {
-       isDeleted: false
-
-      };
+    const query = {
+      isDeleted: false,
+    };
 
     // Search filter across vendorName, transNo, vendorId, category, verification date, city, state
     if (search && search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i');
+      const searchRegex = new RegExp(search.trim(), "i");
       query.$or = [
         { vendorName: searchRegex },
         { transNo: searchRegex },
@@ -119,18 +122,17 @@ export const getVendors = async (req, res) => {
     }
 
     if (category && category.trim()) {
-      query.category = new RegExp(category.trim(), 'i');
+      query.category = new RegExp(category.trim(), "i");
     }
 
     if (state && state.trim()) {
-      query.state = new RegExp(state.trim(), 'i');
+      query.state = new RegExp(state.trim(), "i");
     }
 
     if (city && city.trim()) {
-      query.city = new RegExp(city.trim(), 'i');
+      query.city = new RegExp(city.trim(), "i");
     }
 
-   
     const totalVendors = await SuperAdminVendor.countDocuments(query);
 
     const vendors = await SuperAdminVendor.find(query)
@@ -147,7 +149,7 @@ export const getVendors = async (req, res) => {
       vendors,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 // 2. CREATE SINGLE VENDOR RECORD
@@ -167,11 +169,11 @@ export const createVendor = async (req, res) => {
     state,
     city,
     pinCode,
+    pincode,
     completeAddress,
     gstin,
     password,
     customFields = [],
-
   } = req.body;
   try {
     const DEFAULT_VENDOR_LIMIT = 100;
@@ -179,7 +181,7 @@ export const createVendor = async (req, res) => {
       isDeleted: false,
     });
     const validatedCustomFields =
-    await validateAndPrepareCustomFields(customFields);
+      await validateAndPrepareCustomFields(customFields);
 
     if (vendorCount >= DEFAULT_VENDOR_LIMIT) {
       return res.status(400).json({
@@ -190,7 +192,7 @@ export const createVendor = async (req, res) => {
     if (!vendorName || !vendorName.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Vendor Name is required',
+        message: "Vendor Name is required",
       });
     }
 
@@ -206,43 +208,39 @@ export const createVendor = async (req, res) => {
         });
       }
     }
-    // check for duplicate  vendorName 
+    // check for duplicate  vendorName
     const normalizedVendorName = vendorName.trim();
     const existingVendor = await SuperAdminVendor.findOne({
       vendorName: {
-        $regex: `^${normalizedVendorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
-        $options: 'i',
+        $regex: `^${normalizedVendorName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+        $options: "i",
       },
       isDeleted: false,
     });
-    
+
     if (existingVendor) {
       return res.status(409).json({
         success: false,
         message: `Vendor name '${normalizedVendorName}' already exists.`,
       });
     }
-     // check if the email is unique or not 
-     const cleanEmail = email?.trim().toLowerCase() || "";
-     if (cleanEmail) {
-       const existingVendor = await SuperAdminVendor.findOne({
-         email: cleanEmail,
-       });
-       if (existingVendor) {
-         return res.status(409).json({
-           success: false,
-           message: "This email is already registered.",
-         });
-       }
-     }
-    const {
-      vendorId: autoVendorId,
-      transNo: autoTransNo,
-    } = await generateVendorIdAndTransNo();
+    // check if the email is unique or not
+    const cleanEmail = email?.trim().toLowerCase() || "";
+    if (cleanEmail) {
+      const existingVendor = await SuperAdminVendor.findOne({
+        email: cleanEmail,
+      });
+      if (existingVendor) {
+        return res.status(409).json({
+          success: false,
+          message: "This email is already registered.",
+        });
+      }
+    }
+    const { vendorId: autoVendorId, transNo: autoTransNo } =
+      await generateVendorIdAndTransNo();
     const finalTransNo =
-      transNo && transNo.trim()
-        ? transNo.trim()
-        : autoTransNo;
+      transNo && transNo.trim() ? transNo.trim() : autoTransNo;
     // Auto Sr No
     let calculatedSrNo = srNo;
     if (!calculatedSrNo) {
@@ -250,9 +248,7 @@ export const createVendor = async (req, res) => {
         isDeleted: false,
       });
 
-      calculatedSrNo = (count + 1)
-        .toString()
-        .padStart(2, '0');
+      calculatedSrNo = (count + 1).toString().padStart(2, "0");
     }
     /*
      * IMPORTANT:
@@ -270,27 +266,25 @@ export const createVendor = async (req, res) => {
       srNo: calculatedSrNo,
 
       vendorName: vendorName.trim(),
-      ownerName: ownerName ? ownerName.trim() : '',
-      category: category ? category.trim() : '',
+      ownerName: ownerName ? ownerName.trim() : "",
+      category: category ? category.trim() : "",
 
       verificationDateTime: verificationDateTime
         ? new Date(verificationDateTime)
         : new Date(),
 
-      contactNo: contactNo ? contactNo.trim() : '',
+      contactNo: contactNo ? contactNo.trim() : "",
       email: cleanEmail,
 
-      state: state ? state.trim() : '',
-      city: city ? city.trim() : '',
-      pinCode: pinCode ? pinCode.trim() : '',
-      completeAddress: completeAddress
-        ? completeAddress.trim()
-        : '',
-      gstin: gstin ? gstin.trim() : '',
-      password: password ? password.trim() : '',
+      state: state ? state.trim() : "",
+      city: city ? city.trim() : "",
+      pinCode: pinCode ? pinCode.trim() : pincode ? pincode.trim() : "",
+      completeAddress: completeAddress ? completeAddress.trim() : "",
+      gstin: gstin ? gstin.trim() : "",
+      password: password ? password.trim() : "",
 
       // ALWAYS Pending on creation
-      status: 'Pending',
+      status: "Pending",
       customFields: validatedCustomFields,
 
       createdBy: req.superAdmin._id,
@@ -298,8 +292,7 @@ export const createVendor = async (req, res) => {
 
     // 2. Create Vendor authentication record
     const vendorAuthEmail =
-      cleanEmail ||
-      `${autoVendorId.toLowerCase()}@lts-dbms.com`;
+      cleanEmail || `${autoVendorId.toLowerCase()}@lts-dbms.com`;
 
     await Vendor.findOneAndUpdate(
       { vendorId: autoVendorId },
@@ -308,11 +301,9 @@ export const createVendor = async (req, res) => {
         email: vendorAuthEmail,
 
         fullName:
-          ownerName && ownerName.trim()
-            ? ownerName.trim()
-            : vendorName.trim(),
+          ownerName && ownerName.trim() ? ownerName.trim() : vendorName.trim(),
 
-        phone: contactNo ? contactNo.trim() : '',
+        phone: contactNo ? contactNo.trim() : "",
 
         // No password until activation
         password: password ? password.trim() : null,
@@ -320,53 +311,50 @@ export const createVendor = async (req, res) => {
         storeName: vendorName.trim(),
 
         // Vendor cannot login yet
-        storeStatus: 'Pending Verification',
+        storeStatus: "Pending Verification",
 
-        state: state ? state.trim() : '',
-        city: city ? city.trim() : '',
-        address: completeAddress
-          ? completeAddress.trim()
-          : '',
+        state: state ? state.trim() : "",
+        city: city ? city.trim() : "",
+        address: completeAddress ? completeAddress.trim() : "",
       },
       {
         upsert: true,
-        returnDocument: 'after',
+        returnDocument: "after",
         setDefaultsOnInsert: true,
-      }
+      },
     );
     // 3. Audit log
     await createAuditLog({
-      user: req.superAdmin?.adminId || 'SUPER',
-      userName: req.superAdmin?.name || 'Super Admin',
-      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-      action: 'Created Vendor',
+      user: req.superAdmin?.adminId || "SUPER",
+      userName: req.superAdmin?.name || "Super Admin",
+      userRole: req.superAdmin?.role || "SUPER_ADMIN",
+      action: "Created Vendor",
       record: vendor.transNo || vendor.vendorId,
-      module: 'Vendor Database',
+      module: "Vendor Database",
     });
 
     // 4. Response
     return res.status(201).json({
       success: true,
-      message: 'Vendor created successfully and is pending approval.',
+      message: "Vendor created successfully and is pending approval.",
       data: {
         vendorId: vendor.vendorId,
-        email: vendor.email || '',
+        email: vendor.email || "",
         status: vendor.status,
         vendor,
       },
     });
-
   } catch (error) {
-    console.error('Create vendor error:', error);
+    console.error("Create vendor error:", error);
 
     return res.status(500).json({
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: error.message,
     });
   }
 };
-// Active the Account and Send Id and Password 
+// Active the Account and Send Id and Password
 export const activateVendor = async (req, res) => {
   try {
     const identifier = req.params.vendorId || req.params.id;
@@ -374,7 +362,7 @@ export const activateVendor = async (req, res) => {
     if (!identifier) {
       return res.status(400).json({
         success: false,
-        message: 'Vendor identifier is required',
+        message: "Vendor identifier is required",
       });
     }
 
@@ -384,15 +372,15 @@ export const activateVendor = async (req, res) => {
     if (!vendor) {
       return res.status(404).json({
         success: false,
-        message: 'Vendor not found',
+        message: "Vendor not found",
       });
     }
 
     // Prevent activating an already active vendor unless force is provided
-    if (vendor.status === 'Active' && !req.body?.force) {
+    if (vendor.status === "Active" && !req.body?.force) {
       return res.status(400).json({
         success: false,
-        message: 'Vendor is already active',
+        message: "Vendor is already active",
       });
     }
 
@@ -401,7 +389,7 @@ export const activateVendor = async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          'Vendor cannot be activated because no email address is available.',
+          "Vendor cannot be activated because no email address is available.",
       });
     }
 
@@ -419,7 +407,7 @@ export const activateVendor = async (req, res) => {
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
     // Update master vendor
-    vendor.status = 'Active';
+    vendor.status = "Active";
     vendor.password = hashedPassword;
     vendor.updatedBy = req.superAdmin?._id || req.user?._id || null;
     await vendor.save();
@@ -428,28 +416,25 @@ export const activateVendor = async (req, res) => {
     const cleanEmail = vendor.email.toLowerCase().trim();
     await Vendor.findOneAndUpdate(
       {
-        $or: [
-          { vendorId: vendor.vendorId },
-          { email: cleanEmail },
-        ],
+        $or: [{ vendorId: vendor.vendorId }, { email: cleanEmail }],
       },
       {
         vendorId: vendor.vendorId,
         email: cleanEmail,
         password: hashedPassword,
-        storeStatus: 'Active & Verified',
+        storeStatus: "Active & Verified",
         fullName: vendor.ownerName || vendor.vendorName,
         storeName: vendor.vendorName,
-        phone: vendor.contactNo || '',
-        state: vendor.state || '',
-        city: vendor.city || '',
-        address: vendor.completeAddress || '',
+        phone: vendor.contactNo || "",
+        state: vendor.state || "",
+        city: vendor.city || "",
+        address: vendor.completeAddress || "",
       },
       {
         upsert: true,
-        returnDocument: 'after',
+        returnDocument: "after",
         setDefaultsOnInsert: true,
-      }
+      },
     );
 
     // Sync Customer collection if record exists
@@ -463,12 +448,12 @@ export const activateVendor = async (req, res) => {
           ],
         },
         {
-          status: 'Active',
+          status: "Active",
           password: hashedPassword,
-        }
+        },
       );
     } catch (custErr) {
-      console.error('Customer sync error on vendor activate:', custErr.message);
+      console.error("Customer sync error on vendor activate:", custErr.message);
     }
 
     /*
@@ -476,26 +461,26 @@ export const activateVendor = async (req, res) => {
      */
     const emailResult = await sendVendorCredentialsEmail({
       toEmail: vendor.email,
-      vendorName: vendor.vendorName || vendor.ownerName || 'Vendor Partner',
+      vendorName: vendor.vendorName || vendor.ownerName || "Vendor Partner",
       vendorId: vendor.vendorId,
       password: rawPassword,
     });
 
     // Audit log
     await createAuditLog({
-      user: req.superAdmin?.adminId || 'SUPER',
-      userName: req.superAdmin?.name || 'Super Admin',
-      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-      action: 'Activated Vendor',
+      user: req.superAdmin?.adminId || "SUPER",
+      userName: req.superAdmin?.name || "Super Admin",
+      userRole: req.superAdmin?.role || "SUPER_ADMIN",
+      action: "Activated Vendor",
       record: vendor.transNo || vendor.vendorId,
-      module: 'Vendor Database',
+      module: "Vendor Database",
     });
 
     return res.status(200).json({
       success: true,
       message: emailResult.success
-        ? 'Vendor activated and login credentials sent successfully via email.'
-        : 'Vendor activated, but credentials email could not be sent.',
+        ? "Vendor activated and login credentials sent successfully via email."
+        : "Vendor activated, but credentials email could not be sent.",
       data: {
         vendorId: vendor.vendorId,
         transNo: vendor.transNo,
@@ -508,10 +493,10 @@ export const activateVendor = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Activate vendor error:', error);
+    console.error("Activate vendor error:", error);
     return res.status(500).json({
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: error.message,
     });
   }
@@ -525,14 +510,14 @@ export const changeVendorPassword = async (req, res) => {
     if (!newPassword || !newPassword.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'New password is required',
+        message: "New password is required",
       });
     }
 
     if (newPassword.trim().length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters long',
+        message: "Password must be at least 6 characters long",
       });
     }
 
@@ -541,21 +526,22 @@ export const changeVendorPassword = async (req, res) => {
     if (!vendor) {
       return res.status(404).json({
         success: false,
-        message: 'Vendor not found',
+        message: "Vendor not found",
       });
     }
 
-    if (vendor.status !== 'Active' && vendor.status !== 'ACTIVE') {
+    if (vendor.status !== "Active" && vendor.status !== "ACTIVE") {
       return res.status(400).json({
         success: false,
-        message: 'Password can only be changed for an active vendor',
+        message: "Password can only be changed for an active vendor",
       });
     }
 
     if (!vendor.email) {
       return res.status(400).json({
         success: false,
-        message: 'Vendor cannot receive password because no registered email address is available.',
+        message:
+          "Vendor cannot receive password because no registered email address is available.",
       });
     }
 
@@ -572,7 +558,7 @@ export const changeVendorPassword = async (req, res) => {
         ],
       },
       { password: hashedPassword },
-      { returnDocument: 'after' }
+      { returnDocument: "after" },
     );
 
     try {
@@ -584,10 +570,13 @@ export const changeVendorPassword = async (req, res) => {
             { email: vendor.email.toLowerCase().trim() },
           ],
         },
-        { password: hashedPassword }
+        { password: hashedPassword },
       );
     } catch (custErr) {
-      console.error('Customer sync error on vendor password change:', custErr.message);
+      console.error(
+        "Customer sync error on vendor password change:",
+        custErr.message,
+      );
     }
 
     const emailResult = await sendVendorCredentialsEmail({
@@ -598,19 +587,19 @@ export const changeVendorPassword = async (req, res) => {
     });
 
     await createAuditLog({
-      user: req.superAdmin?.adminId || 'SUPER',
-      userName: req.superAdmin?.name || 'Super Admin',
-      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-      action: 'Changed Vendor Password',
+      user: req.superAdmin?.adminId || "SUPER",
+      userName: req.superAdmin?.name || "Super Admin",
+      userRole: req.superAdmin?.role || "SUPER_ADMIN",
+      action: "Changed Vendor Password",
       record: vendor.transNo || vendor.vendorId,
-      module: 'Vendor Database',
+      module: "Vendor Database",
     });
 
     return res.status(200).json({
       success: true,
       message: emailResult.success
-        ? 'Vendor password changed and credentials sent successfully.'
-        : 'Vendor password changed, but credentials email could not be sent.',
+        ? "Vendor password changed and credentials sent successfully."
+        : "Vendor password changed, but credentials email could not be sent.",
       data: {
         vendorId: vendor.vendorId,
         email: vendor.email,
@@ -621,10 +610,10 @@ export const changeVendorPassword = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Change vendor password error:', error);
+    console.error("Change vendor password error:", error);
     return res.status(500).json({
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: error.message,
     });
   }
@@ -639,7 +628,7 @@ export const deleteVendor = async (req, res) => {
     if (!vendor) {
       return res.status(404).json({
         success: false,
-        message: 'Vendor not found',
+        message: "Vendor not found",
       });
     }
 
@@ -654,8 +643,8 @@ export const deleteVendor = async (req, res) => {
           { email: vendor.email?.toLowerCase().trim() },
         ],
       },
-      { storeStatus: 'Deleted' },
-      { returnDocument: 'after' }
+      { storeStatus: "Deleted" },
+      { returnDocument: "after" },
     );
 
     try {
@@ -667,34 +656,34 @@ export const deleteVendor = async (req, res) => {
             { email: vendor.email?.toLowerCase().trim() },
           ],
         },
-        { isDeleted: true }
+        { isDeleted: true },
       );
     } catch (custErr) {
-      console.error('Customer sync error on delete vendor:', custErr.message);
+      console.error("Customer sync error on delete vendor:", custErr.message);
     }
 
     await createAuditLog({
-      user: req.superAdmin?.adminId || 'SUPER',
-      userName: req.superAdmin?.name || 'Super Admin',
-      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-      action: 'Deleted Vendor',
+      user: req.superAdmin?.adminId || "SUPER",
+      userName: req.superAdmin?.name || "Super Admin",
+      userRole: req.superAdmin?.role || "SUPER_ADMIN",
+      action: "Deleted Vendor",
       record: vendor.transNo || vendor.vendorId,
-      module: 'Vendor Database',
+      module: "Vendor Database",
     });
 
     return res.status(200).json({
       success: true,
-      message: 'Vendor deleted successfully.',
+      message: "Vendor deleted successfully.",
       data: {
         vendorId: vendor.vendorId,
         deleted: true,
       },
     });
   } catch (error) {
-    console.error('Delete vendor error:', error);
+    console.error("Delete vendor error:", error);
     return res.status(500).json({
       success: false,
-      message: 'Server error',
+      message: "Server error",
       error: error.message,
     });
   }
@@ -702,13 +691,7 @@ export const deleteVendor = async (req, res) => {
 // Search Filter for the vendor's
 export const searchVendors = async (req, res) => {
   try {
-    const {
-      name,
-      state,
-      city,
-      page = 1,
-      limit = 20,
-    } = req.query;
+    const { name, state, city, page = 1, limit = 20 } = req.query;
 
     const pageNumber = Number(page);
     const limitNumber = Number(limit);
@@ -716,7 +699,7 @@ export const searchVendors = async (req, res) => {
     if (!Number.isInteger(pageNumber) || pageNumber < 1) {
       return res.status(400).json({
         success: false,
-        message: 'Page must be a positive integer.',
+        message: "Page must be a positive integer.",
       });
     }
 
@@ -727,7 +710,7 @@ export const searchVendors = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Limit must be between 1 and 100.',
+        message: "Limit must be between 1 and 100.",
       });
     }
 
@@ -737,35 +720,35 @@ export const searchVendors = async (req, res) => {
       isDeleted: false,
       status: req.query?.status
         ? normalizeStatus(req.query.status)
-        : { $nin: ['Blocked', 'BLOCKED', 'blocked'] },
+        : { $nin: ["Blocked", "BLOCKED", "blocked"] },
     };
 
     // Vendor name search
-    if (typeof name === 'string' && name.trim()) {
+    if (typeof name === "string" && name.trim()) {
       filter.vendorName = {
         $regex: name.trim(),
-        $options: 'i',
+        $options: "i",
       };
     }
 
     // State filter
-    if (typeof state === 'string' && state.trim()) {
+    if (typeof state === "string" && state.trim()) {
       filter.state = state.trim();
     }
 
     // City filter
-    if (typeof city === 'string' && city.trim()) {
+    if (typeof city === "string" && city.trim()) {
       filter.city = city.trim();
     }
 
     const [vendors, total] = await Promise.all([
       SuperAdminVendor.find(filter)
         .select(
-          'vendorId vendorName contactNo verificationDateTime state city status createdBy'
+          "vendorId vendorName contactNo verificationDateTime state city status createdBy",
         )
         .populate({
-          path: 'createdBy',
-          select: 'adminId referCode fullName',
+          path: "createdBy",
+          select: "adminId referCode fullName",
         })
         .sort({ verificationDateTime: -1 })
         .skip(skip)
@@ -792,7 +775,7 @@ export const searchVendors = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Vendors searched successfully.',
+      message: "Vendors searched successfully.",
       data,
       pagination: {
         page: pageNumber,
@@ -804,11 +787,11 @@ export const searchVendors = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Search vendors error:', error);
+    console.error("Search vendors error:", error);
 
     return res.status(500).json({
       success: false,
-      message: 'Failed to search vendors.',
+      message: "Failed to search vendors.",
     });
   }
 };
@@ -819,40 +802,40 @@ export const createVendorFormField = async (req, res) => {
       label,
       type,
       required = false,
-      placeholder = '',
+      placeholder = "",
       options = [],
     } = req.body;
 
     if (!label || !label.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Field label is required.',
+        message: "Field label is required.",
       });
     }
 
     const allowedTypes = [
-      'TEXT',
-      'NUMBER',
-      'EMAIL',
-      'DATE',
-      'DROPDOWN',
-      'CHECKBOX',
-      'TOGGLE',
-      'TEXTAREA',
+      "TEXT",
+      "NUMBER",
+      "EMAIL",
+      "DATE",
+      "DROPDOWN",
+      "CHECKBOX",
+      "TOGGLE",
+      "TEXTAREA",
     ];
 
     if (!allowedTypes.includes(type)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid field type.',
+        message: "Invalid field type.",
       });
     }
 
-    if (type === 'DROPDOWN') {
+    if (type === "DROPDOWN") {
       if (!Array.isArray(options) || options.length === 0) {
         return res.status(400).json({
           success: false,
-          message: 'Options are required for dropdown fields.',
+          message: "Options are required for dropdown fields.",
         });
       }
     }
@@ -861,27 +844,27 @@ export const createVendorFormField = async (req, res) => {
       label: label.trim(),
       type,
       required: Boolean(required),
-      placeholder: placeholder?.trim() || '',
-      options: type === 'DROPDOWN' ? options : [],
+      placeholder: placeholder?.trim() || "",
+      options: type === "DROPDOWN" ? options : [],
       createdBy: req.superAdmin._id,
       updatedBy: req.superAdmin._id,
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Vendor form field created successfully.',
+      message: "Vendor form field created successfully.",
       data: field,
     });
   } catch (error) {
-    console.error('Create vendor form field error:', error);
+    console.error("Create vendor form field error:", error);
 
     return res.status(500).json({
       success: false,
-      message: 'Server error.',
+      message: "Server error.",
     });
   }
 };
-// GET Custom Field Data 
+// GET Custom Field Data
 export const getVendorFormFields = async (req, res) => {
   try {
     const fields = await VendorFormField.find({
@@ -892,16 +875,16 @@ export const getVendorFormFields = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Vendor form fields fetched successfully.',
+      message: "Vendor form fields fetched successfully.",
       data: fields,
     });
   } catch (error) {
     console.log("hi error");
-    console.error('Get vendor form fields error:', error);
+    console.error("Get vendor form fields error:", error);
 
     return res.status(500).json({
       success: false,
-      message: 'Server error.',
+      message: "Server error.",
     });
   }
 };
@@ -910,13 +893,7 @@ export const updateVendorFormField = async (req, res) => {
   try {
     const { fieldId } = req.params;
 
-    const {
-      label,
-      type,
-      required,
-      placeholder,
-      options,
-    } = req.body;
+    const { label, type, required, placeholder, options } = req.body;
 
     const field = await VendorFormField.findOne({
       _id: fieldId,
@@ -926,7 +903,7 @@ export const updateVendorFormField = async (req, res) => {
     if (!field) {
       return res.status(404).json({
         success: false,
-        message: 'Vendor form field not found.',
+        message: "Vendor form field not found.",
       });
     }
 
@@ -934,7 +911,7 @@ export const updateVendorFormField = async (req, res) => {
       if (!label.trim()) {
         return res.status(400).json({
           success: false,
-          message: 'Field label cannot be empty.',
+          message: "Field label cannot be empty.",
         });
       }
 
@@ -943,20 +920,20 @@ export const updateVendorFormField = async (req, res) => {
 
     if (type !== undefined) {
       const allowedTypes = [
-        'TEXT',
-        'NUMBER',
-        'EMAIL',
-        'DATE',
-        'DROPDOWN',
-        'CHECKBOX',
-        'TOGGLE',
-        'TEXTAREA',
+        "TEXT",
+        "NUMBER",
+        "EMAIL",
+        "DATE",
+        "DROPDOWN",
+        "CHECKBOX",
+        "TOGGLE",
+        "TEXTAREA",
       ];
 
       if (!allowedTypes.includes(type)) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid field type.',
+          message: "Invalid field type.",
         });
       }
 
@@ -972,11 +949,11 @@ export const updateVendorFormField = async (req, res) => {
     }
 
     if (options !== undefined) {
-      if (field.type === 'DROPDOWN') {
+      if (field.type === "DROPDOWN") {
         if (!Array.isArray(options) || options.length === 0) {
           return res.status(400).json({
             success: false,
-            message: 'Options are required for dropdown fields.',
+            message: "Options are required for dropdown fields.",
           });
         }
 
@@ -992,15 +969,15 @@ export const updateVendorFormField = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Vendor form field updated successfully.',
+      message: "Vendor form field updated successfully.",
       data: field,
     });
   } catch (error) {
-    console.error('Update vendor form field error:', error);
+    console.error("Update vendor form field error:", error);
 
     return res.status(500).json({
       success: false,
-      message: 'Server error.',
+      message: "Server error.",
     });
   }
 };
@@ -1022,26 +999,26 @@ export const deleteVendorFormField = async (req, res) => {
       },
       {
         new: true,
-      }
+      },
     );
 
     if (!field) {
       return res.status(404).json({
         success: false,
-        message: 'Vendor form field not found.',
+        message: "Vendor form field not found.",
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Vendor form field removed successfully.',
+      message: "Vendor form field removed successfully.",
     });
   } catch (error) {
-    console.error('Delete vendor form field error:', error);
+    console.error("Delete vendor form field error:", error);
 
     return res.status(500).json({
       success: false,
-      message: 'Server error.',
+      message: "Server error.",
     });
   }
 };
@@ -1056,12 +1033,12 @@ export const getVendorById = async (req, res) => {
     const vendor = await findVendorByIdOrCustomId(id);
 
     if (!vendor) {
-      return res.status(404).json({ message: 'Vendor record not found' });
+      return res.status(404).json({ message: "Vendor record not found" });
     }
 
     res.json(vendor);
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 // 4. UPDATE VENDOR RECORD (STATUS RULES ENFORCED)
@@ -1075,7 +1052,7 @@ export const updateVendor = async (req, res) => {
     const vendor = await findVendorByIdOrCustomId(id);
 
     if (!vendor) {
-      return res.status(404).json({ message: 'Vendor record not found' });
+      return res.status(404).json({ message: "Vendor record not found" });
     }
     const {
       srNo,
@@ -1087,7 +1064,7 @@ export const updateVendor = async (req, res) => {
       state,
       city,
       status,
-      pinCode
+      pinCode,
     } = req.body;
 
     // BUSINESS RULE: Status Transition Protection
@@ -1096,9 +1073,10 @@ export const updateVendor = async (req, res) => {
       const currentNormalized = normalizeStatus(vendor.status);
       const incomingNormalized = normalizeStatus(status);
 
-      if (currentNormalized === 'Active' && incomingNormalized === 'Pending') {
+      if (currentNormalized === "Active" && incomingNormalized === "Pending") {
         return res.status(400).json({
-          message: 'Status Transition Error: Cannot change status from Active back to Pending',
+          message:
+            "Status Transition Error: Cannot change status from Active back to Pending",
         });
       }
       vendor.status = incomingNormalized;
@@ -1106,45 +1084,47 @@ export const updateVendor = async (req, res) => {
 
     if (vendorName) vendor.vendorName = vendorName.trim();
     if (transNo) vendor.transNo = transNo.trim();
-    if (category !== undefined) vendor.category = category ? category.trim() : '';
-    if (verificationDateTime) vendor.verificationDateTime = new Date(verificationDateTime);
+    if (category !== undefined)
+      vendor.category = category ? category.trim() : "";
+    if (verificationDateTime)
+      vendor.verificationDateTime = new Date(verificationDateTime);
     if (contactNo !== undefined) vendor.contactNo = contactNo.trim();
     if (state !== undefined) vendor.state = state.trim();
     if (city !== undefined) vendor.city = city.trim();
     if (srNo !== undefined) vendor.srNo = srNo;
-    if(pinCode!==undefined) vendor.pinCode=pinCode
+    if (pinCode !== undefined) vendor.pinCode = pinCode;
 
     vendor.updatedBy = req.superAdmin._id;
     await vendor.save();
 
     // Automatic Audit Log Recording
     await createAuditLog({
-      user: req.superAdmin?.adminId || 'SUPER',
-      userName: req.superAdmin?.name || 'Super Admin',
-      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-      action: 'Updated Vendor',
+      user: req.superAdmin?.adminId || "SUPER",
+      userName: req.superAdmin?.name || "Super Admin",
+      userRole: req.superAdmin?.role || "SUPER_ADMIN",
+      action: "Updated Vendor",
       record: vendor.transNo || vendor.vendorId,
-      module: 'Vendor Database',
+      module: "Vendor Database",
     });
 
     res.json({
-      message: 'Vendor record updated successfully',
+      message: "Vendor record updated successfully",
       vendor,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
 export const bulkUpdateVendorStatuses = async (req, res) => {
   const records = req.body?.vendors;
-  const allowedStatuses = ['Active', 'Pending', 'Blocked'];
+  const allowedStatuses = ["Active", "Pending", "Blocked"];
   const maxBulkCount = 100;
 
   if (!Array.isArray(records) || records.length === 0) {
     return res.status(400).json({
       success: false,
-      message: 'vendors must be a non-empty array of vendor records',
+      message: "vendors must be a non-empty array of vendor records",
     });
   }
   if (records.length > maxBulkCount) {
@@ -1155,23 +1135,27 @@ export const bulkUpdateVendorStatuses = async (req, res) => {
   }
 
   const normalizedRecords = records.map((record) => ({
-    id: String(record?._id || ''),
+    id: String(record?._id || ""),
     status: record?.status,
   }));
-  const invalidRecords = normalizedRecords.filter(({ id, status }) =>
-    !mongoose.Types.ObjectId.isValid(id) || !allowedStatuses.includes(status)
+  const invalidRecords = normalizedRecords.filter(
+    ({ id, status }) =>
+      !mongoose.Types.ObjectId.isValid(id) || !allowedStatuses.includes(status),
   );
   if (invalidRecords.length > 0) {
     return res.status(400).json({
       success: false,
-      message: 'Each vendor record must include a valid MongoDB ID and status',
-      invalidIds: invalidRecords.map(({ id }) => id || '(missing ID)'),
+      message: "Each vendor record must include a valid MongoDB ID and status",
+      invalidIds: invalidRecords.map(({ id }) => id || "(missing ID)"),
     });
   }
-  if (new Set(normalizedRecords.map(({ id }) => id)).size !== normalizedRecords.length) {
+  if (
+    new Set(normalizedRecords.map(({ id }) => id)).size !==
+    normalizedRecords.length
+  ) {
     return res.status(400).json({
       success: false,
-      message: 'Duplicate vendor IDs are not allowed',
+      message: "Duplicate vendor IDs are not allowed",
     });
   }
 
@@ -1181,53 +1165,62 @@ export const bulkUpdateVendorStatuses = async (req, res) => {
       _id: { $in: vendorIds },
       isDeleted: false,
     });
-    const vendorsById = new Map(vendors.map((vendor) => [String(vendor._id), vendor]));
-    const results = await Promise.allSettled(normalizedRecords.map(async ({ id, status }) => {
-      const vendor = vendorsById.get(id);
-      if (!vendor) {
-        throw new Error('Vendor not found or deleted');
-      }
+    const vendorsById = new Map(
+      vendors.map((vendor) => [String(vendor._id), vendor]),
+    );
+    const results = await Promise.allSettled(
+      normalizedRecords.map(async ({ id, status }) => {
+        const vendor = vendorsById.get(id);
+        if (!vendor) {
+          throw new Error("Vendor not found or deleted");
+        }
 
-      const currentStatus = String(vendor.status || 'Pending').trim().toLowerCase();
-      if (currentStatus === 'active' && status === 'Pending') {
-        throw new Error('Active vendors cannot be changed back to Pending');
-      }
-      if (currentStatus === 'pending' && status === 'Active') {
-        throw new Error('Pending vendors must be activated individually to provision login credentials');
-      }
+        const currentStatus = String(vendor.status || "Pending")
+          .trim()
+          .toLowerCase();
+        if (currentStatus === "active" && status === "Pending") {
+          throw new Error("Active vendors cannot be changed back to Pending");
+        }
+        if (currentStatus === "pending" && status === "Active") {
+          throw new Error(
+            "Pending vendors must be activated individually to provision login credentials",
+          );
+        }
 
-      vendor.status = status;
-      vendor.updatedBy = req.superAdmin?._id || null;
-      await vendor.save();
-      await createAuditLog({
-        user: req.superAdmin?.adminId || 'SUPER',
-        userName: req.superAdmin?.name || 'Super Admin',
-        userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-        action: `Bulk vendor status update to ${status}`,
-        record: vendor.transNo || vendor.vendorId,
-        module: 'Vendor Database',
-      });
-      return id;
-    }));
+        vendor.status = status;
+        vendor.updatedBy = req.superAdmin?._id || null;
+        await vendor.save();
+        await createAuditLog({
+          user: req.superAdmin?.adminId || "SUPER",
+          userName: req.superAdmin?.name || "Super Admin",
+          userRole: req.superAdmin?.role || "SUPER_ADMIN",
+          action: `Bulk vendor status update to ${status}`,
+          record: vendor.transNo || vendor.vendorId,
+          module: "Vendor Database",
+        });
+        return id;
+      }),
+    );
 
     const updatedIds = [];
     const failures = [];
     results.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
+      if (result.status === "fulfilled") {
         updatedIds.push(result.value);
       } else {
         failures.push({
           vendorId: normalizedRecords[index].id,
-          message: result.reason?.message || 'Failed to update vendor status',
+          message: result.reason?.message || "Failed to update vendor status",
         });
       }
     });
 
     return res.status(200).json({
       success: failures.length === 0,
-      message: failures.length === 0
-        ? `Status updated for ${updatedIds.length} vendor${updatedIds.length === 1 ? '' : 's'}`
-        : `Status updated for ${updatedIds.length} vendor${updatedIds.length === 1 ? '' : 's'}; ${failures.length} failed`,
+      message:
+        failures.length === 0
+          ? `Status updated for ${updatedIds.length} vendor${updatedIds.length === 1 ? "" : "s"}`
+          : `Status updated for ${updatedIds.length} vendor${updatedIds.length === 1 ? "" : "s"}; ${failures.length} failed`,
       data: {
         requestedCount: normalizedRecords.length,
         updatedCount: updatedIds.length,
@@ -1236,10 +1229,10 @@ export const bulkUpdateVendorStatuses = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Bulk vendor status update failed:', error);
+    console.error("Bulk vendor status update failed:", error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to update selected vendor statuses',
+      message: "Failed to update selected vendor statuses",
       error: error.message,
     });
   }
@@ -1252,7 +1245,7 @@ export const bulkDeleteVendors = async (req, res) => {
   if (!Array.isArray(vendorIds) || vendorIds.length === 0) {
     return res.status(400).json({
       success: false,
-      message: 'vendorIds must be a non-empty array',
+      message: "vendorIds must be a non-empty array",
     });
   }
   if (vendorIds.length > maxBulkCount) {
@@ -1267,61 +1260,67 @@ export const bulkDeleteVendors = async (req, res) => {
   if (invalidIds.length > 0) {
     return res.status(400).json({
       success: false,
-      message: 'One or more vendor IDs are invalid',
+      message: "One or more vendor IDs are invalid",
       invalidIds,
     });
   }
   if (new Set(ids).size !== ids.length) {
     return res.status(400).json({
       success: false,
-      message: 'Duplicate vendor IDs are not allowed',
+      message: "Duplicate vendor IDs are not allowed",
     });
   }
 
   try {
-    const results = await Promise.allSettled(ids.map(async (id) => {
-      const vendor = await SuperAdminVendor.findOne({ _id: id, isDeleted: false });
-      if (!vendor) {
-        throw new Error('Vendor not found or already deleted');
-      }
-      vendor.isDeleted = true;
-      vendor.updatedBy = req.superAdmin?._id || null;
-      await vendor.save();
+    const results = await Promise.allSettled(
+      ids.map(async (id) => {
+        const vendor = await SuperAdminVendor.findOne({
+          _id: id,
+          isDeleted: false,
+        });
+        if (!vendor) {
+          throw new Error("Vendor not found or already deleted");
+        }
+        vendor.isDeleted = true;
+        vendor.updatedBy = req.superAdmin?._id || null;
+        await vendor.save();
 
-      await Vendor.findOneAndUpdate(
-        { vendorId: vendor.vendorId },
-        { storeStatus: 'Deleted' },
-        { returnDocument: 'after' }
-      );
-      await createAuditLog({
-        user: req.superAdmin?.adminId || 'SUPER',
-        userName: req.superAdmin?.name || 'Super Admin',
-        userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-        action: 'Bulk Deleted Vendor',
-        record: vendor.transNo || vendor.vendorId,
-        module: 'Vendor Database',
-      });
-      return id;
-    }));
+        await Vendor.findOneAndUpdate(
+          { vendorId: vendor.vendorId },
+          { storeStatus: "Deleted" },
+          { returnDocument: "after" },
+        );
+        await createAuditLog({
+          user: req.superAdmin?.adminId || "SUPER",
+          userName: req.superAdmin?.name || "Super Admin",
+          userRole: req.superAdmin?.role || "SUPER_ADMIN",
+          action: "Bulk Deleted Vendor",
+          record: vendor.transNo || vendor.vendorId,
+          module: "Vendor Database",
+        });
+        return id;
+      }),
+    );
 
     const deletedIds = [];
     const failures = [];
     results.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
+      if (result.status === "fulfilled") {
         deletedIds.push(result.value);
       } else {
         failures.push({
           vendorId: ids[index],
-          message: result.reason?.message || 'Failed to delete vendor',
+          message: result.reason?.message || "Failed to delete vendor",
         });
       }
     });
 
     return res.status(200).json({
       success: failures.length === 0,
-      message: failures.length === 0
-        ? `Deleted ${deletedIds.length} vendor${deletedIds.length === 1 ? '' : 's'}`
-        : `Deleted ${deletedIds.length} vendor${deletedIds.length === 1 ? '' : 's'}; ${failures.length} failed`,
+      message:
+        failures.length === 0
+          ? `Deleted ${deletedIds.length} vendor${deletedIds.length === 1 ? "" : "s"}`
+          : `Deleted ${deletedIds.length} vendor${deletedIds.length === 1 ? "" : "s"}; ${failures.length} failed`,
       data: {
         requestedCount: ids.length,
         deletedCount: deletedIds.length,
@@ -1330,10 +1329,10 @@ export const bulkDeleteVendors = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Bulk vendor deletion failed:', error);
+    console.error("Bulk vendor deletion failed:", error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to delete selected vendors',
+      message: "Failed to delete selected vendors",
       error: error.message,
     });
   }
@@ -1347,27 +1346,54 @@ export const importVendors = async (req, res) => {
     let vendorsPayload = req.body?.vendors || req.body?.data;
 
     // Direct Binary Excel / CSV file upload via multer (req.file or req.files)
-    const uploadedFile = req.file || (Array.isArray(req.files) && req.files.length > 0 ? req.files[0] : null);
+    const uploadedFile =
+      req.file ||
+      (Array.isArray(req.files) && req.files.length > 0 ? req.files[0] : null);
     if (uploadedFile && uploadedFile.buffer) {
       vendorsPayload = parseExcelOrCsvBuffer(uploadedFile.buffer);
     }
 
     if (!Array.isArray(vendorsPayload) || vendorsPayload.length === 0) {
-      return res.status(400).json({ message: 'Please attach a valid Excel/CSV file (.xlsx, .xls, .csv) or provide a non-empty array of vendor records' });
+      return res
+        .status(400)
+        .json({
+          message:
+            "Please attach a valid Excel/CSV file (.xlsx, .xls, .csv) or provide a non-empty array of vendor records",
+        });
     }
 
     // Helper to extract clean digits from phone string for exact matching
-    const cleanPhoneDigits = (phoneStr) => (phoneStr ? phoneStr.toString().replace(/[\s\-\(\)\.\+]/g, '') : '');
+    const cleanPhoneDigits = (phoneStr) =>
+      phoneStr ? phoneStr.toString().replace(/[\s\-\(\)\.\+]/g, "") : "";
 
     // Fetch all existing vendor records (including soft-deleted) to build lookup sets
-    const existingRecords = await SuperAdminVendor.find({}).select('vendorId transNo vendorName contactNo');
+    const existingRecords = await SuperAdminVendor.find({}).select(
+      "vendorId transNo vendorName contactNo",
+    );
 
-    const existingTransNoSet = new Set(existingRecords.map((r) => (r.transNo || '').toLowerCase().trim()).filter(Boolean));
-    const existingVendorIdsSet = new Set(existingRecords.map((r) => (r.vendorId || '').toLowerCase().trim()).filter(Boolean));
-    const existingNamesSet = new Set(existingRecords.map((r) => (r.vendorName || '').toLowerCase().trim()).filter(Boolean));
-    const existingPhoneSet = new Set(existingRecords.map((r) => cleanPhoneDigits(r.contactNo)).filter(Boolean));
+    const existingTransNoSet = new Set(
+      existingRecords
+        .map((r) => (r.transNo || "").toLowerCase().trim())
+        .filter(Boolean),
+    );
+    const existingVendorIdsSet = new Set(
+      existingRecords
+        .map((r) => (r.vendorId || "").toLowerCase().trim())
+        .filter(Boolean),
+    );
+    const existingNamesSet = new Set(
+      existingRecords
+        .map((r) => (r.vendorName || "").toLowerCase().trim())
+        .filter(Boolean),
+    );
+    const existingPhoneSet = new Set(
+      existingRecords.map((r) => cleanPhoneDigits(r.contactNo)).filter(Boolean),
+    );
     const existingNamePhoneSet = new Set(
-      existingRecords.map((r) => `${(r.vendorName || '').toLowerCase().trim()}_${cleanPhoneDigits(r.contactNo)}`)
+      existingRecords.map(
+        (r) =>
+          `${(r.vendorName || "").toLowerCase().trim()}_${cleanPhoneDigits(r.contactNo)}`,
+      ),
     );
 
     // Filter incoming payload based on Vendor Name & Phone Number uniqueness + index collision protection
@@ -1384,10 +1410,38 @@ export const importVendors = async (req, res) => {
         continue;
       }
 
-      const name = (item.vendorName || item.VendorName || item['Vendor Name'] || item.Name || '').toString().trim();
-      const phone = (item.contactNo || item.ContactNo || item['Contact No'] || item['Contact No.'] || item.Phone || item['Phone Number'] || '').toString().trim();
-      const trans = (item.transNo || item.TransNo || item['Trans No'] || item['TRANS NO.'] || '').toString().trim();
-      const venId = (item.vendorId || item.VendorId || item['Vendor ID'] || '').toString().trim();
+      const name = (
+        item.vendorName ||
+        item.VendorName ||
+        item["Vendor Name"] ||
+        item.Name ||
+        ""
+      )
+        .toString()
+        .trim();
+      const phone = (
+        item.contactNo ||
+        item.ContactNo ||
+        item["Contact No"] ||
+        item["Contact No."] ||
+        item.Phone ||
+        item["Phone Number"] ||
+        ""
+      )
+        .toString()
+        .trim();
+      const trans = (
+        item.transNo ||
+        item.TransNo ||
+        item["Trans No"] ||
+        item["TRANS NO."] ||
+        ""
+      )
+        .toString()
+        .trim();
+      const venId = (item.vendorId || item.VendorId || item["Vendor ID"] || "")
+        .toString()
+        .trim();
 
       if (!name) {
         skippedDuplicatesCount++;
@@ -1403,12 +1457,16 @@ export const importVendors = async (req, res) => {
       // 100% Future-Proof Uniqueness Rule:
       // Skip if exact SAME Vendor Name AND SAME Phone Number pair exists in DB or current Excel batch
       const isDuplicateNamePhone = phoneDigits
-        ? existingNamePhoneSet.has(namePhoneKey) || batchNamePhoneSet.has(namePhoneKey)
+        ? existingNamePhoneSet.has(namePhoneKey) ||
+          batchNamePhoneSet.has(namePhoneKey)
         : existingNamesSet.has(nameLower) || batchNamesSet.has(nameLower);
 
       // Index Collision Protection: Skip if explicit transNo or vendorId collides with DB
-      const isDuplicateTrans = transLower && (existingTransNoSet.has(transLower) || batchTransNoSet.has(transLower));
-      const isDuplicateVenId = venIdLower && existingVendorIdsSet.has(venIdLower);
+      const isDuplicateTrans =
+        transLower &&
+        (existingTransNoSet.has(transLower) || batchTransNoSet.has(transLower));
+      const isDuplicateVenId =
+        venIdLower && existingVendorIdsSet.has(venIdLower);
 
       if (isDuplicateNamePhone || isDuplicateTrans || isDuplicateVenId) {
         skippedDuplicatesCount++;
@@ -1438,11 +1496,11 @@ export const importVendors = async (req, res) => {
 
     existingRecords.forEach((v) => {
       if (v.vendorId) {
-        const num = parseInt(v.vendorId.replace(/^VEN/i, ''), 10);
+        const num = parseInt(v.vendorId.replace(/^VEN/i, ""), 10);
         if (!isNaN(num) && num > maxVenNum) maxVenNum = num;
       }
       if (v.transNo) {
-        const num = parseInt(v.transNo.replace(/^TRX90/i, ''), 10);
+        const num = parseInt(v.transNo.replace(/^TRX90/i, ""), 10);
         if (!isNaN(num) && num > maxTrxNum) maxTrxNum = num;
       }
     });
@@ -1450,39 +1508,88 @@ export const importVendors = async (req, res) => {
     let currentVenNum = maxVenNum + 1;
     let currentTrxNum = maxTrxNum + 1;
 
-    const totalExisting = await SuperAdminVendor.countDocuments({ isDeleted: false });
+    const totalExisting = await SuperAdminVendor.countDocuments({
+      isDeleted: false,
+    });
 
     const newVendorEntries = uniqueRecords.map((v, index) => {
       // Auto-generate VENxxx ensuring no collision
-      let vendorId = (v.vendorId || v.VendorId || v['Vendor ID'] || '').toString().trim();
+      let vendorId = (v.vendorId || v.VendorId || v["Vendor ID"] || "")
+        .toString()
+        .trim();
       if (!vendorId) {
-        while (existingVendorIdsSet.has(`ven${currentVenNum.toString().padStart(3, '0')}`)) {
+        while (
+          existingVendorIdsSet.has(
+            `ven${currentVenNum.toString().padStart(3, "0")}`,
+          )
+        ) {
           currentVenNum++;
         }
-        vendorId = `VEN${currentVenNum.toString().padStart(3, '0')}`;
+        vendorId = `VEN${currentVenNum.toString().padStart(3, "0")}`;
         currentVenNum++;
       }
       existingVendorIdsSet.add(vendorId.toLowerCase());
 
       // Auto-generate TRX901xx ensuring no collision
-      let transNo = (v.transNo || v.TransNo || v['Trans No'] || v['TRANS NO.'] || '').toString().trim();
+      let transNo = (
+        v.transNo ||
+        v.TransNo ||
+        v["Trans No"] ||
+        v["TRANS NO."] ||
+        ""
+      )
+        .toString()
+        .trim();
       if (!transNo) {
-        while (existingTransNoSet.has(`trx90${currentTrxNum.toString().padStart(3, '0')}`)) {
+        while (
+          existingTransNoSet.has(
+            `trx90${currentTrxNum.toString().padStart(3, "0")}`,
+          )
+        ) {
           currentTrxNum++;
         }
-        transNo = `TRX90${currentTrxNum.toString().padStart(3, '0')}`;
+        transNo = `TRX90${currentTrxNum.toString().padStart(3, "0")}`;
         currentTrxNum++;
       }
       existingTransNoSet.add(transNo.toLowerCase());
 
-      const srNo = v.srNo || v['Sr No'] || v['SR. NO.'] || (totalExisting + index + 1).toString().padStart(2, '0');
-      const vendorName = (v.vendorName || v.VendorName || v['Vendor Name'] || v.Name || 'Unnamed Vendor').toString().trim();
-      const category = (v.category || v.Category || 'General').toString().trim();
-      const rawVerificationDate = v.verificationDateTime || v.VerificationDate || v['Verification Date'] || v['Verification Date & Time'] || v['Contact Verification'];
-      const verificationDateTime = rawVerificationDate ? new Date(rawVerificationDate) : new Date();
-      const contactNo = (v.contactNo || v.ContactNo || v['Contact No'] || v['Contact No.'] || '').toString().trim();
-      const state = (v.state || v.State || '').toString().trim();
-      const city = (v.city || v.City || '').toString().trim();
+      const srNo =
+        v.srNo ||
+        v["Sr No"] ||
+        v["SR. NO."] ||
+        (totalExisting + index + 1).toString().padStart(2, "0");
+      const vendorName = (
+        v.vendorName ||
+        v.VendorName ||
+        v["Vendor Name"] ||
+        v.Name ||
+        "Unnamed Vendor"
+      )
+        .toString()
+        .trim();
+      const category = (v.category || v.Category || "General")
+        .toString()
+        .trim();
+      const rawVerificationDate =
+        v.verificationDateTime ||
+        v.VerificationDate ||
+        v["Verification Date"] ||
+        v["Verification Date & Time"] ||
+        v["Contact Verification"];
+      const verificationDateTime = rawVerificationDate
+        ? new Date(rawVerificationDate)
+        : new Date();
+      const contactNo = (
+        v.contactNo ||
+        v.ContactNo ||
+        v["Contact No"] ||
+        v["Contact No."] ||
+        ""
+      )
+        .toString()
+        .trim();
+      const state = (v.state || v.State || "").toString().trim();
+      const city = (v.city || v.City || "").toString().trim();
       const status = normalizeStatus(v.status || v.Status);
 
       return {
@@ -1509,7 +1616,9 @@ export const importVendors = async (req, res) => {
       vendors: insertedVendors,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error during import', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Server error during import", error: error.message });
   }
 };
 
@@ -1519,34 +1628,57 @@ export const importVendors = async (req, res) => {
 // @access  Private (SuperAdmin)
 export const exportVendorsCSV = async (req, res) => {
   try {
-    const vendors = await SuperAdminVendor.find({ isDeleted: false }).sort({ createdAt: 1 });
+    const vendors = await SuperAdminVendor.find({ isDeleted: false }).sort({
+      createdAt: 1,
+    });
 
-    const headers = ['Sr No', 'Trans No', 'ID', 'Vendor Name', 'Category', 'Verification Date & Time', 'Contact No', 'State', 'City', 'Status'];
+    const headers = [
+      "Sr No",
+      "Trans No",
+      "ID",
+      "Vendor Name",
+      "Category",
+      "Verification Date & Time",
+      "Contact No",
+      "State",
+      "City",
+      "Status",
+    ];
 
     const rowsData = vendors.map((v) => {
-      const verifDate = v.verificationDateTime ? new Date(v.verificationDateTime).toLocaleString() : '';
+      const verifDate = v.verificationDateTime
+        ? new Date(v.verificationDateTime).toLocaleString()
+        : "";
       return [
-        v.srNo || '',
-        v.transNo || '',
-        v.vendorId || '',
-        v.vendorName || '',
-        v.category || '',
+        v.srNo || "",
+        v.transNo || "",
+        v.vendorId || "",
+        v.vendorName || "",
+        v.category || "",
         verifDate,
-        v.contactNo || '',
-        v.state || '',
-        v.city || '',
-        v.status || 'Active',
+        v.contactNo || "",
+        v.state || "",
+        v.city || "",
+        v.status || "Active",
       ];
     });
 
     // Use reusable generateCSVData utility from src/utils/excelCsvHandler.js
     const csvContent = generateCSVData(headers, rowsData);
 
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="Vendor_Database.csv"');
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="Vendor_Database.csv"',
+    );
     res.status(200).send(csvContent);
   } catch (error) {
-    res.status(500).json({ message: 'Server error during CSV export', error: error.message });
+    res
+      .status(500)
+      .json({
+        message: "Server error during CSV export",
+        error: error.message,
+      });
   }
 };
 // EXPORT VENDORS TO PDF REPORT
@@ -1555,17 +1687,30 @@ export const exportVendorsCSV = async (req, res) => {
 // @access  Private (SuperAdmin)
 export const exportVendorsPDF = async (req, res) => {
   try {
-    const vendors = await SuperAdminVendor.find({ isDeleted: false }).sort({ createdAt: 1 });
+    const vendors = await SuperAdminVendor.find({ isDeleted: false }).sort({
+      createdAt: 1,
+    });
 
-    const headers = ['SR. NO.', 'TRANS NO.', 'VENDOR NAME', 'CATEGORY', 'VERIFICATION DATE & TIME', 'STATE', 'CITY', 'STATUS'];
+    const headers = [
+      "SR. NO.",
+      "TRANS NO.",
+      "VENDOR NAME",
+      "CATEGORY",
+      "VERIFICATION DATE & TIME",
+      "STATE",
+      "CITY",
+      "STATUS",
+    ];
 
     const tableRowsHtml = vendors
       .map((v, i) => {
-        const verifDate = v.verificationDateTime ? new Date(v.verificationDateTime).toLocaleString() : '';
-        const statusColor = v.status === 'Pending' ? '#d97706' : '#16a34a';
+        const verifDate = v.verificationDateTime
+          ? new Date(v.verificationDateTime).toLocaleString()
+          : "";
+        const statusColor = v.status === "Pending" ? "#d97706" : "#16a34a";
         return `
         <tr>
-          <td>${(i + 1).toString().padStart(2, '0')}</td>
+          <td>${(i + 1).toString().padStart(2, "0")}</td>
           <td><strong style="color: #ea580c;">${v.transNo}</strong></td>
           <td><strong>${v.vendorName}</strong></td>
           <td>${v.category}</td>
@@ -1575,22 +1720,30 @@ export const exportVendorsPDF = async (req, res) => {
           <td style="color: ${statusColor}; font-weight: bold;">${v.status}</td>
         </tr>`;
       })
-      .join('');
+      .join("");
 
     // Use reusable generateHTMLPDFReport utility from src/utils/excelCsvHandler.js
     const pdfHtmlReport = generateHTMLPDFReport(
-      'Vendor Database Report',
-      'Super Admin Master Vendor Directory',
+      "Vendor Database Report",
+      "Super Admin Master Vendor Directory",
       headers,
       tableRowsHtml,
-      vendors.length
+      vendors.length,
     );
 
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Content-Disposition', 'inline; filename="Vendor_Database_Report.pdf"');
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'inline; filename="Vendor_Database_Report.pdf"',
+    );
     res.status(200).send(pdfHtmlReport);
   } catch (error) {
-    res.status(500).json({ message: 'Server error during PDF export', error: error.message });
+    res
+      .status(500)
+      .json({
+        message: "Server error during PDF export",
+        error: error.message,
+      });
   }
 };
 // -----------------Block Vendor ------------------------------------------
@@ -1626,7 +1779,7 @@ export const blockVendor = async (req, res) => {
             { email: vendor.email?.toLowerCase().trim() },
           ],
         },
-        { storeStatus: "Blocked" }
+        { storeStatus: "Blocked" },
       );
       await Customer.findOneAndUpdate(
         {
@@ -1636,19 +1789,19 @@ export const blockVendor = async (req, res) => {
             { email: vendor.email?.toLowerCase().trim() },
           ],
         },
-        { status: "Blocked" }
+        { status: "Blocked" },
       );
     } catch (syncErr) {
       console.error("Block vendor sync error:", syncErr.message);
     }
 
     await createAuditLog({
-      user: req.superAdmin?.adminId || 'SUPER',
-      userName: req.superAdmin?.name || 'Super Admin',
-      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-      action: 'Blocked Vendor',
+      user: req.superAdmin?.adminId || "SUPER",
+      userName: req.superAdmin?.name || "Super Admin",
+      userRole: req.superAdmin?.role || "SUPER_ADMIN",
+      action: "Blocked Vendor",
       record: vendor.transNo || vendor.vendorId,
-      module: 'Vendor Database',
+      module: "Vendor Database",
     });
 
     return res.status(200).json({
@@ -1700,7 +1853,7 @@ export const unblockVendor = async (req, res) => {
             { email: vendor.email?.toLowerCase().trim() },
           ],
         },
-        { storeStatus: "Active & Verified" }
+        { storeStatus: "Active & Verified" },
       );
       await Customer.findOneAndUpdate(
         {
@@ -1710,19 +1863,19 @@ export const unblockVendor = async (req, res) => {
             { email: vendor.email?.toLowerCase().trim() },
           ],
         },
-        { status: "Active" }
+        { status: "Active" },
       );
     } catch (syncErr) {
       console.error("Unblock vendor sync error:", syncErr.message);
     }
 
     await createAuditLog({
-      user: req.superAdmin?.adminId || 'SUPER',
-      userName: req.superAdmin?.name || 'Super Admin',
-      userRole: req.superAdmin?.role || 'SUPER_ADMIN',
-      action: 'Unblocked Vendor',
+      user: req.superAdmin?.adminId || "SUPER",
+      userName: req.superAdmin?.name || "Super Admin",
+      userRole: req.superAdmin?.role || "SUPER_ADMIN",
+      action: "Unblocked Vendor",
       record: vendor.transNo || vendor.vendorId,
-      module: 'Vendor Database',
+      module: "Vendor Database",
     });
 
     return res.status(200).json({
