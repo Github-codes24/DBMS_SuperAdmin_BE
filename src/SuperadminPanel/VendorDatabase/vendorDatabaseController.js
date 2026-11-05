@@ -1097,6 +1097,31 @@ export const updateVendor = async (req, res) => {
     vendor.updatedBy = req.superAdmin._id;
     await vendor.save();
 
+    // make a update in vendor to 
+    await Vendor.findOneAndUpdate(
+      {
+        $or: [
+          { vendorId: vendor.vendorId },
+          { email: vendor.email },
+        ],
+      },
+      {
+        $set: {
+          vendorId: vendor.vendorId,
+          storeName: vendor.vendorName,
+          storeStatus:
+            vendor.status === 'Active'
+              ? 'Active & Verified'
+              : 'Pending Verification',
+          state: vendor.state || '',
+          city: vendor.city || '',
+          phone: vendor.contactNo || '',
+          updatedAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+
     // Automatic Audit Log Recording
     await createAuditLog({
       user: req.superAdmin?.adminId || "SUPER",

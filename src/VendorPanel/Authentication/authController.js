@@ -10,6 +10,66 @@ const generateToken = (id) => {
 // @desc    Auth vendor & get token
 // @route   POST /api/auth/login
 // @access  Public
+// export const loginVendor = async (req, res) => {
+//   const { loginId, email, password } = req.body;
+//   const identifier = loginId || email;
+
+//   try {
+//     if (!identifier || !password) {
+//       return res.status(400).json({ message: 'Please provide Email/Vendor ID and Password' });
+//     }
+
+//     // Find vendor by email OR vendorId (case-insensitive)
+//     // const vendor = await Vendor.findOne({
+//     //   $or: [
+//     //     { email: identifier.toLowerCase().trim() },
+//     //     { vendorId: identifier.trim() },
+//     //   ],
+//     // });
+
+//     // debugging 
+
+//     const vendor = await Vendor.findOne({
+//       $or: [
+//         { email: identifier.toLowerCase().trim() },
+//         { vendorId: identifier.trim() },
+//       ],
+//     }).select('+password');
+    
+//     console.log('identifier:', identifier);
+//     console.log('vendor found:', !!vendor);
+//     console.log('has password:', !!vendor?.password);
+//     console.log('stored password:', vendor?.password);
+//     if (vendor?.password) {
+//       console.log('match:', await bcrypt.compare(password, vendor.password));
+//     }
+
+//     if (vendor && vendor.password && (await bcrypt.compare(password, vendor.password))) {
+//       // Check if vendor has been activated by Super Admin
+//       if (vendor.storeStatus !== 'Active & Verified') {
+//         return res.status(403).json({
+//           message: 'Your account is pending verification and approval by Super Admin. Please wait for Super Admin activation.',
+//           storeStatus: vendor.storeStatus,
+//         });
+//       }
+
+//       res.json({
+//         _id: vendor._id,
+//         vendorId: vendor.vendorId,
+//         fullName: vendor.fullName,
+//         email: vendor.email,
+//         storeName: vendor.storeName,
+//         storeStatus: vendor.storeStatus,
+//         token: generateToken(vendor._id),
+//       });
+//     } else {
+//       res.status(401).json({ message: 'Invalid Email/Vendor ID or Password' });
+//     }
+//   } catch (error) {
+//     res.status(500).json({ message: 'Server error', error: error.message });
+//   }
+// };
+
 export const loginVendor = async (req, res) => {
   const { loginId, email, password } = req.body;
   const identifier = loginId || email;
@@ -19,7 +79,6 @@ export const loginVendor = async (req, res) => {
       return res.status(400).json({ message: 'Please provide Email/Vendor ID and Password' });
     }
 
-    // Find vendor by email OR vendorId (case-insensitive)
     const vendor = await Vendor.findOne({
       $or: [
         { email: identifier.toLowerCase().trim() },
@@ -27,8 +86,8 @@ export const loginVendor = async (req, res) => {
       ],
     });
 
-    if (vendor && vendor.password && (await bcrypt.compare(password, vendor.password))) {
-      // Check if vendor has been activated by Super Admin
+    // Plain-text comparison
+    if (vendor && vendor.password && vendor.password === password) {
       if (vendor.storeStatus !== 'Active & Verified') {
         return res.status(403).json({
           message: 'Your account is pending verification and approval by Super Admin. Please wait for Super Admin activation.',
@@ -36,7 +95,7 @@ export const loginVendor = async (req, res) => {
         });
       }
 
-      res.json({
+      return res.json({
         _id: vendor._id,
         vendorId: vendor.vendorId,
         fullName: vendor.fullName,
@@ -45,9 +104,9 @@ export const loginVendor = async (req, res) => {
         storeStatus: vendor.storeStatus,
         token: generateToken(vendor._id),
       });
-    } else {
-      res.status(401).json({ message: 'Invalid Email/Vendor ID or Password' });
     }
+
+    res.status(401).json({ message: 'Invalid Email/Vendor ID or Password' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
