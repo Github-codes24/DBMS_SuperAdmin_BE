@@ -67,7 +67,7 @@ const superAdminVendorSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
-    pincode: {
+    pinCode: {
       type: String,
       default: '',
       trim: true,

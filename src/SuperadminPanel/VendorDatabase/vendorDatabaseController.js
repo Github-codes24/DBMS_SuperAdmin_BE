@@ -94,7 +94,10 @@ export const getVendors = async (req, res) => {
 
     const { search, status, state, city, category } = req.query;
 
-    const query = { isDeleted: false };
+     const query = {
+       isDeleted: false
+
+      };
 
     // Search filter across vendorName, transNo, vendorId, category, verification date, city, state
     if (search && search.trim()) {
@@ -127,6 +130,7 @@ export const getVendors = async (req, res) => {
       query.city = new RegExp(city.trim(), 'i');
     }
 
+   
     const totalVendors = await SuperAdminVendor.countDocuments(query);
 
     const vendors = await SuperAdminVendor.find(query)
@@ -162,7 +166,7 @@ export const createVendor = async (req, res) => {
     email,
     state,
     city,
-    pincode,
+    pinCode,
     completeAddress,
     gstin,
     customFields = [],
@@ -277,7 +281,7 @@ export const createVendor = async (req, res) => {
 
       state: state ? state.trim() : '',
       city: city ? city.trim() : '',
-      pincode: pincode ? pincode.trim() : '',
+      pinCode: pinCode ? pinCode.trim() : '',
       completeAddress: completeAddress
         ? completeAddress.trim()
         : '',
@@ -1081,6 +1085,7 @@ export const updateVendor = async (req, res) => {
       state,
       city,
       status,
+      pinCode
     } = req.body;
 
     // BUSINESS RULE: Status Transition Protection
@@ -1105,6 +1110,7 @@ export const updateVendor = async (req, res) => {
     if (state !== undefined) vendor.state = state.trim();
     if (city !== undefined) vendor.city = city.trim();
     if (srNo !== undefined) vendor.srNo = srNo;
+    if(pinCode!==undefined) vendor.pinCode=pinCode
 
     vendor.updatedBy = req.superAdmin._id;
     await vendor.save();

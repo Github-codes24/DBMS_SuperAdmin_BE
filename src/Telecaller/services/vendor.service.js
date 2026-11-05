@@ -76,6 +76,7 @@ export const createVendor = async (data, performedBy, ip) => {
     city,
     name,
     locality,
+    pinCode,
     isPaidVendor,
     fullAddress,
     address,
@@ -119,11 +120,14 @@ const vendor = await Customers.create({
   city: city ? city.trim() : '',
   locality: locality ? locality.trim() : '',
   address: typeof vendorAddress === 'string' ? vendorAddress.trim() : '',
-  isPaidVendor: isPaidVendor === true || isPaidVendor === 'true' || isPaidVendor === 'yes',
+  isPaidVendor:isPaidVendor === true || isPaidVendor === 'true' ||
+   isPaidVendor === 'yes'? 'Yes' : 'No',
   assignedTelecaller: performedBy ? String(performedBy) : '',
   createdBy: createdById,
   status: 'Active',
+  pinCode:pinCode 
 });
+
 
   // 4. Audit Log
   try {
@@ -139,6 +143,7 @@ const vendor = await Customers.create({
         companyName: vendor.companyName,
         phone: vendor.phone,
         email: vendor.email,
+        pinCode:vendor.pinCode
       },
       ipAddress: ip || '',
     });
@@ -479,6 +484,7 @@ export const updateVendorPersonal = async (
     phone: vendor.phone,
     address: vendor.address,
     gst: vendor.gst,
+    pinCode:vendor.pinCode
   };
 
   const allowedFields = [
@@ -491,6 +497,7 @@ export const updateVendorPersonal = async (
     "email",
     "gst",
     "address",
+    "pinCode"
   ];
 
   allowedFields.forEach((field) => {
