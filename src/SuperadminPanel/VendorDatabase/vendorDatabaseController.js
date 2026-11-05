@@ -169,6 +169,7 @@ export const createVendor = async (req, res) => {
     pinCode,
     completeAddress,
     gstin,
+    password,
     customFields = [],
 
   } = req.body;
@@ -286,6 +287,7 @@ export const createVendor = async (req, res) => {
         ? completeAddress.trim()
         : '',
       gstin: gstin ? gstin.trim() : '',
+      password: password ? password.trim() : '',
 
       // ALWAYS Pending on creation
       status: 'Pending',
@@ -313,7 +315,7 @@ export const createVendor = async (req, res) => {
         phone: contactNo ? contactNo.trim() : '',
 
         // No password until activation
-        password: null,
+        password: password ? password.trim() : null,
 
         storeName: vendorName.trim(),
 
