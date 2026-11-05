@@ -120,7 +120,8 @@ const vendor = await Customers.create({
   city: city ? city.trim() : '',
   locality: locality ? locality.trim() : '',
   address: typeof vendorAddress === 'string' ? vendorAddress.trim() : '',
-  isPaidVendor: isPaidVendor === true || isPaidVendor === 'true' || isPaidVendor === 'yes',
+  isPaidVendor:isPaidVendor === true || isPaidVendor === 'true' ||
+   isPaidVendor === 'yes'? 'Yes' : 'No',
   assignedTelecaller: performedBy ? String(performedBy) : '',
   createdBy: createdById,
   status: 'Active',
