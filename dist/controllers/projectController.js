@@ -33,19 +33,19 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateProject = exports.getProjectsWithRoles = exports.getProjects = exports.createProject = void 0;
+exports.deleteProject = exports.updateProject = exports.createProject = exports.getProjectsWithRoles = exports.getProjects = void 0;
 // controllers/project.controller.ts
-const svc = __importStar(require("../services/projectService"));
+const svc = __importStar(require("../services/projectService.js"));
 const request_js_1 = require("../utils/request.js");
 const helpers_js_1 = require("./helpers.js");
-// create project on the platform 
-exports.createProject = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.createProject({
-    ...req.body, createdBy: (0, request_js_1.actorId)(req)
-}), 201));
-// get your project on the platform 
+/** GET /api/platform/projects */
 exports.getProjects = (0, helpers_js_1.wrap)(async (_req, res) => (0, helpers_js_1.ok)(res, await svc.getProjects()));
-// get project with roles 
+/** GET /api/platform/projects-with-roles */
 exports.getProjectsWithRoles = (0, helpers_js_1.wrap)(async (_req, res) => (0, helpers_js_1.ok)(res, await svc.getProjectsWithRoles()));
-// update project 
+/** POST /api/platform/projects */
+exports.createProject = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.createProject({ ...req.body, createdBy: (0, request_js_1.actorId)(req) }), 201));
+/** PATCH /api/platform/projects/:projectId */
 exports.updateProject = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.updateProject((0, request_js_1.param)(req, "projectId"), req.body, (0, request_js_1.actorId)(req))));
+/** DELETE /api/platform/projects/:projectId */
+exports.deleteProject = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.deleteProject((0, request_js_1.param)(req, "projectId"), (0, request_js_1.actorId)(req))));
 //# sourceMappingURL=projectController.js.map

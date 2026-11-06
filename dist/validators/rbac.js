@@ -6,23 +6,45 @@ const zod_1 = require("zod");
 const key = zod_1.z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]{1,47}$/);
 const permKey = zod_1.z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]{1,47}:[a-z][a-z0-9_-]{1,47}$/);
 const objectId = zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/);
+const panelLinkDto = zod_1.z.object({
+    name: zod_1.z.string().trim().min(1).max(100),
+    url: zod_1.z.string().trim().min(1).max(2000),
+});
+const userTypeDto = zod_1.z.object({
+    role: zod_1.z.string().trim().min(1).max(60),
+    count: zod_1.z.number().int().min(0),
+});
+const projectStatusEnum = zod_1.z.enum(["active", "inactive", "upcoming", "completed", "on_hold"]);
 exports.createProjectDto = zod_1.z.object({
     body: zod_1.z.object({
         name: zod_1.z.string().trim().min(2).max(100),
-        description: zod_1.z.string().trim().max(500).optional()
+        description: zod_1.z.string().trim().max(500).optional(),
+        logo: zod_1.z.string().trim().max(2000).optional(),
+        theme: zod_1.z.string().trim().regex(/^#[0-9a-fA-F]{6}$/).optional().or(zod_1.z.literal("")),
+        startDate: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(zod_1.z.literal("")),
+        endDate: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(zod_1.z.literal("")),
+        status: projectStatusEnum.optional(),
+        adminId: zod_1.z.string().optional(),
+        panelLinks: zod_1.z.array(panelLinkDto).max(100).optional(),
+        userTypes: zod_1.z.array(userTypeDto).max(100).optional(),
     }).strict(),
     params: zod_1.z.object({}).strict(),
-    query: zod_1.z.object({}).strict()
+    query: zod_1.z.object({}).strict(),
 });
 exports.updateProjectDto = zod_1.z.object({
     body: zod_1.z.object({
         name: zod_1.z.string().trim().min(2).max(100).optional(),
         description: zod_1.z.string().trim().max(500).optional(),
-        status: zod_1.z.enum(["active", "inactive"]).optional(),
+        logo: zod_1.z.string().trim().max(2000).optional(),
+        theme: zod_1.z.string().trim().regex(/^#[0-9a-fA-F]{6}$/).optional().or(zod_1.z.literal("")),
+        startDate: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(zod_1.z.literal("")),
+        endDate: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(zod_1.z.literal("")),
+        status: projectStatusEnum.optional(),
+        adminId: zod_1.z.string().optional(),
+        panelLinks: zod_1.z.array(panelLinkDto).max(100).optional(),
+        userTypes: zod_1.z.array(userTypeDto).max(100).optional(),
     }).strict(),
-    params: zod_1.z.object({
-        projectId: objectId,
-    }).strict(),
+    params: zod_1.z.object({ projectId: objectId }).strict(),
     query: zod_1.z.object({}).strict(),
 });
 exports.createRoleDto = zod_1.z.object({
@@ -31,9 +53,7 @@ exports.createRoleDto = zod_1.z.object({
         description: zod_1.z.string().trim().max(300).optional(),
         moduleKeys: zod_1.z.array(key).max(200).default([]),
     }).strict(),
-    params: zod_1.z.object({
-        projectId: objectId,
-    }).strict(),
+    params: zod_1.z.object({ projectId: objectId }).strict(),
     query: zod_1.z.object({}).strict(),
 });
 exports.updateRoleDto = zod_1.z.object({
@@ -43,10 +63,7 @@ exports.updateRoleDto = zod_1.z.object({
         moduleKeys: zod_1.z.array(key).max(200).optional(),
         isActive: zod_1.z.boolean().optional(),
     }).strict(),
-    params: zod_1.z.object({
-        projectId: objectId,
-        roleId: objectId,
-    }).strict(),
+    params: zod_1.z.object({ projectId: objectId, roleId: objectId }).strict(),
     query: zod_1.z.object({}).strict(),
 });
 exports.savePermissionsDto = zod_1.z.object({
@@ -54,10 +71,7 @@ exports.savePermissionsDto = zod_1.z.object({
         expectedVersion: zod_1.z.number().int().min(1),
         permissions: zod_1.z.array(permKey).max(1000),
     }).strict(),
-    params: zod_1.z.object({
-        projectId: objectId,
-        roleId: objectId,
-    }).strict(),
+    params: zod_1.z.object({ projectId: objectId, roleId: objectId }).strict(),
     query: zod_1.z.object({}).strict(),
 });
 exports.bulkModulesDto = zod_1.z.object({
@@ -69,9 +83,7 @@ exports.bulkModulesDto = zod_1.z.object({
             actions: zod_1.z.array(key).optional(),
         }).strict()).min(1).max(100),
     }).strict(),
-    params: zod_1.z.object({
-        projectId: objectId,
-    }).strict(),
+    params: zod_1.z.object({ projectId: objectId }).strict(),
     query: zod_1.z.object({}).strict(),
 });
 exports.updateModuleDto = zod_1.z.object({
@@ -81,23 +93,14 @@ exports.updateModuleDto = zod_1.z.object({
         sortOrder: zod_1.z.number().int().optional(),
         isActive: zod_1.z.boolean().optional(),
     }).strict(),
-    params: zod_1.z.object({
-        projectId: objectId,
-        moduleId: objectId,
-    }).strict(),
+    params: zod_1.z.object({ projectId: objectId, moduleId: objectId }).strict(),
     query: zod_1.z.object({}).strict(),
 });
 exports.moduleActionsDto = zod_1.z.object({
-    body: zod_1.z.object({
-        actions: zod_1.z.array(key).min(1),
-    }).strict(),
-    params: zod_1.z.object({
-        projectId: objectId,
-        moduleId: objectId,
-    }).strict(),
+    body: zod_1.z.object({ actions: zod_1.z.array(key).min(1) }).strict(),
+    params: zod_1.z.object({ projectId: objectId, moduleId: objectId }).strict(),
     query: zod_1.z.object({}).strict(),
 });
-;
 exports.createActionDto = zod_1.z.object({
     body: zod_1.z.object({
         key,
@@ -114,9 +117,7 @@ exports.updateActionDto = zod_1.z.object({
         sortOrder: zod_1.z.number().int().optional(),
         isActive: zod_1.z.boolean().optional(),
     }).strict(),
-    params: zod_1.z.object({
-        key: zod_1.z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]{1,47}$/),
-    }).strict(),
+    params: zod_1.z.object({ key: zod_1.z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]{1,47}$/) }).strict(),
     query: zod_1.z.object({}).strict(),
 });
 exports.createProjectUserDto = zod_1.z.object({
@@ -126,9 +127,7 @@ exports.createProjectUserDto = zod_1.z.object({
         password: zod_1.z.string().min(8).max(128),
         roleId: objectId,
     }).strict(),
-    params: zod_1.z.object({
-        projectId: objectId,
-    }).strict(),
+    params: zod_1.z.object({ projectId: objectId }).strict(),
     query: zod_1.z.object({}).strict(),
 });
 exports.assignRoleDto = zod_1.z.object({ roleId: objectId }).strict();
