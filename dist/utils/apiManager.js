@@ -12,11 +12,14 @@ exports.apiManager = {
                 : {}),
         });
     },
-    failure(res, message, statusCode = 500, code = "INTERNAL_SERVER_ERROR") {
+    failure(res, message, statusCode = 500, code = "INTERNAL_SERVER_ERROR", details) {
         return res.status(statusCode).json({
             success: false,
             message,
-            error: { code },
+            error: {
+                code,
+                ...(details !== undefined ? { details } : {}),
+            },
             ...(res.locals.requestId
                 ? { requestId: res.locals.requestId }
                 : {}),

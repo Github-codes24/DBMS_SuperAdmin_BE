@@ -104,6 +104,7 @@ const userSchema = new mongoose_1.Schema({
         index: true
     },
     passwordHash: { type: String, required: true, select: false },
+    phoneNumber: { type: String, trim: true, default: null },
     role: { type: String, enum: ["superadmin", "user"], default: "user", required: true },
     projectRoles: [
         {

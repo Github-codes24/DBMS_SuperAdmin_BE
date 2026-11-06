@@ -60,8 +60,16 @@ exports.createUserSchema = zod_1.z.object({
             .string()
             .min(8, "Password must be at least 8 characters")
             .max(128, "Password cannot exceed 128 characters"),
-        role: zod_1.z.enum(["superadmin", "user"]).default("user"),
+        phoneNumber: zod_1.z.string().trim().max(20).optional(),
+        role: zod_1.z
+            .preprocess((val) => typeof val === "string"
+            ? val.trim().toLowerCase().replace(/[\s-_]/g, "")
+            : val, zod_1.z.enum(["superadmin", "user"], {
+            message: "Role must be either 'superadmin' or 'user'. Project-level roles belong in projectRoles.",
+        }))
+            .default("user"),
         projectRoles: projectRolesField,
+        projectIds: zod_1.z.array(zod_1.z.string().trim()).optional(),
         isActive: zod_1.z.boolean().default(true),
     })
         .strict(),
@@ -93,8 +101,17 @@ exports.updateUserSchema = zod_1.z.object({
             .max(254)
             .transform((email) => email.toLowerCase())
             .optional(),
-        role: zod_1.z.enum(["superadmin", "user"]).default("user").optional(),
+        phoneNumber: zod_1.z.string().trim().max(20).optional(),
+        role: zod_1.z
+            .preprocess((val) => typeof val === "string"
+            ? val.trim().toLowerCase().replace(/[\s-_]/g, "")
+            : val, zod_1.z.enum(["superadmin", "user"], {
+            message: "Role must be either 'superadmin' or 'user'. Project-level roles belong in projectRoles.",
+        }))
+            .default("user")
+            .optional(),
         projectRoles: projectRolesField,
+        projectIds: zod_1.z.array(zod_1.z.string().trim()).optional(),
         isActive: zod_1.z.boolean().optional(),
     })
         .strict(),

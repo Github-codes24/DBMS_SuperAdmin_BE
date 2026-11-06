@@ -40,15 +40,22 @@ const httpError_js_1 = require("../utils/httpError.js");
 const validate = (schema) => {
     return (req, res, next) => {
         const result = schema.safeParse({
-            body: req.body,
-            params: req.params,
-            query: req.query,
+            body: req.body ?? {},
+            params: req.params ?? {},
+            query: req.query ?? {},
         });
         if (!result.success) {
-            return apiManager_js_1.apiManager.failure(res, "Request validation failed", 400, "VALIDATION_ERROR");
+            // Helpful for debugging in your terminal:
+            console.error("Zod Validation Error:", result.error.format());
+            const details = result.error.issues.map((issue) => ({
+                field: issue.path.length > 1 ? issue.path.slice(1).join(".") : issue.path.join("."),
+                message: issue.message,
+                code: issue.code,
+            }));
+            return apiManager_js_1.apiManager.failure(res, "Request validation failed", 400, "VALIDATION_ERROR", details);
         }
         res.locals.validated = result.data;
-        return next();
+        next();
     };
 };
 exports.validate = validate;
