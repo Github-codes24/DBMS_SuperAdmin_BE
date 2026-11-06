@@ -23,9 +23,9 @@ async function bootstrapSuperAdmin(): Promise<void> {
     );
   }
 
-  if (password.length < 12) {
+  if (password.length < 8) {
     throw new Error(
-      "SUPERADMIN_PASSWORD must contain at least 12 characters",
+      "SUPERADMIN_PASSWORD must contain at least 8 characters",
     );
   }
 
