@@ -17,7 +17,14 @@ const errorHandler = (err, req, res, _next) => {
     if (res.headersSent) {
         return;
     }
-    return apiManager_js_1.apiManager.failure(res, "An unexpected error occurred", 500, "INTERNAL_SERVER_ERROR");
+    const statusCode = typeof err?.statusCode === "number" ? err.statusCode : 500;
+    const code = typeof err?.code === "string"
+        ? err.code
+        : statusCode === 500
+            ? "INTERNAL_SERVER_ERROR"
+            : "ERROR";
+    const message = statusCode >= 500 ? "An unexpected error occurred" : error.message;
+    return apiManager_js_1.apiManager.failure(res, message, statusCode, code);
 };
 exports.errorHandler = errorHandler;
 //# sourceMappingURL=errorHandler.js.map

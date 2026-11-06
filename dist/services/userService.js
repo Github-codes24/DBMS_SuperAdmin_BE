@@ -335,6 +335,7 @@ function formatUser(doc) {
         id: doc._id.toString(),
         name: doc.name,
         email: doc.email,
+        phoneNumber: doc.phoneNumber ?? null,
         role: doc.role,
         projectRoles,
         projectIds: projectRoles.filter((p) => p.isActive).map((p) => p.projectId),
@@ -464,6 +465,7 @@ async function createUser(input, currentAuth) {
         name: input.name,
         email: input.email,
         passwordHash,
+        phoneNumber: input.phoneNumber ?? null,
         role,
         projectRoles: await buildProjectRoles(input.projectRoles ?? [], currentAuth), // CHANGED from projectIds
         isActive: input.isActive,
@@ -502,6 +504,9 @@ async function updateUser(id, input, currentAuth) {
     }
     if (input.name !== undefined) {
         user.name = input.name;
+    }
+    if (input.phoneNumber !== undefined) {
+        user.set("phoneNumber", input.phoneNumber);
     }
     let mustRevoke = false;
     if (input.role !== undefined && input.role !== user.role) {

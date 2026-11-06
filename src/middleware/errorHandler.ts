@@ -25,10 +25,21 @@ export const errorHandler: ErrorRequestHandler = (
     return;
   }
 
+  const statusCode =
+    typeof (err as any)?.statusCode === "number" ? (err as any).statusCode : 500;
+  const code =
+    typeof (err as any)?.code === "string"
+      ? (err as any).code
+      : statusCode === 500
+        ? "INTERNAL_SERVER_ERROR"
+        : "ERROR";
+  const message =
+    statusCode >= 500 ? "An unexpected error occurred" : error.message;
+
   return apiManager.failure(
     res,
-    "An unexpected error occurred",
-    500,
-    "INTERNAL_SERVER_ERROR",
+    message,
+    statusCode,
+    code,
   );
 };

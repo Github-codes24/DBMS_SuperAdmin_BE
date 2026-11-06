@@ -23,11 +23,15 @@ export const apiManager = {
     message: string,
     statusCode = 500,
     code = "INTERNAL_SERVER_ERROR",
+    details?: unknown,
   ) {
     return res.status(statusCode).json({
       success: false,
       message,
-      error: { code },
+      error: {
+        code,
+        ...(details !== undefined ? { details } : {}),
+      },
       ...(res.locals.requestId
         ? { requestId: res.locals.requestId as string }
         : {}),

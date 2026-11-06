@@ -48,24 +48,35 @@ import { httpError } from "../utils/httpError.js";
 export const validate = (schema: ZodType): RequestHandler => {
   return (req, res, next) => {
     const result = schema.safeParse({
-      body: req.body,
-      params: req.params,
-      query: req.query,
+      body: req.body ?? {},
+      params: req.params ?? {},
+      query: req.query ?? {},
     });
 
     if (!result.success) {
-  return apiManager.failure(
-    res,
-    "Request validation failed",
-    400,
-    "VALIDATION_ERROR",
-  );
-}
-res.locals.validated = result.data;
+      // Helpful for debugging in your terminal:
+      console.error("Zod Validation Error:", result.error.format());
 
-return next();
+      const details = result.error.issues.map((issue) => ({
+        field: issue.path.length > 1 ? issue.path.slice(1).join(".") : issue.path.join("."),
+        message: issue.message,
+        code: issue.code,
+      }));
+
+      return apiManager.failure(
+        res,
+        "Request validation failed",
+        400,
+        "VALIDATION_ERROR",
+        details,
+      );
+    }
+
+    res.locals.validated = result.data;
+    next();
   };
 };
+
 export const objectIdParams = (...names: string[]): RequestHandler => (req, _res, next) => {
   for (const n of names) {
     const v = req.params[n];

@@ -19,8 +19,8 @@ async function bootstrapSuperAdmin() {
     if (!name || !email || !password) {
         throw new Error("SUPERADMIN_NAME, SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD must be configured");
     }
-    if (password.length < 12) {
-        throw new Error("SUPERADMIN_PASSWORD must contain at least 12 characters");
+    if (password.length < 8) {
+        throw new Error("SUPERADMIN_PASSWORD must contain at least 8 characters");
     }
     console.log("Connecting to MongoDB...");
     await mongoose_1.default.connect(mongoUri);

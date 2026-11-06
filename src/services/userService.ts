@@ -390,6 +390,7 @@ export interface UserResponse {
   id: string;
   name: string;
   email: string;
+  phoneNumber?: string | null;
   role: string;
   projectRoles: UserProjectRoleResponse[]; // NEW: the source of truth
   projectIds: string[];                    // kept for the frontend: derived from active projectRoles
@@ -424,6 +425,7 @@ function formatUser(doc: any): UserResponse {
     id: doc._id.toString(),
     name: doc.name,
     email: doc.email,
+    phoneNumber: doc.phoneNumber ?? null,
     role: doc.role,
     projectRoles,
     projectIds: projectRoles.filter((p) => p.isActive).map((p) => p.projectId),
@@ -627,6 +629,7 @@ export async function createUser(
     name: input.name,
     email: input.email,
     passwordHash,
+    phoneNumber: input.phoneNumber ?? null,
     role,
     projectRoles: await buildProjectRoles(input.projectRoles ?? [], currentAuth), // CHANGED from projectIds
     isActive: input.isActive,
@@ -698,6 +701,10 @@ export async function updateUser(
 
   if (input.name !== undefined) {
     user.name = input.name;
+  }
+
+  if (input.phoneNumber !== undefined) {
+    user.set("phoneNumber", input.phoneNumber);
   }
 
   let mustRevoke = false;
