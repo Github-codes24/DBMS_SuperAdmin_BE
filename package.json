@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "bootstrap:superadmin": "tsx src/scripts/bootstrapSuperAdmin.ts"
+    "bootstrap:superadmin": "tsx src/scripts/bootstrapSuperAdmin.ts",
+    "seed": "tsx src/scripts/seedFakeUsers.ts"
   },
   "repository": {
     "type": "git",
