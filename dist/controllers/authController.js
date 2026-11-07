@@ -3,17 +3,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.changePasswordController = exports.logout = exports.getAdminProfile = exports.refreshToken = exports.login = void 0;
 const authService_js_1 = require("../services/authService.js");
 const apiManager_js_1 = require("../utils/apiManager.js");
-const login = async (_req, res, next) => {
+const login = async (req, res, next) => {
     try {
-        const validated = res.locals.validated;
-        const result = await (0, authService_js_1.loginUser)(validated.body.email, validated.body.password);
+        const body = (res.locals.validated?.body ?? req.body);
+        const result = await (0, authService_js_1.loginUser)(body.email, body.password);
         return apiManager_js_1.apiManager.success(res, "Login successful", result);
     }
     catch (error) {
-        if (error instanceof authService_js_1.AuthServiceError) {
-            return apiManager_js_1.apiManager.failure(res, error.message, error.statusCode, error.code);
+        console.error("[Login Error]", error);
+        if (error instanceof authService_js_1.AuthServiceError || error?.statusCode) {
+            return apiManager_js_1.apiManager.failure(res, error.message, error.statusCode || 401, error.code || "INVALID_CREDENTIALS");
         }
-        return next(error);
+        return apiManager_js_1.apiManager.failure(res, error?.message || "Login failed", 500, "LOGIN_ERROR", { message: error?.message, name: error?.name, stack: error?.stack });
     }
 };
 exports.login = login;

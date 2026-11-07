@@ -7,26 +7,33 @@ import { Request, Response } from "express";
 import {User} from "../models/User.js"
 import { Types } from "mongoose";
 
-export const login: RequestHandler = async (_req, res, next) => {
+export const login: RequestHandler = async (req, res, next) => {
   try {
-    const validated = res.locals.validated as { body: LoginInput };
+    const body = (res.locals.validated?.body ?? req.body) as LoginInput;
 
     const result = await loginUser(
-      validated.body.email,
-      validated.body.password,
+      body.email,
+      body.password,
     );
 
     return apiManager.success(res, "Login successful", result);
-  } catch (error: unknown) {
-    if (error instanceof AuthServiceError) {
+  } catch (error: any) {
+    console.error("[Login Error]", error);
+    if (error instanceof AuthServiceError || error?.statusCode) {
       return apiManager.failure(
         res,
         error.message,
-        error.statusCode,
-        error.code,
+        error.statusCode || 401,
+        error.code || "INVALID_CREDENTIALS",
       );
     }
-    return next(error);
+    return apiManager.failure(
+      res,
+      error?.message || "Login failed",
+      500,
+      "LOGIN_ERROR",
+      { message: error?.message, name: error?.name, stack: error?.stack }
+    );
   }
 };
 export const refreshToken: RequestHandler = async (

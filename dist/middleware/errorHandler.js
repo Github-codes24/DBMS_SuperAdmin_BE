@@ -29,8 +29,11 @@ const errorHandler = (err, req, res, _next) => {
     if (res.headersSent) {
         return;
     }
-    const clientMessage = statusCode === 500 ? "An unexpected error occurred" : error.message;
-    return apiManager_js_1.apiManager.failure(res, clientMessage, statusCode, code);
+    const clientMessage = error.message || "An unexpected error occurred";
+    return apiManager_js_1.apiManager.failure(res, clientMessage, statusCode, code, {
+        details: error.message,
+        name: error.name,
+    });
 };
 exports.errorHandler = errorHandler;
 //# sourceMappingURL=errorHandler.js.map
