@@ -40,8 +40,10 @@ export const errorHandler: ErrorRequestHandler = (
     return;
   }
 
-  const clientMessage =
-    statusCode === 500 ? "An unexpected error occurred" : error.message;
+  const clientMessage = error.message || "An unexpected error occurred";
 
-  return apiManager.failure(res, clientMessage, statusCode, code);
+  return apiManager.failure(res, clientMessage, statusCode, code, {
+    details: error.message,
+    name: error.name,
+  });
 };
