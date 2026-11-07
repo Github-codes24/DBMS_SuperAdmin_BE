@@ -17,46 +17,58 @@ const userTypeDto = z.object({
 
 const projectStatusEnum = z.enum(["active", "inactive", "upcoming", "completed", "on_hold"]);
 
-const optionalDateField = z
-  .union([
-    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
-    z.literal(""),
-    z.null(),
-    z.undefined(),
-  ])
-  .optional()
-  .transform((val) => (val ? String(val).trim() : ""));
-
-const optionalThemeField = z
-  .union([
-    z.string().trim().regex(/^#[0-9a-fA-F]{6}$/),
-    z.literal(""),
-    z.null(),
-    z.undefined(),
-  ])
-  .optional()
-  .transform((val) => (val ? String(val).trim() : "#f96321"));
-
-const optionalLogoField = z
-  .union([
-    z.string().trim().max(10_000_000),
-    z.literal(""),
-    z.null(),
-    z.undefined(),
-  ])
-  .optional()
-  .transform((val) => (val ? String(val).trim() : ""));
-
-const optionalStringField = (max = 1000) =>
+const optionalDateField = z.preprocess(
+  (val) => (typeof val === "string" ? val.trim() : val),
   z
     .union([
-      z.string().trim().max(max),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       z.literal(""),
       z.null(),
       z.undefined(),
     ])
     .optional()
-    .transform((val) => (val ? String(val).trim() : ""));
+    .transform((val) => (val ? String(val).trim() : ""))
+);
+
+const optionalThemeField = z.preprocess(
+  (val) => (typeof val === "string" ? val.trim() : val),
+  z
+    .union([
+      z.string().regex(/^#[0-9a-fA-F]{6}$/),
+      z.literal(""),
+      z.null(),
+      z.undefined(),
+    ])
+    .optional()
+    .transform((val) => (val ? String(val).trim() : "#f96321"))
+);
+
+const optionalLogoField = z.preprocess(
+  (val) => (typeof val === "string" ? val.trim() : val),
+  z
+    .union([
+      z.string().max(10_000_000),
+      z.literal(""),
+      z.null(),
+      z.undefined(),
+    ])
+    .optional()
+    .transform((val) => (val ? String(val).trim() : ""))
+);
+
+const optionalStringField = (max = 1000) =>
+  z.preprocess(
+    (val) => (typeof val === "string" ? val.trim() : val),
+    z
+      .union([
+        z.string().max(max),
+        z.literal(""),
+        z.null(),
+        z.undefined(),
+      ])
+      .optional()
+      .transform((val) => (val ? String(val).trim() : ""))
+  );
 
 export const createProjectDto = z.object({
   body: z.object({
