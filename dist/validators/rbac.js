@@ -15,42 +15,42 @@ const userTypeDto = zod_1.z.object({
     count: zod_1.z.number().int().min(0),
 });
 const projectStatusEnum = zod_1.z.enum(["active", "inactive", "upcoming", "completed", "on_hold"]);
-const optionalDateField = zod_1.z
+const optionalDateField = zod_1.z.preprocess((val) => (typeof val === "string" ? val.trim() : val), zod_1.z
     .union([
-    zod_1.z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
+    zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     zod_1.z.literal(""),
     zod_1.z.null(),
     zod_1.z.undefined(),
 ])
     .optional()
-    .transform((val) => (val ? String(val).trim() : ""));
-const optionalThemeField = zod_1.z
+    .transform((val) => (val ? String(val).trim() : "")));
+const optionalThemeField = zod_1.z.preprocess((val) => (typeof val === "string" ? val.trim() : val), zod_1.z
     .union([
-    zod_1.z.string().trim().regex(/^#[0-9a-fA-F]{6}$/),
+    zod_1.z.string().regex(/^#[0-9a-fA-F]{6}$/),
     zod_1.z.literal(""),
     zod_1.z.null(),
     zod_1.z.undefined(),
 ])
     .optional()
-    .transform((val) => (val ? String(val).trim() : "#f96321"));
-const optionalLogoField = zod_1.z
+    .transform((val) => (val ? String(val).trim() : "#f96321")));
+const optionalLogoField = zod_1.z.preprocess((val) => (typeof val === "string" ? val.trim() : val), zod_1.z
     .union([
-    zod_1.z.string().trim().max(10_000_000),
+    zod_1.z.string().max(10_000_000),
     zod_1.z.literal(""),
     zod_1.z.null(),
     zod_1.z.undefined(),
 ])
     .optional()
-    .transform((val) => (val ? String(val).trim() : ""));
-const optionalStringField = (max = 1000) => zod_1.z
+    .transform((val) => (val ? String(val).trim() : "")));
+const optionalStringField = (max = 1000) => zod_1.z.preprocess((val) => (typeof val === "string" ? val.trim() : val), zod_1.z
     .union([
-    zod_1.z.string().trim().max(max),
+    zod_1.z.string().max(max),
     zod_1.z.literal(""),
     zod_1.z.null(),
     zod_1.z.undefined(),
 ])
     .optional()
-    .transform((val) => (val ? String(val).trim() : ""));
+    .transform((val) => (val ? String(val).trim() : "")));
 exports.createProjectDto = zod_1.z.object({
     body: zod_1.z.object({
         name: zod_1.z.string().trim().min(2).max(100),
