@@ -15,7 +15,9 @@ const audit_service_js_1 = require("./audit.service.js");
 async function getNextProjectId() {
     const exists = await counter_js_1.Counter.exists({ _id: "project" });
     if (!exists) {
-        const all = await Project_js_1.Project.find({ projectId: /^PID-\d+$/ }).select("projectId").lean();
+        const all = await Project_js_1.Project.find({ projectId: /^PID-\d+$/ })
+            .select("projectId")
+            .lean();
         const max = all.reduce((m, p) => Math.max(m, Number(p.projectId.slice(4))), 0);
         await counter_js_1.Counter.updateOne({ _id: "project" }, { $setOnInsert: { seq: max } }, { upsert: true }).catch(() => { });
     }
@@ -53,16 +55,28 @@ async function getProjects() {
 async function getProjectsWithRoles() {
     const [projects, roles] = await Promise.all([
         Project_js_1.Project.find().select("projectId name type status").lean(),
-        roles_js_1.Role.find().select("name projectId isSystem isActive").sort({ name: 1 }).lean(),
+        roles_js_1.Role.find()
+            .select("name projectId isSystem isActive")
+            .sort({ name: 1 })
+            .lean(),
     ]);
     return projects
         .map((p) => ({
         ...p,
         roles: roles
             .filter((r) => String(r.projectId) === String(p._id))
-            .map((r) => ({ _id: r._id, name: r.name, isSystem: r.isSystem, isActive: r.isActive })),
+            .map((r) => ({
+            _id: r._id,
+            name: r.name,
+            isSystem: r.isSystem,
+            isActive: r.isActive,
+        })),
     }))
-        .sort((a, b) => a.type === "platform" ? -1 : b.type === "platform" ? 1 : a.name.localeCompare(b.name));
+        .sort((a, b) => a.type === "platform"
+        ? -1
+        : b.type === "platform"
+            ? 1
+            : a.name.localeCompare(b.name));
 }
 async function updateProject(projectId, data, actorId) {
     const project = await Project_js_1.Project.findById(projectId);
@@ -115,9 +129,15 @@ async function getMyProjects(userId, userRole) {
     const user = await User_js_1.User.findById(userId).select("projectRoles");
     if (!user)
         throw (0, httpError_js_1.httpError)(404, "USER_NOT_FOUND", "User not found");
-    const ids = user.projectRoles.filter((pr) => pr.isActive).map((pr) => pr.projectId);
+    const ids = user.projectRoles
+        .filter((pr) => pr.isActive)
+        .map((pr) => pr.projectId);
     if (ids.length === 0)
         return [];
-    return Project_js_1.Project.find({ _id: { $in: ids }, status: "active", type: "tenant" }).select("projectId name description status createdAt updatedAt");
+    return Project_js_1.Project.find({
+        _id: { $in: ids },
+        status: "active",
+        type: "tenant",
+    }).select("projectId name description status createdAt updatedAt");
 }
 //# sourceMappingURL=projectService.js.map

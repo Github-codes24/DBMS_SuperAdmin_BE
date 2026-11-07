@@ -15,37 +15,73 @@ const userTypeDto = zod_1.z.object({
     count: zod_1.z.number().int().min(0),
 });
 const projectStatusEnum = zod_1.z.enum(["active", "inactive", "upcoming", "completed", "on_hold"]);
+const optionalDateField = zod_1.z
+    .union([
+    zod_1.z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
+    zod_1.z.literal(""),
+    zod_1.z.null(),
+    zod_1.z.undefined(),
+])
+    .optional()
+    .transform((val) => (val ? String(val).trim() : ""));
+const optionalThemeField = zod_1.z
+    .union([
+    zod_1.z.string().trim().regex(/^#[0-9a-fA-F]{6}$/),
+    zod_1.z.literal(""),
+    zod_1.z.null(),
+    zod_1.z.undefined(),
+])
+    .optional()
+    .transform((val) => (val ? String(val).trim() : "#f96321"));
+const optionalLogoField = zod_1.z
+    .union([
+    zod_1.z.string().trim().max(10_000_000),
+    zod_1.z.literal(""),
+    zod_1.z.null(),
+    zod_1.z.undefined(),
+])
+    .optional()
+    .transform((val) => (val ? String(val).trim() : ""));
+const optionalStringField = (max = 1000) => zod_1.z
+    .union([
+    zod_1.z.string().trim().max(max),
+    zod_1.z.literal(""),
+    zod_1.z.null(),
+    zod_1.z.undefined(),
+])
+    .optional()
+    .transform((val) => (val ? String(val).trim() : ""));
 exports.createProjectDto = zod_1.z.object({
     body: zod_1.z.object({
         name: zod_1.z.string().trim().min(2).max(100),
-        description: zod_1.z.string().trim().max(500).optional(),
-        logo: zod_1.z.string().trim().max(2000).optional(),
-        theme: zod_1.z.string().trim().regex(/^#[0-9a-fA-F]{6}$/).optional().or(zod_1.z.literal("")),
-        startDate: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(zod_1.z.literal("")),
-        endDate: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(zod_1.z.literal("")),
-        status: projectStatusEnum.optional(),
-        adminId: zod_1.z.string().optional(),
-        panelLinks: zod_1.z.array(panelLinkDto).max(100).optional(),
-        userTypes: zod_1.z.array(userTypeDto).max(100).optional(),
-    }).strict(),
-    params: zod_1.z.object({}).strict(),
-    query: zod_1.z.object({}).strict(),
+        description: optionalStringField(1000),
+        logo: optionalLogoField,
+        theme: optionalThemeField,
+        startDate: optionalDateField,
+        endDate: optionalDateField,
+        status: projectStatusEnum.optional().default("active"),
+        adminId: optionalStringField(200),
+        panelLinks: zod_1.z.array(panelLinkDto).max(100).optional().default([]),
+        userTypes: zod_1.z.array(userTypeDto).max(100).optional().default([]),
+    }).passthrough(),
+    params: zod_1.z.object({}).passthrough(),
+    query: zod_1.z.object({}).passthrough(),
 });
 exports.updateProjectDto = zod_1.z.object({
     body: zod_1.z.object({
         name: zod_1.z.string().trim().min(2).max(100).optional(),
-        description: zod_1.z.string().trim().max(500).optional(),
-        logo: zod_1.z.string().trim().max(2000).optional(),
-        theme: zod_1.z.string().trim().regex(/^#[0-9a-fA-F]{6}$/).optional().or(zod_1.z.literal("")),
-        startDate: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(zod_1.z.literal("")),
-        endDate: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(zod_1.z.literal("")),
+        description: optionalStringField(1000),
+        logo: optionalLogoField,
+        theme: optionalThemeField,
+        startDate: optionalDateField,
+        endDate: optionalDateField,
         status: projectStatusEnum.optional(),
-        adminId: zod_1.z.string().optional(),
+        adminId: optionalStringField(200),
         panelLinks: zod_1.z.array(panelLinkDto).max(100).optional(),
         userTypes: zod_1.z.array(userTypeDto).max(100).optional(),
-    }).strict(),
-    params: zod_1.z.object({ projectId: objectId }).strict(),
-    query: zod_1.z.object({}).strict(),
+    }).passthrough(),
+    params: zod_1.z.object({ projectId: objectId }).passthrough(),
+    query: zod_1.z.object({}).passthrough(),
 });
 exports.createRoleDto = zod_1.z.object({
     body: zod_1.z.object({

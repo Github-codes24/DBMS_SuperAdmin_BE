@@ -17,38 +17,79 @@ const userTypeDto = z.object({
 
 const projectStatusEnum = z.enum(["active", "inactive", "upcoming", "completed", "on_hold"]);
 
+const optionalDateField = z
+  .union([
+    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
+    z.literal(""),
+    z.null(),
+    z.undefined(),
+  ])
+  .optional()
+  .transform((val) => (val ? String(val).trim() : ""));
+
+const optionalThemeField = z
+  .union([
+    z.string().trim().regex(/^#[0-9a-fA-F]{6}$/),
+    z.literal(""),
+    z.null(),
+    z.undefined(),
+  ])
+  .optional()
+  .transform((val) => (val ? String(val).trim() : "#f96321"));
+
+const optionalLogoField = z
+  .union([
+    z.string().trim().max(10_000_000),
+    z.literal(""),
+    z.null(),
+    z.undefined(),
+  ])
+  .optional()
+  .transform((val) => (val ? String(val).trim() : ""));
+
+const optionalStringField = (max = 1000) =>
+  z
+    .union([
+      z.string().trim().max(max),
+      z.literal(""),
+      z.null(),
+      z.undefined(),
+    ])
+    .optional()
+    .transform((val) => (val ? String(val).trim() : ""));
+
 export const createProjectDto = z.object({
   body: z.object({
     name:        z.string().trim().min(2).max(100),
-    description: z.string().trim().max(500).optional(),
-    logo:        z.string().trim().max(2000).optional(),
-    theme:       z.string().trim().regex(/^#[0-9a-fA-F]{6}$/).optional().or(z.literal("")),
-    startDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
-    endDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
-    status:      projectStatusEnum.optional(),
-    adminId:     z.string().optional(),
-    panelLinks:  z.array(panelLinkDto).max(100).optional(),
-    userTypes:   z.array(userTypeDto).max(100).optional(),
-  }).strict(),
-  params: z.object({}).strict(),
-  query:  z.object({}).strict(),
+    description: optionalStringField(1000),
+    logo:        optionalLogoField,
+    theme:       optionalThemeField,
+    startDate:   optionalDateField,
+    endDate:     optionalDateField,
+    status:      projectStatusEnum.optional().default("active"),
+    adminId:     optionalStringField(200),
+    panelLinks:  z.array(panelLinkDto).max(100).optional().default([]),
+    userTypes:   z.array(userTypeDto).max(100).optional().default([]),
+  }).passthrough(),
+  params: z.object({}).passthrough(),
+  query:  z.object({}).passthrough(),
 });
 
 export const updateProjectDto = z.object({
   body: z.object({
     name:        z.string().trim().min(2).max(100).optional(),
-    description: z.string().trim().max(500).optional(),
-    logo:        z.string().trim().max(2000).optional(),
-    theme:       z.string().trim().regex(/^#[0-9a-fA-F]{6}$/).optional().or(z.literal("")),
-    startDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
-    endDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
+    description: optionalStringField(1000),
+    logo:        optionalLogoField,
+    theme:       optionalThemeField,
+    startDate:   optionalDateField,
+    endDate:     optionalDateField,
     status:      projectStatusEnum.optional(),
-    adminId:     z.string().optional(),
+    adminId:     optionalStringField(200),
     panelLinks:  z.array(panelLinkDto).max(100).optional(),
     userTypes:   z.array(userTypeDto).max(100).optional(),
-  }).strict(),
-  params: z.object({ projectId: objectId }).strict(),
-  query:  z.object({}).strict(),
+  }).passthrough(),
+  params: z.object({ projectId: objectId }).passthrough(),
+  query:  z.object({}).passthrough(),
 });
 
 export const createRoleDto = z.object({
