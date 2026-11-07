@@ -20,12 +20,9 @@ const validate = (schema) => {
         }
         if (result.data && typeof result.data === "object") {
             const typed = result.data;
-            if (typed.body !== undefined)
+            if (typed.body !== undefined) {
                 req.body = typed.body;
-            if (typed.params !== undefined)
-                req.params = typed.params;
-            if (typed.query !== undefined)
-                req.query = typed.query;
+            }
         }
         res.locals.validated = result.data;
         next();

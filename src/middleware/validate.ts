@@ -29,9 +29,9 @@ export const validate = (schema: ZodType): RequestHandler => {
 
     if (result.data && typeof result.data === "object") {
       const typed = result.data as Record<string, unknown>;
-      if (typed.body !== undefined) req.body = typed.body;
-      if (typed.params !== undefined) req.params = typed.params as any;
-      if (typed.query !== undefined) req.query = typed.query as any;
+      if (typed.body !== undefined) {
+        req.body = typed.body;
+      }
     }
 
     res.locals.validated = result.data;
