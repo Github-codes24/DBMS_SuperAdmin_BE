@@ -72,8 +72,19 @@ const userSchema = new Schema(
            index: true 
           },
     passwordHash: { type: String, required: true, select: false },
+    phoneNumber: { type: String, trim: true, default: null },
 
-    role: { type: String, enum: ["superadmin", "user"], default: "user", required: true },
+    role: {
+      type: String,
+      enum: ["superadmin", "admin", "manager", "user"],
+      default: "user",
+      required: true,
+    },
+
+    projectIds: {
+      type: [String],
+      default: [],
+    },
 
     projectRoles: [
       {

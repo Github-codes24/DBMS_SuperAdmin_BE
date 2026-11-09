@@ -4,7 +4,7 @@ export interface AuthUser {
   _id: Types.ObjectId;
   name: string;
   email: string;
-  role: "superadmin" | "user";
+  role: "superadmin" | "admin" | "manager" | "user";
   projectRoles: { projectId: Types.ObjectId; roleId: Types.ObjectId; isActive: boolean }[];
 }
 
