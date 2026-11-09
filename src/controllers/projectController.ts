@@ -44,6 +44,18 @@ export const getChildUsers = wrap(async (req, res) =>
 export const getChildRoles = wrap(async (req, res) =>
   ok(res, await bridgeSvc.getChildRoles(param(req, "projectId"))));
 
+/** PATCH /api/platform/projects/:projectId/bridge/users/:userId/status */
+export const updateChildUserStatus = wrap(async (req, res) =>
+  ok(
+    res,
+    await bridgeSvc.updateChildUserStatus(
+      param(req, "projectId"),
+      param(req, "userId"),
+      req.body.status,
+    ),
+  ));
+
+
 /** POST /api/platform/projects/:projectId/sso/launch */
 export const launchSso = wrap(async (req, res) => {
   const actor = {

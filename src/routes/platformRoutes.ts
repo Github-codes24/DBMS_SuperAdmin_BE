@@ -61,6 +61,11 @@ platform.get(
   objectIdParams("projectId"),
   project.getChildUsers,
 );
+platform.patch(
+  "/projects/:projectId/bridge/users/:userId/status",
+  objectIdParams("projectId"),
+  project.updateChildUserStatus,
+);
 platform.get(
   "/projects/:projectId/bridge/roles",
   objectIdParams("projectId"),
