@@ -558,6 +558,122 @@ export const exchangeSsoTicket = async (req, res) => {
       });
     }
 
+    const appKey = decoded.appKey || "lts-superadmin";
+
+    // ─────────────────────────────────────────────────────────────
+    // TARGET 1: VENDOR PANEL SSO HANDOFF
+    // ─────────────────────────────────────────────────────────────
+    if (appKey === "lts-vendor") {
+      let vendor = await Vendor.findOne({ email: userEmail });
+      if (!vendor) {
+        vendor = await Vendor.findOne({
+          storeStatus: { $in: ["Active & Verified", "Active", "Verified"] },
+        });
+        if (!vendor) {
+          vendor = await Vendor.create({
+            vendorId: `VND-PLT-${Date.now().toString().slice(-4)}`,
+            email: userEmail,
+            fullName: decoded.name || "Platform Super Admin",
+            storeName: "Platform Administration Store",
+            storeStatus: "Active & Verified",
+            phone: "9999999999",
+          });
+        }
+      }
+
+      const vendorToken = jwt.sign(
+        { id: vendor._id },
+        process.env.JWT_SECRET || "fallback_secret",
+        { expiresIn: "30d" },
+      );
+
+      try {
+        await AuditLog.create({
+          adminId: vendor.vendorId || String(vendor._id),
+          action: "PLATFORM_SSO_VENDOR_LOGIN",
+          description: `Federated SSO launch into Vendor Panel from Platform control plane (actor: ${decoded.sub})`,
+          ipAddress: req.ip || "127.0.0.1",
+          userAgent: req.headers["user-agent"] || "Platform-Control-Plane",
+        });
+      } catch (auditErr) {
+        console.warn("[PlatformBridgeSSO] Non-blocking audit error:", auditErr.message);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Vendor SSO session authenticated successfully",
+        token: vendorToken,
+        accessToken: vendorToken,
+        user: {
+          _id: vendor._id,
+          vendorId: vendor.vendorId,
+          fullName: vendor.fullName,
+          email: vendor.email,
+          storeName: vendor.storeName,
+          storeStatus: vendor.storeStatus,
+        },
+        redirectRoute: decoded.targetRoute || "/",
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // TARGET 2: TELECALLER PANEL SSO HANDOFF
+    // ─────────────────────────────────────────────────────────────
+    if (appKey === "lts-telecaller") {
+      let telecaller = await Telecaller.findOne({ email: userEmail });
+      if (!telecaller) {
+        telecaller = await Telecaller.findOne({ isDeleted: false });
+        if (!telecaller) {
+          telecaller = await Telecaller.create({
+            name: decoded.name || "Platform Super Admin",
+            employeeId: `TC-PLT-${Date.now().toString().slice(-4)}`,
+            email: userEmail,
+            mobileNumber: "9999999999",
+            role: "TELECALLER",
+            status: "Active",
+          });
+        }
+      }
+
+      const telecallerToken = jwt.sign(
+        { id: telecaller._id, role: "TELECALLER" },
+        process.env.JWT_SECRET || "lts_default_jwt_secret_key_2026",
+        { expiresIn: process.env.JWT_EXPIRES_IN || "7d" },
+      );
+
+      try {
+        await AuditLog.create({
+          adminId: telecaller.employeeId || String(telecaller._id),
+          action: "PLATFORM_SSO_TELECALLER_LOGIN",
+          description: `Federated SSO launch into Telecaller CRM from Platform control plane (actor: ${decoded.sub})`,
+          ipAddress: req.ip || "127.0.0.1",
+          userAgent: req.headers["user-agent"] || "Platform-Control-Plane",
+        });
+      } catch (auditErr) {
+        console.warn("[PlatformBridgeSSO] Non-blocking audit error:", auditErr.message);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Telecaller SSO session authenticated successfully",
+        token: telecallerToken,
+        accessToken: telecallerToken,
+        user: {
+          id: telecaller._id,
+          _id: telecaller._id,
+          name: telecaller.name,
+          employeeId: telecaller.employeeId,
+          email: telecaller.email,
+          phone: telecaller.mobileNumber || telecaller.phone || "",
+          role: "TELECALLER",
+        },
+        redirectRoute: decoded.targetRoute || "/",
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // TARGET 3: SUPER ADMIN PANEL SSO HANDOFF (DEFAULT)
+    // ─────────────────────────────────────────────────────────────
     // Lookup existing SuperAdmin or provision one
     let admin = await SuperAdmin.findOne({ email: userEmail });
     if (!admin) {
@@ -616,6 +732,7 @@ export const exchangeSsoTicket = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "SSO session authenticated successfully",
+      token: accessToken,
       accessToken,
       refreshToken,
       user: {
