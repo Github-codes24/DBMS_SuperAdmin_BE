@@ -5,6 +5,7 @@ import {
   getBridgeModules,
   getBridgeUsers,
   getBridgeRoles,
+  exchangeSsoTicket,
 } from "./bridgeController.js";
 import {
   optionalPlatformBridge,
@@ -48,4 +49,12 @@ router.get("/users", requirePlatformBridge, getBridgeUsers);
  */
 router.get("/roles", requirePlatformBridge, getBridgeRoles);
 
+/**
+ * @route   POST /api/v1/platform-bridge/sso-exchange
+ * @desc    Exchange signed single-use launch ticket for child session tokens
+ * @access  Ticket-authenticated
+ */
+router.post("/sso-exchange", exchangeSsoTicket);
+
 export default router;
+

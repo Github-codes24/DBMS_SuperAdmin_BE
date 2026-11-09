@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
 import SuperAdminVendor from "../SuperadminPanel/VendorDatabase/vendorDatabaseSchema.js";
 import Customer from "../SuperadminPanel/CustomerDatabase/customerSchema.js";
 import Telecaller from "../SuperadminPanel/TelecallerManagement/telecallerSchema.js";
@@ -484,3 +485,158 @@ export const getBridgeRoles = async (req, res) => {
     });
   }
 };
+
+// In-memory replay prevention cache for SSO nonces (evicts expired entries)
+const redeemedNonces = new Map();
+const cleanupNonces = () => {
+  const now = Date.now();
+  for (const [nonce, expiresAt] of redeemedNonces.entries()) {
+    if (expiresAt <= now) redeemedNonces.delete(nonce);
+  }
+};
+setInterval(cleanupNonces, 60000).unref();
+
+const DEFAULT_BRIDGE_SECRET = "dbms_platform_bridge_secret_key_2026";
+
+/**
+ * Standardized Platform Bridge SSO Ticket Exchange Endpoint
+ * Validates a single-use signed ticket from the Platform control plane,
+ * provisions or authenticates the SuperAdmin user in LTS, and issues
+ * child session tokens without requiring password entry.
+ */
+export const exchangeSsoTicket = async (req, res) => {
+  const { ticket } = req.body;
+  if (!ticket) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing SSO ticket in request body",
+    });
+  }
+
+  const bridgeSecret =
+    process.env.PLATFORM_BRIDGE_SECRET || DEFAULT_BRIDGE_SECRET;
+
+  let decoded;
+  try {
+    decoded = jwt.verify(ticket, bridgeSecret, {
+      audience: "LTS",
+      issuer: "platform-control-plane",
+    });
+  } catch (err) {
+    console.warn("[PlatformBridgeSSO] Invalid ticket:", err.message);
+    return res.status(401).json({
+      success: false,
+      message: `Invalid or expired SSO ticket: ${err.message}`,
+    });
+  }
+
+  // Verify and record nonce to prevent replay attacks
+  const nonce = decoded.nonce;
+  if (!nonce) {
+    return res.status(400).json({
+      success: false,
+      message: "SSO ticket is missing replay prevention nonce",
+    });
+  }
+
+  if (redeemedNonces.has(nonce)) {
+    return res.status(409).json({
+      success: false,
+      message: "SSO ticket has already been redeemed (replay rejected)",
+    });
+  }
+
+  // Store nonce with a 2-minute expiration
+  redeemedNonces.set(nonce, Date.now() + 120000);
+
+  try {
+    const userEmail = (decoded.email || "").toLowerCase().trim();
+    if (!userEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "SSO ticket contains no email address",
+      });
+    }
+
+    // Lookup existing SuperAdmin or provision one
+    let admin = await SuperAdmin.findOne({ email: userEmail });
+    if (!admin) {
+      // Find any existing active SuperAdmin to prevent account proliferation,
+      // or provision a new linked SuperAdmin record for Platform control
+      admin = await SuperAdmin.findOne({ status: { $in: ["Active", "ACTIVE"] } });
+      if (!admin) {
+        admin = await SuperAdmin.create({
+          adminId: `SA-PLT-${Date.now().toString().slice(-4)}`,
+          email: userEmail,
+          fullName: decoded.name || "Platform Super Admin",
+          phone: "9999999999",
+          role: "SuperAdmin",
+          status: "Active",
+        });
+      }
+    }
+
+    // Account must be active
+    if (admin.status && admin.status.toLowerCase() !== "active") {
+      return res.status(403).json({
+        success: false,
+        message: "Child project account is suspended or inactive",
+      });
+    }
+
+    // Generate LTS child application tokens
+    const accessToken = jwt.sign(
+      { id: admin._id, role: "SuperAdmin" },
+      process.env.JWT_SECRET || "fallback_secret",
+      { expiresIn: "8h" },
+    );
+
+    const refreshToken = jwt.sign(
+      { id: admin._id, role: "SuperAdmin" },
+      process.env.JWT_REFRESH_SECRET || "fallback_refresh_secret",
+      { expiresIn: "7d" },
+    );
+
+    admin.refreshToken = refreshToken;
+    await admin.save();
+
+    // Log the SSO login event
+    try {
+      await AuditLog.create({
+        adminId: admin.adminId || String(admin._id),
+        action: "PLATFORM_SSO_LOGIN",
+        description: `Federated SSO login from Platform control plane (actor: ${decoded.sub})`,
+        ipAddress: req.ip || "127.0.0.1",
+        userAgent: req.headers["user-agent"] || "Platform-Control-Plane",
+      });
+    } catch (auditErr) {
+      console.warn("[PlatformBridgeSSO] Audit log non-blocking error:", auditErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "SSO session authenticated successfully",
+      accessToken,
+      refreshToken,
+      user: {
+        _id: admin._id,
+        adminId: admin.adminId,
+        email: admin.email,
+        fullName: admin.fullName,
+        phone: admin.phone || "",
+        role: admin.role || "SuperAdmin",
+        status: admin.status,
+        avatar: admin.avatar || "",
+      },
+      redirectRoute: decoded.targetRoute || "/dashboard",
+    });
+  } catch (err) {
+    console.error("[PlatformBridgeSSO] Exchange failure:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal error establishing child SSO session",
+      error: err.message,
+    });
+  }
+};
+
