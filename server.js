@@ -130,6 +130,7 @@ app.use("/api/plans", telecallerPlanRoutes);
 
 // ── Parent Platform Bridge API (Parent-Child Control Plane) ──────────────────
 app.use("/api/v1/platform-bridge", platformBridgeRoutes);
+app.use("/api/platform-bridge", platformBridgeRoutes);
 
 // Root Route
 app.get("/", (req, res) => {
