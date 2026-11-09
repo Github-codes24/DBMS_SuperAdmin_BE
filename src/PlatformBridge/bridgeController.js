@@ -486,6 +486,120 @@ export const getBridgeRoles = async (req, res) => {
   }
 };
 
+/**
+ * Standardized Platform Bridge Update Role Permissions Endpoint
+ * Persists updated permissions for a role in LTS child database.
+ */
+export const updateBridgeRolePermissions = async (req, res) => {
+  const { roleId } = req.params;
+  const { permissions } = req.body;
+
+  try {
+    let role = null;
+    if (mongoose.Types.ObjectId.isValid(roleId)) {
+      role = await Role.findById(roleId);
+    }
+    if (!role) {
+      role = await Role.findOne({
+        $or: [
+          { roleId: roleId },
+          { title: { $regex: new RegExp(`^${roleId}$`, "i") } },
+        ],
+      });
+    }
+
+    if (!role) {
+      const formattedTitle = roleId.replace(/_/g, " ");
+      role = await Role.create({
+        roleId,
+        title: formattedTitle.charAt(0).toUpperCase() + formattedTitle.slice(1),
+        description: `${formattedTitle} role`,
+        isMasterRole: roleId.toUpperCase() === "SUPER_ADMIN",
+        status: "ACTIVE",
+      });
+    }
+
+    if (Array.isArray(permissions)) {
+      if (typeof permissions[0] === "string") {
+        const matrixMap = {};
+        permissions.forEach((permStr) => {
+          const [modKey, actKey] = permStr.split(":");
+          if (!matrixMap[modKey]) {
+            matrixMap[modKey] = {
+              moduleKey: modKey,
+              viewAccess: false,
+              editAccess: false,
+              exportAccess: false,
+              deleteAccess: false,
+              fullAccess: false,
+            };
+          }
+          if (actKey === "view") matrixMap[modKey].viewAccess = true;
+          if (actKey === "edit" || actKey === "update") matrixMap[modKey].editAccess = true;
+          if (actKey === "export" || actKey === "import") matrixMap[modKey].exportAccess = true;
+          if (actKey === "delete") matrixMap[modKey].deleteAccess = true;
+          if (actKey === "full") matrixMap[modKey].fullAccess = true;
+        });
+
+        for (const [modKey, pms] of Object.entries(matrixMap)) {
+          await PermissionMatrix.findOneAndUpdate(
+            { roleId: role._id, moduleKey: modKey },
+            {
+              $set: {
+                roleId: role._id,
+                roleTitle: role.title,
+                moduleKey: modKey,
+                moduleName: modKey.replace(/_/g, " "),
+                ...pms,
+              },
+            },
+            { upsert: true, new: true },
+          );
+        }
+      } else {
+        for (const modPerm of permissions) {
+          const { moduleKey, viewAccess, editAccess, exportAccess, deleteAccess, fullAccess, moduleName } = modPerm;
+          await PermissionMatrix.findOneAndUpdate(
+            { roleId: role._id, moduleKey },
+            {
+              $set: {
+                roleId: role._id,
+                roleTitle: role.title,
+                moduleKey,
+                moduleName: moduleName || moduleKey.replace(/_/g, " "),
+                viewAccess: Boolean(viewAccess),
+                editAccess: Boolean(editAccess),
+                exportAccess: Boolean(exportAccess),
+                deleteAccess: Boolean(deleteAccess),
+                fullAccess: Boolean(fullAccess),
+              },
+            },
+            { upsert: true, new: true },
+          );
+        }
+      }
+    }
+
+    const updatedMatrices = await PermissionMatrix.find({ roleId: role._id }).lean();
+    return res.json({
+      success: true,
+      message: `Permissions updated successfully for ${role.title}`,
+      data: {
+        roleId: role.roleId || role._id,
+        roleTitle: role.title,
+        permissions: updatedMatrices,
+      },
+    });
+  } catch (err) {
+    console.error("[PlatformBridgeRolePermissions] Error updating permissions:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update child role permissions",
+      error: err.message,
+    });
+  }
+};
+
 // In-memory replay prevention cache for SSO nonces (evicts expired entries)
 const redeemedNonces = new Map();
 const cleanupNonces = () => {

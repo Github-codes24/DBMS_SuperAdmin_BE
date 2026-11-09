@@ -7,6 +7,7 @@ import {
   getBridgeRoles,
   exchangeSsoTicket,
   updateBridgeUserStatus,
+  updateBridgeRolePermissions,
 } from "./bridgeController.js";
 import {
   optionalPlatformBridge,
@@ -49,6 +50,13 @@ router.get("/users", requirePlatformBridge, getBridgeUsers);
  * @access  Protected (X-Platform-API-Key or Bearer token required)
  */
 router.get("/roles", requirePlatformBridge, getBridgeRoles);
+
+/**
+ * @route   PUT /api/v1/platform-bridge/roles/:roleId/permissions
+ * @desc    Update permissions matrix for a child project role
+ * @access  Protected (X-Platform-API-Key or Bearer token required)
+ */
+router.put("/roles/:roleId/permissions", requirePlatformBridge, updateBridgeRolePermissions);
 
 /**
  * @route   POST /api/v1/platform-bridge/sso-exchange
