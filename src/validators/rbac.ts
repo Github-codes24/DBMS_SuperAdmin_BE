@@ -139,14 +139,19 @@ export const bulkModulesDto = z.object({
     modules: z.array(
       z.object({
         key,
-        name:        z.string().trim().min(2).max(80),
+        name: z.string().trim().min(2).max(80),
         description: z.string().trim().max(300).optional(),
-        actions:     z.array(key).optional(),
+        actions: z.array(key).optional(),
+        panel: z.string().trim().min(2).max(80),
       }).strict(),
     ).min(1).max(100),
   }).strict(),
-  params: z.object({ projectId: objectId }).strict(),
-  query:  z.object({}).strict(),
+
+  params: z.object({
+    projectId: objectId,
+  }).strict(),
+
+  query: z.object({}).strict(),
 });
 
 export const updateModuleDto = z.object({
@@ -198,5 +203,16 @@ export const createProjectUserDto = z.object({
   query:  z.object({}).strict(),
 });
 
-export const assignRoleDto = z.object({ roleId: objectId }).strict();
+export const assignRoleDto = z.object({
+  body: z.object({
+    roleId: objectId,
+  }).strict(),
+
+  params: z.object({
+    projectId: objectId,
+    userId: objectId,
+  }).strict(),
+
+  query: z.object({}).strict(),
+});
 export const activeDto     = z.object({ isActive: z.boolean() }).strict();

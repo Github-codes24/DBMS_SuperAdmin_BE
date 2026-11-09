@@ -379,6 +379,8 @@ function signAccessToken(user: {
   }
   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
 
+  console.log("expiresIn", expiresIn);
+
   const token = jwt.sign(
     { role: user.role, tv: user.tokenVersion ?? 0 }, // informational only: the server re-reads the user on every request
     secret,

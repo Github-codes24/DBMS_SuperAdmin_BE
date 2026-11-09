@@ -6,7 +6,12 @@ import { httpError, isDuplicateKey } from "../utils/httpError.js";
 import { audit } from "./audit.service.js";
 
 export async function createProjectUser(
-  input: { name: string; email: string; password: string; projectId: string; roleId: string },
+  input: { name: string;
+     email: string;
+      password: string; 
+      projectId: string; 
+      roleId: string
+     },
   actorId: string,
 ) {
   const project = await Project.findById(input.projectId);

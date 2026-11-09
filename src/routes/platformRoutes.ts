@@ -8,6 +8,7 @@ import * as project from "../controllers/projectController.js";
 import * as role from "../controllers/roleController.js";
 import * as mod from "../controllers/module.controller.js";
 import * as pu from "../controllers/projectAdminController.js";
+import { getRolesByProject } from "../controllers/projectController.js";
 
 const platform = Router();
 platform.use(authenticate, requireSuperAdmin);
@@ -22,6 +23,8 @@ platform.post("/projects", validate(v.createProjectDto), project.createProject);
 
 /** Projects with their roles (for dropdowns) */
 platform.get("/projects-with-roles", project.getProjectsWithRoles);
+// fetch role from the projects 
+platform.get("/projects/:projectId/roles", getRolesByProject);
 
 /** Update a project's details / status */
 platform.patch(

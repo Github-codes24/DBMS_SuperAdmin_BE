@@ -10,6 +10,11 @@ export const getProjects = wrap(async (_req, res) =>
 /** GET /api/platform/projects-with-roles */
 export const getProjectsWithRoles = wrap(async (_req, res) =>
   ok(res, await svc.getProjectsWithRoles()));
+  
+// Get project Role for the particular projects.
+
+export const getRolesByProject = wrap(async (req, res) =>
+  ok(res, await svc.getRolesByProject(req.params.projectId as string)));
 
 /** POST /api/platform/projects */
 export const createProject = wrap(async (req, res) =>
