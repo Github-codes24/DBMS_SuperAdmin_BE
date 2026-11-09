@@ -44,3 +44,18 @@ export const getChildUsers = wrap(async (req, res) =>
 export const getChildRoles = wrap(async (req, res) =>
   ok(res, await bridgeSvc.getChildRoles(param(req, "projectId"))));
 
+/** POST /api/platform/projects/:projectId/sso/launch */
+export const launchSso = wrap(async (req, res) => {
+  const actor = {
+    id: actorId(req),
+    email: req.user?.email,
+    name: req.user?.name,
+    role: req.user?.role,
+  };
+  ok(
+    res,
+    await bridgeSvc.launchSsoSession(param(req, "projectId"), actor, req.body),
+  );
+});
+
+

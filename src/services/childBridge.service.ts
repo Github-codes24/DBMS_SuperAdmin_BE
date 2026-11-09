@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import jwt from "jsonwebtoken";
 import { Project } from "../models/Project.js";
 import { httpError } from "../utils/httpError.js";
 
@@ -230,4 +232,74 @@ export async function getChildUsers(projectId: string, query?: Record<string, un
 export async function getChildRoles(projectId: string) {
   return fetchFromChildBridge(projectId, "/roles");
 }
+
+export interface SsoLaunchResult {
+  launchUrl: string;
+  ticket: string;
+  appKey: string;
+  appName: string;
+  expiresInSeconds: number;
+}
+
+export async function launchSsoSession(
+  projectId: string,
+  actor: { id: string; email?: string; name?: string; role?: string },
+  options?: { appKey?: string; targetRoute?: string },
+): Promise<SsoLaunchResult> {
+  const project = await Project.findById(projectId);
+  if (!project) throw httpError(404, "PROJECT_NOT_FOUND", "Project not found");
+
+  const apps = project.frontendApps || [];
+  let targetApp = options?.appKey
+    ? apps.find((a) => a.appKey === options.appKey)
+    : apps.find((a) => a.isDefault) || apps[0];
+
+  if (!targetApp) {
+    throw httpError(
+      400,
+      "APP_NOT_CONFIGURED",
+      "No child frontend applications configured for this project",
+    );
+  }
+
+  const secret =
+    project.backendConfig?.secretKeyId ||
+    process.env.PLATFORM_BRIDGE_SECRET ||
+    DEFAULT_BRIDGE_SECRET;
+
+  const nonce = randomUUID();
+  const nowUnix = Math.floor(Date.now() / 1000);
+  const expiresInSeconds = 60;
+
+  const ticketPayload = {
+    iss: "platform-control-plane",
+    aud: project.projectCode || "LTS",
+    sub: actor.id,
+    email: actor.email || "superadmin@platform.internal",
+    name: actor.name || "Platform Super Admin",
+    role: actor.role || "SUPER_ADMIN",
+    appKey: targetApp.appKey,
+    targetRoute: options?.targetRoute || "/dashboard",
+    nonce,
+    iat: nowUnix,
+    exp: nowUnix + expiresInSeconds,
+  };
+
+  const ticket = jwt.sign(ticketPayload, secret);
+  const cleanBase = targetApp.baseUrl.replace(/\/+$/, "");
+  const callbackPath = (targetApp.ssoCallbackPath || "/sso/callback").startsWith("/")
+    ? (targetApp.ssoCallbackPath || "/sso/callback")
+    : `/${targetApp.ssoCallbackPath || "/sso/callback"}`;
+
+  const launchUrl = `${cleanBase}${callbackPath}?ticket=${encodeURIComponent(ticket)}`;
+
+  return {
+    launchUrl,
+    ticket,
+    appKey: targetApp.appKey,
+    appName: targetApp.name,
+    expiresInSeconds,
+  };
+}
+
 

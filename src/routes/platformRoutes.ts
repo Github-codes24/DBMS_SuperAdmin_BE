@@ -67,6 +67,13 @@ platform.get(
   project.getChildRoles,
 );
 
+/** SSO Launch Ticket Generator */
+platform.post(
+  "/projects/:projectId/sso/launch",
+  objectIdParams("projectId"),
+  project.launchSso,
+);
+
 // ── GLOBAL ACTION MANAGEMENT ─────────────────────────────────────────────────
 
 platform.get("/actions", mod.listActions);
