@@ -43,7 +43,8 @@ export const objectIdParams = (...paramNames: string[]): RequestHandler => {
   return (req, _res, next) => {
     for (const name of paramNames) {
       const val = req.params[name];
-      if (typeof val !== "string" || !Types.ObjectId.isValid(val)) {
+      const isCustomProjectId = name === "projectId" && typeof val === "string" && /^PID-\d+$/i.test(val);
+      if (typeof val !== "string" || (!Types.ObjectId.isValid(val) && !isCustomProjectId)) {
         return next(httpError(400, "INVALID_ID", `Invalid ${name} parameter`));
       }
     }

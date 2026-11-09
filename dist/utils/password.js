@@ -23,9 +23,10 @@ function generateRefreshToken(userId) {
     if (!secret || secret.length < 32) {
         throw new Error("JWT_REFRESH_SECRET must be configured with at least 32 characters");
     }
+    const refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
     return jsonwebtoken_1.default.sign({ tokenUse: "refresh" }, secret, {
         subject: userId,
-        expiresIn: "7d",
+        expiresIn: refreshExpiresIn,
         issuer: "dbms-superadmin-api",
         audience: "dbms-superadmin",
     });

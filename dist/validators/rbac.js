@@ -6,6 +6,7 @@ const zod_1 = require("zod");
 const key = zod_1.z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]{1,47}$/);
 const permKey = zod_1.z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]{1,47}:[a-z][a-z0-9_-]{1,47}$/);
 const objectId = zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/);
+const projectIdParam = zod_1.z.string().regex(/^[0-9a-fA-F]{24}$|^PID-\d+$/i, "Invalid project ID");
 const panelLinkDto = zod_1.z.object({
     name: zod_1.z.string().trim().min(1).max(100),
     url: zod_1.z.string().trim().min(1).max(2000),
@@ -80,7 +81,7 @@ exports.updateProjectDto = zod_1.z.object({
         panelLinks: zod_1.z.array(panelLinkDto).max(100).optional(),
         userTypes: zod_1.z.array(userTypeDto).max(100).optional(),
     }).passthrough(),
-    params: zod_1.z.object({ projectId: objectId }).passthrough(),
+    params: zod_1.z.object({ projectId: projectIdParam }).passthrough(),
     query: zod_1.z.object({}).passthrough(),
 });
 exports.createRoleDto = zod_1.z.object({

@@ -118,7 +118,7 @@
 //     throw new Error("JWT_ACCESS_SECRET is not configured correctly");
 //   }
 
-//   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+//   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "7d";
 
 //   const accessToken = jwt.sign(
 //     {
@@ -178,7 +178,7 @@
 //     );
 //   }
 
-//   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+//   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "7d";
 
 //   const tokenOptions: SignOptions = {
 //     subject: user._id.toString(),
@@ -363,7 +363,20 @@ export interface LoginResult {
 
 const ISSUER = "dbms-superadmin-api";
 const AUDIENCE = "dbms-superadmin";
-const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getRefreshTtlMs(): number {
+  const envVal = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
+  const match = envVal.match(/^(\d+)([smhd])$/);
+  if (!match) return 7 * 24 * 60 * 60 * 1000;
+  const num = parseInt(match[1], 10);
+  switch (match[2]) {
+    case "s": return num * 1000;
+    case "m": return num * 60 * 1000;
+    case "h": return num * 60 * 60 * 1000;
+    case "d": return num * 24 * 60 * 60 * 1000;
+    default: return 7 * 24 * 60 * 60 * 1000;
+  }
+}
 
 /** CHANGED: one place that signs access tokens. Payload is now sub + role + tv. */
 function signAccessToken(user: {
@@ -377,7 +390,7 @@ function signAccessToken(user: {
       "JWT_ACCESS_SECRET must be configured with at least 32 characters",
     );
   }
-  const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+  const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "7d";
 
   const token = jwt.sign(
     { role: user.role, tv: user.tokenVersion ?? 0 }, // informational only: the server re-reads the user on every request
@@ -457,7 +470,7 @@ export async function refreshUserTokens(refreshToken: string) {
     {
       $set: {
         tokenHash: newTokenHash,
-        expiresAt: new Date(now.getTime() + REFRESH_TTL_MS),
+        expiresAt: new Date(now.getTime() + getRefreshTtlMs()),
       },
     },
     {
@@ -491,7 +504,7 @@ export async function loginUser(
     email: email.trim().toLowerCase(),
   }).select("+passwordHash");
 
-  if (!user) {
+  if (!user || !user.passwordHash) {
     throw new AuthServiceError(
       "Invalid email or password",
       401,
@@ -514,7 +527,7 @@ export async function loginUser(
   await RefreshSession.create({
     userId: user._id,
     tokenHash: hashRefreshToken(refreshToken),
-    expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
+    expiresAt: new Date(Date.now() + getRefreshTtlMs()),
   });
 
   user.lastLoginAt = new Date();
@@ -600,14 +613,14 @@ export async function changePassword(
     );
   }
 
-  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+  if (!user.passwordHash || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
     throw new AuthServiceError(
       "Current password is incorrect",
       401,
       "INVALID_CURRENT_PASSWORD",
     );
   }
-  if (await bcrypt.compare(newPassword, user.passwordHash)) {
+  if (user.passwordHash && (await bcrypt.compare(newPassword, user.passwordHash))) {
     throw new AuthServiceError(
       "New password must differ from the current password",
       400,
