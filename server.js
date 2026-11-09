@@ -38,6 +38,9 @@ import telecallerPaymentRoutes from "./src/Telecaller/routes/payment.routes.js";
 import telecallerFollowupRoutes from "./src/Telecaller/routes/followup.routes.js";
 import telecallerPlanRoutes from "./src/Telecaller/routes/plan.routes.js";
 
+// Parent Platform Bridge Route Import
+import platformBridgeRoutes from "./src/PlatformBridge/bridgeRoutes.js";
+
 // Load environment variables
 dotenv.config();
 
@@ -55,13 +58,18 @@ const allowedOrigins = [
   "http://localhost:5174",
   "http://localhost:5175",
   "http://localhost:5176",
+  "http://localhost:5177",
+  "http://localhost:3007",
   "https://dbms.telecaller.localtradestreet.com",
   "https://dbms.telecaller.localtradestreet.com/",
   "https://dbms.admin.localtradestreet.com",
   "https://dbms.vendor.localtradestreet.com",
   "https://local-trade-street-be-2.onrender.com",
   "https://lts-dbms-backend.onrender.com",
-  "https://lts-dbms-vendor-panel.netlify.app/"
+  "https://lts-dbms-vendor-panel.netlify.app/",
+  "https://dbms-superadmin.netlify.app",
+  "https://dbms-develop.netlify.app",
+  "https://dbms-superadmin-be.onrender.com",
 ];
 
 //middleware
@@ -119,6 +127,9 @@ app.use("/api/telecaller/followup", telecallerFollowupRoutes);
 app.use("/api/telecaller/plans", telecallerPlanRoutes);
 app.use("/api/customer/plan", telecallerPlanRoutes);
 app.use("/api/plans", telecallerPlanRoutes);
+
+// ── Parent Platform Bridge API (Parent-Child Control Plane) ──────────────────
+app.use("/api/v1/platform-bridge", platformBridgeRoutes);
 
 // Root Route
 app.get("/", (req, res) => {
