@@ -55,6 +55,17 @@ export const updateChildUserStatus = wrap(async (req, res) =>
     ),
   ));
 
+/** PUT /api/platform/projects/:projectId/bridge/roles/:roleId/permissions */
+export const updateChildRolePermissions = wrap(async (req, res) =>
+  ok(
+    res,
+    await bridgeSvc.updateChildRolePermissions(
+      param(req, "projectId"),
+      param(req, "roleId"),
+      req.body.permissions,
+    ),
+  ));
+
 
 /** POST /api/platform/projects/:projectId/sso/launch */
 export const launchSso = wrap(async (req, res) => {

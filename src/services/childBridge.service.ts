@@ -300,6 +300,73 @@ export async function updateChildUserStatus(
   }
 }
 
+export async function updateChildRolePermissions(
+  projectId: string,
+  roleId: string,
+  permissions: unknown,
+) {
+  const project = await Project.findById(projectId);
+  if (!project) throw httpError(404, "PROJECT_NOT_FOUND", "Project not found");
+
+  if (!project.backendConfig?.baseUrl) {
+    throw httpError(
+      400,
+      "BACKEND_NOT_CONFIGURED",
+      "Child backend base URL is not configured for this project",
+    );
+  }
+
+  const cleanBase = project.backendConfig.baseUrl.replace(/\/+$/, "");
+  const prefix = (project.backendConfig.bridgePrefix || "/api/v1/platform-bridge").replace(
+    /\/+$/,
+    "",
+  );
+  const url = `${cleanBase}${prefix}/roles/${encodeURIComponent(roleId)}/permissions`;
+
+  const secret =
+    project.backendConfig.secretKeyId ||
+    process.env.PLATFORM_BRIDGE_SECRET ||
+    DEFAULT_BRIDGE_SECRET;
+
+  const timeout = Math.min(Math.max(project.backendConfig.timeoutMs || 8000, 1000), 30000);
+
+  try {
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "X-Platform-API-Key": secret,
+        "User-Agent": "DBMS-SuperAdmin-Platform-Control-Plane",
+      },
+      body: JSON.stringify({ permissions }),
+      signal: AbortSignal.timeout(timeout),
+    });
+
+    const body = (await res.json()) as { success?: boolean; message?: string; data?: unknown };
+    if (!res.ok || body.success === false) {
+      throw httpError(
+        res.status >= 400 && res.status < 500 ? res.status : 502,
+        "CHILD_BRIDGE_ERROR",
+        body.message || `Child bridge responded with status ${res.status}`,
+      );
+    }
+
+    return body.data || body;
+  } catch (err: unknown) {
+    const error = err as { statusCode?: number; status?: string; message?: string; name?: string };
+    if (error.statusCode) throw err;
+    if (error.name === "TimeoutError") {
+      throw httpError(504, "BRIDGE_GATEWAY_TIMEOUT", "Child backend connection timed out");
+    }
+    throw httpError(
+      502,
+      "BRIDGE_COMMUNICATION_FAILED",
+      `Unable to reach child service: ${error.message || "Network error"}`,
+    );
+  }
+}
+
 
 export interface SsoLaunchResult {
   launchUrl: string;

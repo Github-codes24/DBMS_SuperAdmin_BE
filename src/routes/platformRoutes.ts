@@ -71,6 +71,11 @@ platform.get(
   objectIdParams("projectId"),
   project.getChildRoles,
 );
+platform.put(
+  "/projects/:projectId/bridge/roles/:roleId/permissions",
+  objectIdParams("projectId"),
+  project.updateChildRolePermissions,
+);
 
 /** SSO Launch Ticket Generator */
 platform.post(
