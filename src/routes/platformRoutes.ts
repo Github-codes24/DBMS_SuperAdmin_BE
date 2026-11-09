@@ -38,6 +38,35 @@ platform.delete(
   project.deleteProject,
 );
 
+/** Child Project Health Check & Live Status Probe */
+platform.get(
+  "/projects/:projectId/health",
+  objectIdParams("projectId"),
+  project.checkProjectHealth,
+);
+
+/** Child Bridge Data Proxy Endpoints */
+platform.get(
+  "/projects/:projectId/bridge/stats",
+  objectIdParams("projectId"),
+  project.getChildStats,
+);
+platform.get(
+  "/projects/:projectId/bridge/modules",
+  objectIdParams("projectId"),
+  project.getChildModules,
+);
+platform.get(
+  "/projects/:projectId/bridge/users",
+  objectIdParams("projectId"),
+  project.getChildUsers,
+);
+platform.get(
+  "/projects/:projectId/bridge/roles",
+  objectIdParams("projectId"),
+  project.getChildRoles,
+);
+
 // ── GLOBAL ACTION MANAGEMENT ─────────────────────────────────────────────────
 
 platform.get("/actions", mod.listActions);
