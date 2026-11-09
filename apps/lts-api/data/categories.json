@@ -1,0 +1,725 @@
+[
+    {
+      "categoryId": "CAT-001",
+      "categoryName": "Pest Control Service",
+      "categoryUrl": "/subcategory/CAT-001/pest-control-service",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-067",
+          "subCategoryName": "Residential Pest Control  Service",
+          "url": "/service/CAT-001/SUBCAT-067/nagpur/residential-pest-control-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-068",
+          "subCategoryName": "Rodent Control Service",
+          "url": "/service/CAT-001/SUBCAT-068/nagpur/rodent-control-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-069",
+          "subCategoryName": "Mosquito Control Service",
+          "url": "/service/CAT-001/SUBCAT-069/nagpur/mosquito-control-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-070",
+          "subCategoryName": "Ant Control  Service",
+          "url": "/service/CAT-001/SUBCAT-070/nagpur/ant-control-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-071",
+          "subCategoryName": "Lizard Control Service",
+          "url": "/service/CAT-001/SUBCAT-071/nagpur/lizard-control-service"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-003",
+      "categoryName": "Carpenter Service",
+      "categoryUrl": "/subcategory/CAT-003/carpenter-service",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-033",
+          "subCategoryName": "Office Furniture Work",
+          "url": "/service/CAT-003/SUBCAT-033/nagpur/office-furniture-work"
+        },
+        {
+          "subCategoryId": "SUBCAT-032",
+          "subCategoryName": "Door Lock & Handle Fitting",
+          "url": "/service/CAT-003/SUBCAT-032/nagpur/door-lock--handle-fitting"
+        },
+        {
+          "subCategoryId": "SUBCAT-022",
+          "subCategoryName": "Furniture Repair",
+          "url": "/service/CAT-003/SUBCAT-022/nagpur/furniture-repair"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-004",
+      "categoryName": "Electrician Service",
+      "categoryUrl": "/subcategory/CAT-004/electrician-service",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-052",
+          "subCategoryName": "UPS Installation",
+          "url": "/service/CAT-004/SUBCAT-052/nagpur/ups-installation"
+        },
+        {
+          "subCategoryId": "SUBCAT-044",
+          "subCategoryName": "Electrical Wiring Installation",
+          "url": "/service/CAT-004/SUBCAT-044/nagpur/electrical-wiring-installation"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-002",
+      "categoryName": "AC Service",
+      "categoryUrl": "/subcategory/CAT-002/ac-service",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-011",
+          "subCategoryName": "AC Water Leakage Repair",
+          "url": "/service/CAT-002/SUBCAT-011/nagpur/ac-water-leakage-repair"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-008",
+      "categoryName": "Gym",
+      "categoryUrl": "/subcategory/CAT-008/gym",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-120",
+          "subCategoryName": "Personal training",
+          "url": "/service/CAT-008/SUBCAT-120/nagpur/personal-training"
+        },
+        {
+          "subCategoryId": "SUBCAT-147",
+          "subCategoryName": "Zumba / dance fitness",
+          "url": "/service/CAT-008/SUBCAT-147/nagpur/zumba--dance-fitness"
+        },
+        {
+          "subCategoryId": "SUBCAT-126",
+          "subCategoryName": "CrossFit / functional training",
+          "url": "/service/CAT-008/SUBCAT-126/nagpur/crossfit--functional-training"
+        },
+        {
+          "subCategoryId": "SUBCAT-159",
+          "subCategoryName": "Muscle gain programs",
+          "url": "/service/CAT-008/SUBCAT-159/nagpur/muscle-gain-programs"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-018",
+      "categoryName": "Software Development Service",
+      "categoryUrl": "/subcategory/CAT-018/software-development-service",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-287",
+          "subCategoryName": "Website Development",
+          "url": "/service/CAT-018/SUBCAT-287/nagpur/website-development"
+        },
+        {
+          "subCategoryId": "SUBCAT-288",
+          "subCategoryName": "Mobile App Development",
+          "url": "/service/CAT-018/SUBCAT-288/nagpur/mobile-app-development"
+        },
+        {
+          "subCategoryId": "SUBCAT-293",
+          "subCategoryName": "GST Billing Software",
+          "url": "/service/CAT-018/SUBCAT-293/nagpur/gst-billing-software"
+        },
+        {
+          "subCategoryId": "SUBCAT-292",
+          "subCategoryName": "Custom Website Development",
+          "url": "/service/CAT-018/SUBCAT-292/nagpur/custom-website-development"
+        },
+        {
+          "subCategoryId": "SUBCAT-290",
+          "subCategoryName": "CRM Development",
+          "url": "/service/CAT-018/SUBCAT-290/nagpur/crm-development"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-017",
+      "categoryName": "Plumber Service",
+      "categoryUrl": "/subcategory/CAT-017/-plumber-service",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-271",
+          "subCategoryName": "Tap / Faucet Repair & Installation",
+          "url": "/service/CAT-017/SUBCAT-271/nagpur/tap--faucet-repair--installation"
+        },
+        {
+          "subCategoryId": "SUBCAT-272",
+          "subCategoryName": "Leakage Repair (Pipe / Tap / Tank)",
+          "url": "/service/CAT-017/SUBCAT-272/nagpur/leakage-repair-pipe--tap--tank"
+        },
+        {
+          "subCategoryId": "SUBCAT-273",
+          "subCategoryName": "Bathroom Plumbing Services",
+          "url": "/service/CAT-017/SUBCAT-273/nagpur/bathroom-plumbing-services"
+        },
+        {
+          "subCategoryId": "SUBCAT-274",
+          "subCategoryName": "Kitchen Plumbing Services",
+          "url": "/service/CAT-017/SUBCAT-274/nagpur/kitchen-plumbing-services"
+        },
+        {
+          "subCategoryId": "SUBCAT-275",
+          "subCategoryName": "Toilet / WC Repair & Installation",
+          "url": "/service/CAT-017/SUBCAT-275/nagpur/toilet--wc-repair--installation"
+        },
+        {
+          "subCategoryId": "SUBCAT-276",
+          "subCategoryName": "Water Tank Cleaning & Repair",
+          "url": "/service/CAT-017/SUBCAT-276/nagpur/water-tank-cleaning--repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-277",
+          "subCategoryName": "Water Pipe Installation & Repair",
+          "url": "/service/CAT-017/SUBCAT-277/nagpur/water-pipe-installation--repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-278",
+          "subCategoryName": "Drainage System Repair",
+          "url": "/service/CAT-017/SUBCAT-278/nagpur/drainage-system-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-280",
+          "subCategoryName": "Shower Installation & Repair",
+          "url": "/service/CAT-017/SUBCAT-280/nagpur/shower-installation--repair"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-016",
+      "categoryName": "Water Purifier Service",
+      "categoryUrl": "/subcategory/CAT-016/water-purifier-service",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-256",
+          "subCategoryName": "Water Purifier Installation",
+          "url": "/service/CAT-016/SUBCAT-256/nagpur/water-purifier-installation"
+        },
+        {
+          "subCategoryId": "SUBCAT-259",
+          "subCategoryName": "Water Purifier Filter Replacement",
+          "url": "/service/CAT-016/SUBCAT-259/nagpur/water-purifier-filter-replacement"
+        },
+        {
+          "subCategoryId": "SUBCAT-269",
+          "subCategoryName": "Copper Water Purifier Service",
+          "url": "/service/CAT-016/SUBCAT-269/nagpur/copper-water-purifier-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-270",
+          "subCategoryName": "Anti-Bacterial Purifier Cleaning Service",
+          "url": "/service/CAT-016/SUBCAT-270/nagpur/anti-bacterial-purifier-cleaning-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-267",
+          "subCategoryName": "Water Purifier Cleaning & Sanitization",
+          "url": "/service/CAT-016/SUBCAT-267/nagpur/water-purifier-cleaning--sanitization"
+        },
+        {
+          "subCategoryId": "SUBCAT-260",
+          "subCategoryName": "Pump / Motor Repair & Replacement",
+          "url": "/service/CAT-016/SUBCAT-260/nagpur/pump--motor-repair--replacement"
+        },
+        {
+          "subCategoryId": "SUBCAT-261",
+          "subCategoryName": "TDS Adjustment Service",
+          "url": "/service/CAT-016/SUBCAT-261/nagpur/tds-adjustment-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-264",
+          "subCategoryName": "Annual Maintenance Contract (AMC)",
+          "url": "/service/CAT-016/SUBCAT-264/nagpur/annual-maintenance-contract-amc"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-015",
+      "categoryName": "Saloons",
+      "categoryUrl": "/subcategory/CAT-015/saloons",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-240",
+          "subCategoryName": "Haircut & Styling Shop",
+          "url": "/service/CAT-015/SUBCAT-240/nagpur/haircut--styling-shop"
+        },
+        {
+          "subCategoryId": "SUBCAT-241",
+          "subCategoryName": "Hair Spa & Treatment Shop",
+          "url": "/service/CAT-015/SUBCAT-241/nagpur/hair-spa--treatment-shop"
+        },
+        {
+          "subCategoryId": "SUBCAT-242",
+          "subCategoryName": "Hair Coloring & Highlights Shop",
+          "url": "/service/CAT-015/SUBCAT-242/nagpur/hair-coloring--highlights-shop"
+        },
+        {
+          "subCategoryId": "SUBCAT-243",
+          "subCategoryName": "Hair Keratin Treatment Shop",
+          "url": "/service/CAT-015/SUBCAT-243/nagpur/hair-keratin-treatment-shop"
+        },
+        {
+          "subCategoryId": "SUBCAT-244",
+          "subCategoryName": "Men’s Grooming Services Shop",
+          "url": "/service/CAT-015/SUBCAT-244/nagpur/mens-grooming-services-shop"
+        },
+        {
+          "subCategoryId": "SUBCAT-246",
+          "subCategoryName": "Facial & Cleanup Services Shop",
+          "url": "/service/CAT-015/SUBCAT-246/nagpur/facial--cleanup-services-shop"
+        },
+        {
+          "subCategoryId": "SUBCAT-247",
+          "subCategoryName": "Bleach & Detan Services Shop",
+          "url": "/service/CAT-015/SUBCAT-247/nagpur/bleach--detan-services-shop"
+        },
+        {
+          "subCategoryId": "SUBCAT-248",
+          "subCategoryName": "Threading & Waxing Services",
+          "url": "/service/CAT-015/SUBCAT-248/nagpur/threading--waxing-services"
+        },
+        {
+          "subCategoryId": "SUBCAT-249",
+          "subCategoryName": "Bridal Makeup Services",
+          "url": "/service/CAT-015/SUBCAT-249/nagpur/bridal-makeup-services"
+        },
+        {
+          "subCategoryId": "SUBCAT-250",
+          "subCategoryName": "Head , Body & All Massage Services",
+          "url": "/service/CAT-015/SUBCAT-250/nagpur/head--body--all-massage-services"
+        },
+        {
+          "subCategoryId": "SUBCAT-253",
+          "subCategoryName": "Manicure & Pedicure Services",
+          "url": "/service/CAT-015/SUBCAT-253/nagpur/manicure--pedicure-services"
+        },
+        {
+          "subCategoryId": "SUBCAT-255",
+          "subCategoryName": "Unisex Salon Services Shop",
+          "url": "/service/CAT-015/SUBCAT-255/nagpur/unisex-salon-services-shop"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-014",
+      "categoryName": "Grocery Stores",
+      "categoryUrl": "/subcategory/CAT-014/grocery-stores",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-220",
+          "subCategoryName": "Fruits & Vegetables Store",
+          "url": "/service/CAT-014/SUBCAT-220/nagpur/fruits--vegetables-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-221",
+          "subCategoryName": "Dairy Products (Milk, Curd, Paneer) Store",
+          "url": "/service/CAT-014/SUBCAT-221/nagpur/dairy-products-milk-curd-paneer-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-222",
+          "subCategoryName": "Eggs, Meat & Fish Store",
+          "url": "/service/CAT-014/SUBCAT-222/nagpur/eggs-meat--fish-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-223",
+          "subCategoryName": "Atta, Flour , Sooji, Rice & Grains Store",
+          "url": "/service/CAT-014/SUBCAT-223/nagpur/atta-flour--sooji-rice--grains-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-224",
+          "subCategoryName": "Pulses & Lentils (Dal) Store",
+          "url": "/service/CAT-014/SUBCAT-224/nagpur/pulses--lentils-dal-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-225",
+          "subCategoryName": "Cooking Oils & Ghee Store",
+          "url": "/service/CAT-014/SUBCAT-225/nagpur/cooking-oils--ghee-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-226",
+          "subCategoryName": "Spices & Masalas Store",
+          "url": "/service/CAT-014/SUBCAT-226/nagpur/spices--masalas-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-227",
+          "subCategoryName": "Dry Fruits & Nuts Store",
+          "url": "/service/CAT-014/SUBCAT-227/nagpur/dry-fruits--nuts-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-228",
+          "subCategoryName": "Snacks ,Namkeen Biscuits & Cookies Store",
+          "url": "/service/CAT-014/SUBCAT-228/nagpur/snacks-namkeen-biscuits--cookies-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-229",
+          "subCategoryName": "Tea , Coffee , Soft Drinks & Juices Store",
+          "url": "/service/CAT-014/SUBCAT-229/nagpur/tea--coffee--soft-drinks--juices-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-231",
+          "subCategoryName": "Personal Care Products Store",
+          "url": "/service/CAT-014/SUBCAT-231/nagpur/personal-care-products-store"
+        },
+        {
+          "subCategoryId": "SUBCAT-232",
+          "subCategoryName": "Baby Care Products Store",
+          "url": "/service/CAT-014/SUBCAT-232/nagpur/baby-care-products-store"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-013",
+      "categoryName": "Hospitals and Clinics",
+      "categoryUrl": "/subcategory/CAT-013/hospitals-and-clinics",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-204",
+          "subCategoryName": "General Medicine (Physician Services)",
+          "url": "/service/CAT-013/SUBCAT-204/nagpur/general-medicine-physician-services"
+        },
+        {
+          "subCategoryId": "SUBCAT-205",
+          "subCategoryName": "Pediatrics (Child Care)",
+          "url": "/service/CAT-013/SUBCAT-205/nagpur/pediatrics-child-care"
+        },
+        {
+          "subCategoryId": "SUBCAT-206",
+          "subCategoryName": "Gynecology & Obstetrics (Women Care)",
+          "url": "/service/CAT-013/SUBCAT-206/nagpur/gynecology--obstetrics-women-care"
+        },
+        {
+          "subCategoryId": "SUBCAT-207",
+          "subCategoryName": "Orthopedics (Bone & Joint Care)",
+          "url": "/service/CAT-013/SUBCAT-207/nagpur/orthopedics-bone--joint-care"
+        },
+        {
+          "subCategoryId": "SUBCAT-208",
+          "subCategoryName": "Cardiology (Heart Care)",
+          "url": "/service/CAT-013/SUBCAT-208/nagpur/cardiology-heart-care"
+        },
+        {
+          "subCategoryId": "SUBCAT-209",
+          "subCategoryName": "Gastroenterology (Digestive System)",
+          "url": "/service/CAT-013/SUBCAT-209/nagpur/gastroenterology-digestive-system"
+        },
+        {
+          "subCategoryId": "SUBCAT-210",
+          "subCategoryName": "Urology (Urinary System)",
+          "url": "/service/CAT-013/SUBCAT-210/nagpur/urology-urinary-system"
+        },
+        {
+          "subCategoryId": "SUBCAT-211",
+          "subCategoryName": "Nephrology (Kidney Care)",
+          "url": "/service/CAT-013/SUBCAT-211/nagpur/nephrology-kidney-care"
+        },
+        {
+          "subCategoryId": "SUBCAT-212",
+          "subCategoryName": "Psychiatry (Mental Health)",
+          "url": "/service/CAT-013/SUBCAT-212/nagpur/psychiatry-mental-health"
+        },
+        {
+          "subCategoryId": "SUBCAT-213",
+          "subCategoryName": "Radiology (X-ray, MRI, CT Scan)",
+          "url": "/service/CAT-013/SUBCAT-213/nagpur/radiology-x-ray-mri-ct-scan"
+        },
+        {
+          "subCategoryId": "SUBCAT-215",
+          "subCategoryName": "ICU / Critical Care Units",
+          "url": "/service/CAT-013/SUBCAT-215/nagpur/icu--critical-care-units"
+        },
+        {
+          "subCategoryId": "SUBCAT-216",
+          "subCategoryName": "Dental Clinics",
+          "url": "/service/CAT-013/SUBCAT-216/nagpur/dental-clinics"
+        },
+        {
+          "subCategoryId": "SUBCAT-217",
+          "subCategoryName": "Eye Clinics (Ophthalmology)",
+          "url": "/service/CAT-013/SUBCAT-217/nagpur/eye-clinics-ophthalmology"
+        },
+        {
+          "subCategoryId": "SUBCAT-218",
+          "subCategoryName": "Physiotherapy & Rehabilitation Clinics",
+          "url": "/service/CAT-013/SUBCAT-218/nagpur/physiotherapy--rehabilitation-clinics"
+        },
+        {
+          "subCategoryId": "SUBCAT-219",
+          "subCategoryName": "General Surgery",
+          "url": "/service/CAT-013/SUBCAT-219/nagpur/general-surgery"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-012",
+      "categoryName": "Home Applicances & Repair Service",
+      "categoryUrl": "/subcategory/CAT-012/home-applicances--repair-service-",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-182",
+          "subCategoryName": "Air Conditioner (AC) Repair & Service",
+          "url": "/service/CAT-012/SUBCAT-182/nagpur/air-conditioner-ac-repair--service"
+        },
+        {
+          "subCategoryId": "SUBCAT-183",
+          "subCategoryName": "Refrigerator (Fridge) Repair",
+          "url": "/service/CAT-012/SUBCAT-183/nagpur/refrigerator-fridge-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-184",
+          "subCategoryName": "Air Cooler Repair",
+          "url": "/service/CAT-012/SUBCAT-184/nagpur/air-cooler-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-185",
+          "subCategoryName": "Washing Machine Repair",
+          "url": "/service/CAT-012/SUBCAT-185/nagpur/washing-machine-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-186",
+          "subCategoryName": "Microwave Oven Repair",
+          "url": "/service/CAT-012/SUBCAT-186/nagpur/microwave-oven-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-187",
+          "subCategoryName": "Dishwasher Repair",
+          "url": "/service/CAT-012/SUBCAT-187/nagpur/dishwasher-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-188",
+          "subCategoryName": "Electric Chimney Repair",
+          "url": "/service/CAT-012/SUBCAT-188/nagpur/electric-chimney-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-189",
+          "subCategoryName": "Water Purifier (RO/UV) Service",
+          "url": "/service/CAT-012/SUBCAT-189/nagpur/water-purifier-rouv-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-190",
+          "subCategoryName": "Geyser (Water Heater) Repair",
+          "url": "/service/CAT-012/SUBCAT-190/nagpur/geyser-water-heater-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-191",
+          "subCategoryName": "Induction Cooktop Repair",
+          "url": "/service/CAT-012/SUBCAT-191/nagpur/induction-cooktop-repair"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-011",
+      "categoryName": "Hotels & Resorts",
+      "categoryUrl": "/subcategory/CAT-011/hotels--resorts",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-167",
+          "subCategoryName": "Luxury Hotels (5 Star & Premium)",
+          "url": "/service/CAT-011/SUBCAT-167/nagpur/luxury-hotels-5-star--premium"
+        },
+        {
+          "subCategoryId": "SUBCAT-168",
+          "subCategoryName": "Boutique Hotels",
+          "url": "/service/CAT-011/SUBCAT-168/nagpur/boutique-hotels"
+        },
+        {
+          "subCategoryId": "SUBCAT-169",
+          "subCategoryName": "Beach Resorts",
+          "url": "/service/CAT-011/SUBCAT-169/nagpur/beach-resorts"
+        },
+        {
+          "subCategoryId": "SUBCAT-170",
+          "subCategoryName": "Hill Station Resorts",
+          "url": "/service/CAT-011/SUBCAT-170/nagpur/hill-station-resorts"
+        },
+        {
+          "subCategoryId": "SUBCAT-171",
+          "subCategoryName": "Couple-Friendly Hotels",
+          "url": "/service/CAT-011/SUBCAT-171/nagpur/couple-friendly-hotels"
+        },
+        {
+          "subCategoryId": "SUBCAT-172",
+          "subCategoryName": "Family-Friendly Hotels",
+          "url": "/service/CAT-011/SUBCAT-172/nagpur/family-friendly-hotels"
+        },
+        {
+          "subCategoryId": "SUBCAT-173",
+          "subCategoryName": "Wedding & Destination Resorts",
+          "url": "/service/CAT-011/SUBCAT-173/nagpur/wedding--destination-resorts"
+        },
+        {
+          "subCategoryId": "SUBCAT-174",
+          "subCategoryName": "Conference & Banquet Hotels",
+          "url": "/service/CAT-011/SUBCAT-174/nagpur/conference--banquet-hotels"
+        },
+        {
+          "subCategoryId": "SUBCAT-175",
+          "subCategoryName": "Spa & Wellness Resorts",
+          "url": "/service/CAT-011/SUBCAT-175/nagpur/spa--wellness-resorts"
+        },
+        {
+          "subCategoryId": "SUBCAT-176",
+          "subCategoryName": "Private Villa Resorts",
+          "url": "/service/CAT-011/SUBCAT-176/nagpur/private-villa-resorts"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-010",
+      "categoryName": "Travel & Tours",
+      "categoryUrl": "/subcategory/CAT-010/travel--tours",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-149",
+          "subCategoryName": "Domestic Tour Packages",
+          "url": "/service/CAT-010/SUBCAT-149/nagpur/domestic-tour-packages"
+        },
+        {
+          "subCategoryId": "SUBCAT-150",
+          "subCategoryName": "International Tour Packages",
+          "url": "/service/CAT-010/SUBCAT-150/nagpur/international-tour-packages"
+        },
+        {
+          "subCategoryId": "SUBCAT-152",
+          "subCategoryName": "Honeymoon Tour Packages",
+          "url": "/service/CAT-010/SUBCAT-152/nagpur/honeymoon-tour-packages"
+        },
+        {
+          "subCategoryId": "SUBCAT-153",
+          "subCategoryName": "Family Tour Packages",
+          "url": "/service/CAT-010/SUBCAT-153/nagpur/family-tour-packages"
+        },
+        {
+          "subCategoryId": "SUBCAT-154",
+          "subCategoryName": "Adventure Tour Packages",
+          "url": "/service/CAT-010/SUBCAT-154/nagpur/adventure-tour-packages"
+        },
+        {
+          "subCategoryId": "SUBCAT-157",
+          "subCategoryName": "Manali Tour Packages",
+          "url": "/service/CAT-010/SUBCAT-157/nagpur/manali-tour-packages"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-005",
+      "categoryName": "Car Repair Service",
+      "categoryUrl": "/subcategory/CAT-005/car-repair-service",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-084",
+          "subCategoryName": "Car General Service",
+          "url": "/service/CAT-005/SUBCAT-084/nagpur/car-general-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-086",
+          "subCategoryName": "Car Engine Repair",
+          "url": "/service/CAT-005/SUBCAT-086/nagpur/car-engine-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-090",
+          "subCategoryName": "Car Battery Replacement",
+          "url": "/service/CAT-005/SUBCAT-090/nagpur/car-battery-replacement"
+        },
+        {
+          "subCategoryId": "SUBCAT-091",
+          "subCategoryName": "Car Denting & Painting Service",
+          "url": "/service/CAT-005/SUBCAT-091/nagpur/car-denting--painting-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-093",
+          "subCategoryName": "Car Washing Service",
+          "url": "/service/CAT-005/SUBCAT-093/nagpur/car-washing-service"
+        },
+        {
+          "subCategoryId": "SUBCAT-098",
+          "subCategoryName": "Car Accessories Installation Service",
+          "url": "/service/CAT-005/SUBCAT-098/nagpur/car-accessories-installation-service"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-007",
+      "categoryName": "Doctors",
+      "categoryUrl": "/subcategory/CAT-007/doctors",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-132",
+          "subCategoryName": "Dentist",
+          "url": "/service/CAT-007/SUBCAT-132/nagpur/dentist"
+        },
+        {
+          "subCategoryId": "SUBCAT-133",
+          "subCategoryName": "Radiologist (X-ray, MRI, CT Scan)",
+          "url": "/service/CAT-007/SUBCAT-133/nagpur/radiologist-x-ray-mri-ct-scan"
+        },
+        {
+          "subCategoryId": "SUBCAT-117",
+          "subCategoryName": "Orthopedic Doctor (Bone Specialist)",
+          "url": "/service/CAT-007/SUBCAT-117/nagpur/orthopedic-doctor-bone-specialist"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-006",
+      "categoryName": "Mobile Service",
+      "categoryUrl": "/subcategory/CAT-006/mobile-service",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-100",
+          "subCategoryName": "Mobile Screen Replacement",
+          "url": "/service/CAT-006/SUBCAT-100/nagpur/mobile-screen-replacement"
+        },
+        {
+          "subCategoryId": "SUBCAT-102",
+          "subCategoryName": "Mobile Charging Port Repair",
+          "url": "/service/CAT-006/SUBCAT-102/nagpur/mobile-charging-port-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-104",
+          "subCategoryName": "Mobile Camera Repair",
+          "url": "/service/CAT-006/SUBCAT-104/nagpur/mobile-camera-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-111",
+          "subCategoryName": "Dead Phone Repair",
+          "url": "/service/CAT-006/SUBCAT-111/nagpur/dead-phone-repair"
+        },
+        {
+          "subCategoryId": "SUBCAT-109",
+          "subCategoryName": "Mobile Accessories Installation",
+          "url": "/service/CAT-006/SUBCAT-109/nagpur/mobile-accessories-installation"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-019",
+      "categoryName": "Computer Training Institute",
+      "categoryUrl": "/subcategory/CAT-019/computer-training-institute",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-296",
+          "subCategoryName": "TallyPrime",
+          "url": "/service/CAT-019/SUBCAT-296/nagpur/tallyprime"
+        }
+      ]
+    },
+    {
+      "categoryId": "CAT-029",
+      "categoryName": "test category",
+      "categoryUrl": "/subcategory/CAT-029/test-category",
+      "subCategories": [
+        {
+          "subCategoryId": "SUBCAT-337",
+          "subCategoryName": "testing sub category",
+          "url": "/service/CAT-029/SUBCAT-337/nagpur/testing-sub-category"
+        }
+      ]
+    }
+  ]
