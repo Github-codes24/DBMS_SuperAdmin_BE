@@ -46,16 +46,33 @@ const pu = __importStar(require("../controllers/projectAdminController.js"));
 const platform = (0, express_1.Router)();
 platform.use(authenticate_js_1.authenticate, requireSuperAdmin_js_1.requireSuperAdmin);
 // ── PROJECT MANAGEMENT ──────────────────────────────────────────────────────
+/** Summary metrics across all projects (for dashboard metric cards) */
+platform.get("/projects/stats", project.getProjectStats);
 /** List all tenant projects */
 platform.get("/projects", project.getProjects);
 /** Create a new tenant project */
 platform.post("/projects", (0, validate_js_1.validate)(v.createProjectDto), project.createProject);
 /** Projects with their roles (for dropdowns) */
 platform.get("/projects-with-roles", project.getProjectsWithRoles);
+/** Get single tenant project details */
+platform.get("/projects/:projectId", (0, validate_js_1.objectIdParams)("projectId"), project.getProjectById);
 /** Update a project's details / status */
 platform.patch("/projects/:projectId", (0, validate_js_1.objectIdParams)("projectId"), (0, validate_js_1.validate)(v.updateProjectDto), project.updateProject);
 /** Delete a tenant project */
 platform.delete("/projects/:projectId", (0, validate_js_1.objectIdParams)("projectId"), project.deleteProject);
+// ── PROJECT ADMIN MANAGEMENT ──────────────────────────────────────────────────
+/** List all Project Admins (for dropdowns and admin management) */
+platform.get("/project-admins", pu.listProjectAdmins);
+platform.get("/admins", pu.listProjectAdmins);
+/** Create a new Project Admin */
+platform.post("/project-admins", pu.createProjectAdmin);
+platform.post("/admins", pu.createProjectAdmin);
+/** Update a Project Admin */
+platform.patch("/project-admins/:adminId", (0, validate_js_1.objectIdParams)("adminId"), pu.updateProjectAdmin);
+platform.patch("/admins/:adminId", (0, validate_js_1.objectIdParams)("adminId"), pu.updateProjectAdmin);
+/** Delete a Project Admin */
+platform.delete("/project-admins/:adminId", (0, validate_js_1.objectIdParams)("adminId"), pu.deleteProjectAdmin);
+platform.delete("/admins/:adminId", (0, validate_js_1.objectIdParams)("adminId"), pu.deleteProjectAdmin);
 // ── GLOBAL ACTION MANAGEMENT ─────────────────────────────────────────────────
 platform.get("/actions", mod.listActions);
 platform.post("/actions", (0, validate_js_1.validate)(v.createActionDto), mod.createAction);
@@ -75,6 +92,7 @@ platform.delete(`${p}/roles/:roleId`, (0, validate_js_1.objectIdParams)("project
 platform.get(`${p}/roles/:roleId/matrix`, (0, validate_js_1.objectIdParams)("projectId", "roleId"), role.getMatrix);
 platform.put(`${p}/roles/:roleId/permissions`, (0, validate_js_1.objectIdParams)("projectId", "roleId"), (0, validate_js_1.validate)(v.savePermissionsDto), role.savePermissions);
 // ── PROJECT USER MANAGEMENT ──────────────────────────────────────────────────
+platform.get(`${p}/users`, (0, validate_js_1.objectIdParams)("projectId"), pu.getProjectUsers);
 platform.post(`${p}/users`, (0, validate_js_1.objectIdParams)("projectId"), (0, validate_js_1.validate)(v.createProjectUserDto), pu.createProjectUser);
 platform.put(`${p}/users/:userId/role`, (0, validate_js_1.objectIdParams)("projectId", "userId"), (0, validate_js_1.validate)(v.assignRoleDto), pu.assignRole);
 platform.patch(`${p}/users/:userId/access`, (0, validate_js_1.objectIdParams)("projectId", "userId"), (0, validate_js_1.validate)(v.activeDto), pu.setProjectAccess);

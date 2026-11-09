@@ -71,8 +71,10 @@ const userSchema = new Schema(
            unique: true, 
            index: true 
           },
-    passwordHash: { type: String, required: true, select: false },
+    passwordHash: { type: String, required: false, select: false },
+    phone: { type: String, trim: true, default: "" },
     phoneNumber: { type: String, trim: true, default: null },
+    username: { type: String, trim: true, default: "" },
 
     role: {
       type: String,
@@ -90,7 +92,7 @@ const userSchema = new Schema(
       {
         _id: false,
         projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
-        roleId: { type: Schema.Types.ObjectId, ref: "Role", required: true },
+        roleId: { type: Schema.Types.ObjectId, ref: "Role", required: false },
         isActive: { type: Boolean, default: true },
         assignedBy: { type: Schema.Types.ObjectId, ref: "User" },
       },
