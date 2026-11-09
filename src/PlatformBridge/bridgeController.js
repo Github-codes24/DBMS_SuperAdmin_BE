@@ -757,3 +757,89 @@ export const exchangeSsoTicket = async (req, res) => {
   }
 };
 
+/**
+ * Standardized Platform Bridge User Status Updater
+ * Allows Platform Super Admin to toggle active/inactive status across child collections.
+ */
+export const updateBridgeUserStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ success: false, message: "Missing status in request body" });
+  }
+
+  const normalizedStatus = String(status).toUpperCase();
+  const isMongoId = mongoose.Types.ObjectId.isValid(id);
+
+  try {
+    // 1. Check User (Admin/Staff)
+    let user = await User.findOne(
+      isMongoId ? { $or: [{ _id: id }, { userId: id }] } : { userId: id },
+    );
+    if (user) {
+      user.status = normalizedStatus === "ACTIVE" ? "ACTIVE" : "INACTIVE";
+      await user.save();
+      return res.json({
+        success: true,
+        message: `User ${user.fullName} status updated to ${user.status}`,
+        data: { id: user.userId || user._id, status: user.status },
+      });
+    }
+
+    // 2. Check Telecaller
+    let telecaller = await Telecaller.findOne(
+      isMongoId ? { $or: [{ _id: id }, { employeeId: id }] } : { employeeId: id },
+    );
+    if (telecaller) {
+      telecaller.status = normalizedStatus === "ACTIVE" ? "Active" : "Inactive";
+      await telecaller.save();
+      return res.json({
+        success: true,
+        message: `Telecaller ${telecaller.name} status updated to ${telecaller.status}`,
+        data: { id: telecaller.employeeId || telecaller._id, status: telecaller.status },
+      });
+    }
+
+    // 3. Check Vendor
+    let vendor = await Vendor.findOne(
+      isMongoId ? { $or: [{ _id: id }, { vendorId: id }] } : { vendorId: id },
+    );
+    if (vendor) {
+      vendor.storeStatus = normalizedStatus === "ACTIVE" ? "Active & Verified" : "Suspended";
+      await vendor.save();
+      return res.json({
+        success: true,
+        message: `Vendor ${vendor.storeName} status updated to ${vendor.storeStatus}`,
+        data: { id: vendor.vendorId || vendor._id, status: vendor.storeStatus },
+      });
+    }
+
+    // 4. Check SuperAdmin
+    let superAdmin = await SuperAdmin.findOne(
+      isMongoId ? { $or: [{ _id: id }, { adminId: id }] } : { adminId: id },
+    );
+    if (superAdmin) {
+      superAdmin.status = normalizedStatus === "ACTIVE" ? "Active" : "Inactive";
+      await superAdmin.save();
+      return res.json({
+        success: true,
+        message: `SuperAdmin ${superAdmin.fullName} status updated to ${superAdmin.status}`,
+        data: { id: superAdmin.adminId || superAdmin._id, status: superAdmin.status },
+      });
+    }
+
+    return res.status(404).json({
+      success: false,
+      message: `User with ID "${id}" not found in child project collections`,
+    });
+  } catch (err) {
+    console.error("[PlatformBridgeUpdateStatus] Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update user status",
+      error: err.message,
+    });
+  }
+};
+

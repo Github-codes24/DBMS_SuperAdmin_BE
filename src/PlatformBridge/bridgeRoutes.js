@@ -6,6 +6,7 @@ import {
   getBridgeUsers,
   getBridgeRoles,
   exchangeSsoTicket,
+  updateBridgeUserStatus,
 } from "./bridgeController.js";
 import {
   optionalPlatformBridge,
@@ -55,6 +56,13 @@ router.get("/roles", requirePlatformBridge, getBridgeRoles);
  * @access  Ticket-authenticated
  */
 router.post("/sso-exchange", exchangeSsoTicket);
+
+/**
+ * @route   PATCH /api/v1/platform-bridge/users/:id/status
+ * @desc    Toggle child project user status (active/inactive/blocked)
+ * @access  Protected (X-Platform-API-Key or Bearer token required)
+ */
+router.patch("/users/:id/status", requirePlatformBridge, updateBridgeUserStatus);
 
 export default router;
 
