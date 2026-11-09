@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:lts": "node apps/lts-api/server.js",
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
