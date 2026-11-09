@@ -9,17 +9,40 @@ import { audit } from "./audit.service.js";
 type PanelLink = { name: string; url: string };
 type UserType = { role: string; count: number };
 
+type FrontendAppInput = {
+  appKey: string;
+  name: string;
+  baseUrl: string;
+  allowedRoles?: string[];
+  ssoCallbackPath?: string;
+  isDefault?: boolean;
+};
+
+type BackendConfigInput = {
+  baseUrl?: string;
+  bridgePrefix?: string;
+  authType?: "api_key" | "hmac" | "service_jwt";
+  secretKeyId?: string;
+  timeoutMs?: number;
+  retryAttempts?: number;
+};
+
 type ProjectInput = {
   name: string;
+  projectCode?: string;
   description?: string;
   logo?: string;
   theme?: string;
   startDate?: string;
   endDate?: string;
   status?: "active" | "inactive" | "upcoming" | "completed" | "on_hold";
+  integrationStatus?: "unlinked" | "registered" | "connected" | "sync_failed";
   adminId?: string;
   panelLinks?: PanelLink[];
   userTypes?: UserType[];
+  frontendApps?: FrontendAppInput[];
+  backendConfig?: BackendConfigInput;
+  availableModules?: string[];
   createdBy: string;
 };
 
@@ -53,6 +76,7 @@ export async function createProject(input: ProjectInput) {
   const projectId = await getNextProjectId();
   const project = await Project.create({
     projectId,
+    projectCode: input.projectCode ? input.projectCode.trim().toUpperCase() : "",
     name: input.name.trim(),
     description: input.description?.trim() ?? "",
     logo: input.logo?.trim() ?? "",
@@ -60,10 +84,21 @@ export async function createProject(input: ProjectInput) {
     startDate: input.startDate ?? "",
     endDate: input.endDate ?? "",
     status: input.status ?? "active",
+    integrationStatus: input.integrationStatus ?? "unlinked",
     type: "tenant",
     createdBy: input.createdBy,
     panelLinks: input.panelLinks ?? [],
     userTypes: input.userTypes ?? [],
+    frontendApps: input.frontendApps ?? [],
+    backendConfig: input.backendConfig ?? {
+      baseUrl: "",
+      bridgePrefix: "/api/v1/platform-bridge",
+      authType: "api_key",
+      secretKeyId: "",
+      timeoutMs: 5000,
+      retryAttempts: 2,
+    },
+    availableModules: input.availableModules ?? [],
   });
   await audit("project.created", {
     actorId: input.createdBy,
@@ -123,6 +158,8 @@ export async function updateProject(
     );
 
   if (data.name !== undefined) project.name = data.name.trim();
+  if (data.projectCode !== undefined)
+    project.projectCode = data.projectCode ? data.projectCode.trim().toUpperCase() : "";
   if (data.description !== undefined)
     project.description = data.description.trim();
   if (data.logo !== undefined) project.logo = data.logo.trim();
@@ -130,9 +167,20 @@ export async function updateProject(
   if (data.startDate !== undefined) project.startDate = data.startDate;
   if (data.endDate !== undefined) project.endDate = data.endDate;
   if (data.status !== undefined) project.status = data.status;
+  if (data.integrationStatus !== undefined)
+    project.integrationStatus = data.integrationStatus as any;
   if (data.panelLinks !== undefined)
     project.panelLinks = data.panelLinks as any;
   if (data.userTypes !== undefined) project.userTypes = data.userTypes as any;
+  if (data.frontendApps !== undefined)
+    project.frontendApps = data.frontendApps as any;
+  if (data.backendConfig !== undefined)
+    project.backendConfig = {
+      ...(project.backendConfig || {}),
+      ...data.backendConfig,
+    } as any;
+  if (data.availableModules !== undefined)
+    project.availableModules = data.availableModules as any;
 
   await project.save();
   await audit("project.updated", { actorId, projectId, after: data });

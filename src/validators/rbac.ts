@@ -15,7 +15,26 @@ const userTypeDto = z.object({
   count: z.number().int().min(0),
 });
 
+const frontendAppDto = z.object({
+  appKey: z.string().trim().min(1).max(50),
+  name: z.string().trim().min(1).max(100),
+  baseUrl: z.string().trim().min(1).max(2000),
+  allowedRoles: z.array(z.string().trim()).max(50).optional().default([]),
+  ssoCallbackPath: z.string().trim().max(500).optional().default("/sso/callback"),
+  isDefault: z.boolean().optional().default(false),
+});
+
+const backendConfigDto = z.object({
+  baseUrl: z.string().trim().max(2000).optional().default(""),
+  bridgePrefix: z.string().trim().max(200).optional().default("/api/v1/platform-bridge"),
+  authType: z.enum(["api_key", "hmac", "service_jwt"]).optional().default("api_key"),
+  secretKeyId: z.string().trim().max(500).optional().default(""),
+  timeoutMs: z.number().int().min(500).max(60000).optional().default(5000),
+  retryAttempts: z.number().int().min(0).max(5).optional().default(2),
+}).optional();
+
 const projectStatusEnum = z.enum(["active", "inactive", "upcoming", "completed", "on_hold"]);
+const integrationStatusEnum = z.enum(["unlinked", "registered", "connected", "sync_failed"]);
 
 const optionalDateField = z.preprocess(
   (val) => (typeof val === "string" ? val.trim() : val),
@@ -72,16 +91,21 @@ const optionalStringField = (max = 1000) =>
 
 export const createProjectDto = z.object({
   body: z.object({
-    name:        z.string().trim().min(2).max(100),
-    description: optionalStringField(1000),
-    logo:        optionalLogoField,
-    theme:       optionalThemeField,
-    startDate:   optionalDateField,
-    endDate:     optionalDateField,
-    status:      projectStatusEnum.optional().default("active"),
-    adminId:     optionalStringField(200),
-    panelLinks:  z.array(panelLinkDto).max(100).optional().default([]),
-    userTypes:   z.array(userTypeDto).max(100).optional().default([]),
+    name:              z.string().trim().min(2).max(100),
+    projectCode:       optionalStringField(20),
+    description:       optionalStringField(1000),
+    logo:              optionalLogoField,
+    theme:             optionalThemeField,
+    startDate:         optionalDateField,
+    endDate:           optionalDateField,
+    status:            projectStatusEnum.optional().default("active"),
+    integrationStatus: integrationStatusEnum.optional().default("unlinked"),
+    adminId:           optionalStringField(200),
+    panelLinks:        z.array(panelLinkDto).max(100).optional().default([]),
+    userTypes:         z.array(userTypeDto).max(100).optional().default([]),
+    frontendApps:      z.array(frontendAppDto).max(20).optional().default([]),
+    backendConfig:     backendConfigDto,
+    availableModules:  z.array(z.string().trim()).max(100).optional().default([]),
   }).passthrough(),
   params: z.object({}).passthrough(),
   query:  z.object({}).passthrough(),
@@ -89,16 +113,21 @@ export const createProjectDto = z.object({
 
 export const updateProjectDto = z.object({
   body: z.object({
-    name:        z.string().trim().min(2).max(100).optional(),
-    description: optionalStringField(1000),
-    logo:        optionalLogoField,
-    theme:       optionalThemeField,
-    startDate:   optionalDateField,
-    endDate:     optionalDateField,
-    status:      projectStatusEnum.optional(),
-    adminId:     optionalStringField(200),
-    panelLinks:  z.array(panelLinkDto).max(100).optional(),
-    userTypes:   z.array(userTypeDto).max(100).optional(),
+    name:              z.string().trim().min(2).max(100).optional(),
+    projectCode:       optionalStringField(20),
+    description:       optionalStringField(1000),
+    logo:              optionalLogoField,
+    theme:             optionalThemeField,
+    startDate:         optionalDateField,
+    endDate:           optionalDateField,
+    status:            projectStatusEnum.optional(),
+    integrationStatus: integrationStatusEnum.optional(),
+    adminId:           optionalStringField(200),
+    panelLinks:        z.array(panelLinkDto).max(100).optional(),
+    userTypes:         z.array(userTypeDto).max(100).optional(),
+    frontendApps:      z.array(frontendAppDto).max(20).optional(),
+    backendConfig:     backendConfigDto,
+    availableModules:  z.array(z.string().trim()).max(100).optional(),
   }).passthrough(),
   params: z.object({ projectId: objectId }).passthrough(),
   query:  z.object({}).passthrough(),
