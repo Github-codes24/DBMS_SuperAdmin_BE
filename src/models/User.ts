@@ -78,9 +78,9 @@ const userSchema = new Schema(
 
     role: {
       type: String,
-      enum: ["superadmin", "admin", "manager", "user"],
       default: "user",
       required: true,
+      trim: true,
     },
 
     projectIds: {

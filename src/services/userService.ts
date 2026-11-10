@@ -483,6 +483,57 @@ async function buildProjectRoles(
   }));
 }
 
+export function isSuperAdminRole(r?: string): boolean {
+  if (!r) return false;
+  const cleaned = r.trim().toLowerCase().replace(/[\s-_]/g, "");
+  return cleaned === "superadmin";
+}
+
+/**
+ * Validates that the requested role name exists in the Role collection (roles.ts schema).
+ * Case-insensitive match against Role.name.
+ * Returns canonical role name (or "superadmin" for platform super admin).
+ */
+export async function assertRoleExistsInRolesSchema(roleName: string): Promise<string> {
+  const trimmed = roleName.trim();
+  if (!trimmed) {
+    throw new UserServiceError("Role is required and cannot be empty", 400, "INVALID_ROLE");
+  }
+
+  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  const roleDoc = await Role.findOne({
+    name: { $regex: new RegExp(`^${escapeRegex(trimmed)}$`, "i") },
+  }).lean();
+
+  if (roleDoc) {
+    if (roleDoc.isActive === false) {
+      throw new UserServiceError(
+        `Role '${roleDoc.name}' is inactive and cannot be assigned`,
+        400,
+        "INACTIVE_ROLE",
+      );
+    }
+    const cleaned = roleDoc.name.trim().toLowerCase().replace(/[\s-_]/g, "");
+    if (cleaned === "superadmin") {
+      return "superadmin";
+    }
+    return roleDoc.name;
+  }
+
+  // Fallback for default built-in roles if roles collection has not been seeded yet
+  const cleaned = trimmed.toLowerCase().replace(/[\s-_]/g, "");
+  if (["superadmin", "admin", "manager", "user"].includes(cleaned)) {
+    return cleaned;
+  }
+
+  throw new UserServiceError(
+    `Role '${trimmed}' does not exist in the roles schema`,
+    400,
+    "INVALID_ROLE",
+  );
+}
+
 /** Same rules for updateUser and updateUserStatus. */
 async function assertCanDeactivate(user: any, currentAuth: CurrentAuth) {
   if (user._id.toString() === currentAuth.userId) {
@@ -493,8 +544,8 @@ async function assertCanDeactivate(user: any, currentAuth: CurrentAuth) {
     );
   }
 
-  if (user.role === "superadmin") {
-    if (currentAuth.role !== "superadmin") {
+  if (isSuperAdminRole(user.role)) {
+    if (!isSuperAdminRole(currentAuth.role)) {
       throw new UserServiceError(
         "Only Super Admins can change a Super Admin status",
         403,
@@ -503,7 +554,7 @@ async function assertCanDeactivate(user: any, currentAuth: CurrentAuth) {
     }
 
     const activeSuperAdminCount = await User.countDocuments({
-      role: "superadmin",
+      role: { $in: ["superadmin", "SuperAdmin", "Super Admin"] },
       isActive: true,
     });
 
@@ -534,7 +585,8 @@ export async function listUsers(
   const filter: Record<string, unknown> = {};
 
   if (query.role) {
-    filter.role = query.role;
+    const escapedRole = query.role.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    filter.role = { $regex: new RegExp(`^${escapedRole}$`, "i") };
   }
 
   if (query.isActive !== undefined) {
@@ -604,9 +656,10 @@ export async function createUser(
   input: CreateUserInput,
   currentAuth: CurrentAuth,
 ): Promise<UserResponse> {
-  const role = input.role ?? "user";
+  const rawRole = input.role ?? "user";
+  const role = await assertRoleExistsInRolesSchema(rawRole);
 
-  if (role === "superadmin" && currentAuth.role !== "superadmin") {
+  if (isSuperAdminRole(role) && !isSuperAdminRole(currentAuth.role)) {
     throw new UserServiceError(
       "Only Super Admins can create another Super Admin",
       403,
@@ -614,7 +667,7 @@ export async function createUser(
     );
   }
 
-  if (role === "superadmin" && input.projectRoles?.length) {
+  if (isSuperAdminRole(role) && input.projectRoles?.length) {
     throw new UserServiceError(
       "A Super Admin does not hold project roles",
       400,
@@ -658,7 +711,7 @@ export async function updateUser(
     throw new UserServiceError("User not found", 404, "USER_NOT_FOUND");
   }
 
-  if (user.role === "superadmin" && currentAuth.role !== "superadmin") {
+  if (isSuperAdminRole(user.role) && !isSuperAdminRole(currentAuth.role)) {
     throw new UserServiceError(
       "Only Super Admins can modify a Super Admin account",
       403,
@@ -666,30 +719,38 @@ export async function updateUser(
     );
   }
 
-  if (input.role === "superadmin" && currentAuth.role !== "superadmin") {
-    throw new UserServiceError(
-      "Only Super Admins can assign the Super Admin role",
-      403,
-      "FORBIDDEN",
-    );
-  }
+  let validatedRole: string | undefined;
+  if (input.role !== undefined) {
+    validatedRole = await assertRoleExistsInRolesSchema(input.role);
 
-  if (input.role && input.role !== user.role && user._id.toString() === currentAuth.userId) {
-    throw new UserServiceError(
-      "You cannot change your own account type",
-      400,
-      "CANNOT_CHANGE_OWN_ROLE",
-    );
-  }
-
-  if (input.role && input.role !== "superadmin" && user.role === "superadmin") {
-    const superAdminCount = await User.countDocuments({ role: "superadmin" });
-    if (superAdminCount <= 1) {
+    if (isSuperAdminRole(validatedRole) && !isSuperAdminRole(currentAuth.role)) {
       throw new UserServiceError(
-        "Cannot demote the only Super Admin account",
-        400,
-        "CANNOT_DEMOTE_LAST_SUPERADMIN",
+        "Only Super Admins can assign the Super Admin role",
+        403,
+        "FORBIDDEN",
       );
+    }
+
+    if (validatedRole !== user.role && user._id.toString() === currentAuth.userId) {
+      throw new UserServiceError(
+        "You cannot change your own account type",
+        400,
+        "CANNOT_CHANGE_OWN_ROLE",
+      );
+    }
+
+    if (!isSuperAdminRole(validatedRole) && isSuperAdminRole(user.role)) {
+      const superAdminCount = await User.countDocuments({
+        role: { $in: ["superadmin", "SuperAdmin", "Super Admin"] },
+        isActive: true,
+      });
+      if (superAdminCount <= 1) {
+        throw new UserServiceError(
+          "Cannot demote the only Super Admin account",
+          400,
+          "CANNOT_DEMOTE_LAST_SUPERADMIN",
+        );
+      }
     }
   }
 
@@ -722,16 +783,16 @@ export async function updateUser(
 
   let mustRevoke = false;
 
-  if (input.role !== undefined && input.role !== user.role) {
-    user.role = input.role;
-    if (input.role === "superadmin") user.set("projectRoles", []); // a Super Admin needs no project roles
+  if (validatedRole !== undefined && validatedRole !== user.role) {
+    user.role = validatedRole;
+    if (isSuperAdminRole(validatedRole)) user.set("projectRoles", []); // a Super Admin needs no project roles
     user.tokenVersion += 1;
     mustRevoke = true;
   }
 
   // CHANGED: projectIds became projectRoles. Sending it replaces the whole list; omit it to leave it unchanged.
   if (input.projectRoles !== undefined) {
-    if (user.role === "superadmin") {
+    if (isSuperAdminRole(user.role)) {
       throw new UserServiceError(
         "A Super Admin does not hold project roles",
         400,
@@ -767,7 +828,7 @@ export async function updateUserStatus(
     throw new UserServiceError("User not found", 404, "USER_NOT_FOUND");
   }
 
-  if (user.role === "superadmin" && currentAuth.role !== "superadmin") {
+  if (isSuperAdminRole(user.role) && !isSuperAdminRole(currentAuth.role)) {
     throw new UserServiceError(
       "Only Super Admins can change a Super Admin status",
       403,
@@ -799,7 +860,7 @@ export async function resetUserPassword(
     throw new UserServiceError("User not found", 404, "USER_NOT_FOUND");
   }
 
-  if (user.role === "superadmin" && currentAuth.role !== "superadmin") {
+  if (isSuperAdminRole(user.role) && !isSuperAdminRole(currentAuth.role)) {
     throw new UserServiceError(
       "Only Super Admins can reset a Super Admin password",
       403,
@@ -834,8 +895,8 @@ export async function deleteUser(
     );
   }
 
-  if (user.role === "superadmin") {
-    if (currentAuth.role !== "superadmin") {
+  if (isSuperAdminRole(user.role)) {
+    if (!isSuperAdminRole(currentAuth.role)) {
       throw new UserServiceError(
         "Only Super Admins can delete a Super Admin account",
         403,
@@ -843,7 +904,9 @@ export async function deleteUser(
       );
     }
 
-    const superAdminCount = await User.countDocuments({ role: "superadmin" });
+    const superAdminCount = await User.countDocuments({
+      role: { $in: ["superadmin", "SuperAdmin", "Super Admin"] },
+    });
     if (superAdminCount <= 1) {
       throw new UserServiceError(
         "Cannot delete the only Super Admin account",

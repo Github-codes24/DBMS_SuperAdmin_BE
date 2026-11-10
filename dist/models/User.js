@@ -109,9 +109,9 @@ const userSchema = new mongoose_1.Schema({
     username: { type: String, trim: true, default: "" },
     role: {
         type: String,
-        enum: ["superadmin", "admin", "manager", "user"],
         default: "user",
         required: true,
+        trim: true,
     },
     projectIds: {
         type: [String],

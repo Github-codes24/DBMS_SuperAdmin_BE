@@ -25,22 +25,8 @@ const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 const emptyToUndefined = (v: unknown) => (v === "" || v === null ? undefined : v);
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
 
-const normalizeRole = (val: unknown) => {
-  if (typeof val !== "string") return val;
-  const cleaned = val.trim().toLowerCase().replace(/[\s-_]/g, "");
-  if (cleaned === "superadmin") return "superadmin";
-  if (cleaned === "admin") return "admin";
-  if (cleaned === "manager") return "manager";
-  if (cleaned === "user") return "user";
-  return val.trim().toLowerCase();
-};
-
-export const userRoleEnum = z.preprocess(
-  normalizeRole,
-  z.enum(["superadmin", "admin", "manager", "user"], {
-    message: "Role must be one of 'superadmin', 'admin', 'manager', or 'user'",
-  }),
-);
+export const userRoleSchema = z.string().trim().min(1, "Role cannot be empty");
+export const userRoleEnum = userRoleSchema;
 
 const projectRolesField = z
   .array(z.object({ projectId: objectId, roleId: objectId }))
