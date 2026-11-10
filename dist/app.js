@@ -49,7 +49,12 @@ app.use((0, cors_1.default)({
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Project-Id"],
+    allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Project-Id",
+        "ngrok-skip-browser-warning",
+    ],
     exposedHeaders: ["X-Request-ID"],
 }));
 app.use((req, res, next) => {
@@ -70,7 +75,8 @@ app.use((req, res, next) => {
     next();
 });
 app.use(requestContext_js_1.requestContext);
-app.use(express_1.default.json({ limit: "1mb" }));
+app.use(express_1.default.json({ limit: "10mb" }));
+app.use(express_1.default.urlencoded({ limit: "10mb", extended: true }));
 app.get("/api/health", (_req, res) => {
     return apiManager_js_1.apiManager.success(res, "DBMS Super Admin API is running", {
         service: "dbms-superadmin-api",

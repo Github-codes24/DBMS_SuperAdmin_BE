@@ -24,10 +24,12 @@ export const apiManager = {
     statusCode = 500,
     code = "INTERNAL_SERVER_ERROR",
     details?: unknown,
+    details?: unknown,
   ) {
     return res.status(statusCode).json({
       success: false,
       message,
+      error: { code, ...(details !== undefined ? { details } : {}) },
       error: {
         code,
         ...(details !== undefined ? { details } : {}),

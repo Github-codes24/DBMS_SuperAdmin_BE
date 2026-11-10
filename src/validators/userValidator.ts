@@ -25,11 +25,14 @@ const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 const emptyToUndefined = (v: unknown) => (v === "" || v === null ? undefined : v);
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
 
+export const userRoleSchema = z.string().trim().min(1, "Role cannot be empty");
+export const userRoleEnum = userRoleSchema;
+
 const projectRolesField = z
   .array(z.object({ projectId: objectId, roleId: objectId }))
   .max(50)
   .optional();
-  
+
 export const listUsersSchema = z.object({
   body: z.any().optional(),          // GET has no body (undefined in Express 5)
   params: z.any().optional(),
@@ -37,12 +40,12 @@ export const listUsersSchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(10),
     search: z.preprocess(emptyToUndefined, z.string().trim().max(100).optional()),
-    role: z.preprocess(emptyToUndefined, z.enum(["superadmin", "user"]).optional()),
+    role: z.preprocess(emptyToUndefined, userRoleEnum.optional()),
     isActive: z.preprocess(
       emptyToUndefined,
       z.enum(["true", "false"]).transform((val) => val === "true").optional(),
     ),
-    projectId: z.preprocess(emptyToUndefined, objectId.optional()),
+    projectId: z.preprocess(emptyToUndefined, z.string().trim().optional()),
     sortBy: z.enum(["createdAt", "name", "email", "lastLoginAt"]).default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
   }),
@@ -66,18 +69,7 @@ export const createUserSchema = z.object({
         .min(8, "Password must be at least 8 characters")
         .max(128, "Password cannot exceed 128 characters"),
       phoneNumber: z.string().trim().max(20).optional(),
-      role: z
-        .preprocess(
-          (val) =>
-            typeof val === "string"
-              ? val.trim().toLowerCase().replace(/[\s-_]/g, "")
-              : val,
-          z.enum(["superadmin", "user"], {
-            message:
-              "Role must be either 'superadmin' or 'user'. Project-level roles belong in projectRoles.",
-          }),
-        )
-        .default("user"),
+      role: userRoleEnum.default("user"),
       projectRoles: projectRolesField,
       projectIds: z.array(z.string().trim()).optional(),
       isActive: z.boolean().default(true),
@@ -114,19 +106,7 @@ export const updateUserSchema = z.object({
         .transform((email) => email.toLowerCase())
         .optional(),
       phoneNumber: z.string().trim().max(20).optional(),
-      role: z
-        .preprocess(
-          (val) =>
-            typeof val === "string"
-              ? val.trim().toLowerCase().replace(/[\s-_]/g, "")
-              : val,
-          z.enum(["superadmin", "user"], {
-            message:
-              "Role must be either 'superadmin' or 'user'. Project-level roles belong in projectRoles.",
-          }),
-        )
-        .default("user")
-        .optional(),
+      role: userRoleEnum.optional(),
       projectRoles: projectRolesField,
       projectIds: z.array(z.string().trim()).optional(),
       isActive: z.boolean().optional(),

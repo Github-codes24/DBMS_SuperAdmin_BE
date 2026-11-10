@@ -8,7 +8,9 @@ const authorize = (...allowedRoles) => {
         if (!auth || !auth.role) {
             return apiManager_js_1.apiManager.failure(res, "Authentication required", 401, "AUTHENTICATION_REQUIRED");
         }
-        if (!allowedRoles.includes(auth.role)) {
+        const cleanAuthRole = auth.role.trim().toLowerCase().replace(/[\s-_]/g, "");
+        const cleanAllowed = allowedRoles.map((r) => r.trim().toLowerCase().replace(/[\s-_]/g, ""));
+        if (!cleanAllowed.includes(cleanAuthRole) && !allowedRoles.includes(auth.role)) {
             return apiManager_js_1.apiManager.failure(res, "You do not have permission to access this resource", 403, "FORBIDDEN");
         }
         return next();

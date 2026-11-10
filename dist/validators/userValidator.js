@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteUserSchema = exports.resetPasswordSchema = exports.updateUserStatusSchema = exports.updateUserSchema = exports.getUserSchema = exports.createUserSchema = exports.listUsersSchema = void 0;
+exports.deleteUserSchema = exports.resetPasswordSchema = exports.updateUserStatusSchema = exports.updateUserSchema = exports.getUserSchema = exports.createUserSchema = exports.listUsersSchema = exports.userRoleEnum = exports.userRoleSchema = void 0;
 const zod_1 = require("zod");
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 // export const listUsersSchema = z.object({
@@ -24,6 +24,8 @@ const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 // });
 const emptyToUndefined = (v) => (v === "" || v === null ? undefined : v);
 const objectId = zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
+exports.userRoleSchema = zod_1.z.string().trim().min(1, "Role cannot be empty");
+exports.userRoleEnum = exports.userRoleSchema;
 const projectRolesField = zod_1.z
     .array(zod_1.z.object({ projectId: objectId, roleId: objectId }))
     .max(50)
@@ -35,9 +37,9 @@ exports.listUsersSchema = zod_1.z.object({
         page: zod_1.z.coerce.number().int().min(1).default(1),
         limit: zod_1.z.coerce.number().int().min(1).max(100).default(10),
         search: zod_1.z.preprocess(emptyToUndefined, zod_1.z.string().trim().max(100).optional()),
-        role: zod_1.z.preprocess(emptyToUndefined, zod_1.z.enum(["superadmin", "user"]).optional()),
+        role: zod_1.z.preprocess(emptyToUndefined, exports.userRoleEnum.optional()),
         isActive: zod_1.z.preprocess(emptyToUndefined, zod_1.z.enum(["true", "false"]).transform((val) => val === "true").optional()),
-        projectId: zod_1.z.preprocess(emptyToUndefined, objectId.optional()),
+        projectId: zod_1.z.preprocess(emptyToUndefined, zod_1.z.string().trim().optional()),
         sortBy: zod_1.z.enum(["createdAt", "name", "email", "lastLoginAt"]).default("createdAt"),
         sortOrder: zod_1.z.enum(["asc", "desc"]).default("desc"),
     }),
@@ -61,6 +63,7 @@ exports.createUserSchema = zod_1.z.object({
             .min(8, "Password must be at least 8 characters")
             .max(128, "Password cannot exceed 128 characters"),
         phoneNumber: zod_1.z.string().trim().max(20).optional(),
+<<<<<<< HEAD
         role: zod_1.z
             .preprocess((val) => typeof val === "string"
             ? val.trim().toLowerCase().replace(/[\s-_]/g, "")
@@ -68,6 +71,9 @@ exports.createUserSchema = zod_1.z.object({
             message: "Role must be either 'superadmin' or 'user'. Project-level roles belong in projectRoles.",
         }))
             .default("user"),
+=======
+        role: exports.userRoleEnum.default("user"),
+>>>>>>> develop
         projectRoles: projectRolesField,
         projectIds: zod_1.z.array(zod_1.z.string().trim()).optional(),
         isActive: zod_1.z.boolean().default(true),
@@ -102,6 +108,7 @@ exports.updateUserSchema = zod_1.z.object({
             .transform((email) => email.toLowerCase())
             .optional(),
         phoneNumber: zod_1.z.string().trim().max(20).optional(),
+<<<<<<< HEAD
         role: zod_1.z
             .preprocess((val) => typeof val === "string"
             ? val.trim().toLowerCase().replace(/[\s-_]/g, "")
@@ -110,6 +117,9 @@ exports.updateUserSchema = zod_1.z.object({
         }))
             .default("user")
             .optional(),
+=======
+        role: exports.userRoleEnum.optional(),
+>>>>>>> develop
         projectRoles: projectRolesField,
         projectIds: zod_1.z.array(zod_1.z.string().trim()).optional(),
         isActive: zod_1.z.boolean().optional(),

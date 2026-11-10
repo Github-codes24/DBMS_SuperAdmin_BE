@@ -56,31 +56,43 @@ import mongoose, { Schema, type InferSchemaType } from "mongoose";
 
 const userSchema = new Schema(
   {
-    name: { 
+    name: {
       type: String,
-       required: true,
-        trim: true,
-         minlength: 2,
-          maxlength: 100 
-        },
+      required: true,
+      trim: true,
+      minlength: 2,
+      maxlength: 100
+    },
     email: {
-       type: String,
-        required: true,
-         lowercase: true,
-          trim: true,
-           unique: true, 
-           index: true 
-          },
-    passwordHash: { type: String, required: true, select: false },
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+      unique: true,
+      index: true
+    },
+    passwordHash: { type: String, required: false, select: false },
+    phone: { type: String, trim: true, default: "" },
     phoneNumber: { type: String, trim: true, default: null },
+    username: { type: String, trim: true, default: "" },
 
-    role: { type: String, enum: ["superadmin", "user"], default: "user", required: true },
+    role: {
+      type: String,
+      default: "user",
+      required: true,
+      trim: true,
+    },
+
+    projectIds: {
+      type: [String],
+      default: [],
+    },
 
     projectRoles: [
       {
         _id: false,
         projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
-        roleId: { type: Schema.Types.ObjectId, ref: "Role", required: true },
+        roleId: { type: Schema.Types.ObjectId, ref: "Role", required: false },
         isActive: { type: Boolean, default: true },
         assignedBy: { type: Schema.Types.ObjectId, ref: "User" },
       },

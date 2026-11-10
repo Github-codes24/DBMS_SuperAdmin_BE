@@ -103,14 +103,31 @@ const userSchema = new mongoose_1.Schema({
         unique: true,
         index: true
     },
+<<<<<<< HEAD
     passwordHash: { type: String, required: true, select: false },
     phoneNumber: { type: String, trim: true, default: null },
     role: { type: String, enum: ["superadmin", "user"], default: "user", required: true },
+=======
+    passwordHash: { type: String, required: false, select: false },
+    phone: { type: String, trim: true, default: "" },
+    phoneNumber: { type: String, trim: true, default: null },
+    username: { type: String, trim: true, default: "" },
+    role: {
+        type: String,
+        default: "user",
+        required: true,
+        trim: true,
+    },
+    projectIds: {
+        type: [String],
+        default: [],
+    },
+>>>>>>> develop
     projectRoles: [
         {
             _id: false,
             projectId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Project", required: true },
-            roleId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Role", required: true },
+            roleId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Role", required: false },
             isActive: { type: Boolean, default: true },
             assignedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: "User" },
         },

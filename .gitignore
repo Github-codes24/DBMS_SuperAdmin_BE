@@ -24,3 +24,10 @@ yarn-error.log*
 *.sw?
 .DS_Store
 uploads
+
+#misclenous folder
+dist/
+
+# Documentation & Local Test Scripts (ignored from commit)
+PROJECT_MANAGEMENT_API_DOC.md
+test-project-apis.cjs
