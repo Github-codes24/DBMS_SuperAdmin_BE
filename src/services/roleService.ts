@@ -18,21 +18,21 @@ async function findRole(projectId: string, roleId: string) {
   return role;
 }
 
-async function normaliseModuleKeys(projectId: string, keys: string[]) {
-  const unique = [...new Set(keys.map((k) => k.toLowerCase()))];
-  if (unique.length === 0) return unique;
-  const n = await Module.countDocuments({ projectId, key: { $in: unique }, isActive: true });
-  if (n !== unique.length) throw httpError(400, "INVALID_MODULES", "One or more modules do not exist in this project");
-  return unique;
-}
-
 // async function normaliseModuleKeys(projectId: string, keys: string[]) {
 //   const unique = [...new Set(keys.map((k) => k.toLowerCase()))];
 //   if (unique.length === 0) return unique;
-//   const found = await Module.distinct("key", { projectId, key: { $in: unique }, isActive: true });
-//   if (found.length !== unique.length) throw httpError(400, "INVALID_MODULES", "One or more modules do not exist in this project");
+//   const n = await Module.countDocuments({ projectId, key: { $in: unique }, isActive: true });
+//   if (n !== unique.length) throw httpError(400, "INVALID_MODULES", "One or more modules do not exist in this project");
 //   return unique;
 // }
+
+async function normaliseModuleKeys(projectId: string, keys: string[]) {
+  const unique = [...new Set(keys.map((k) => k.toLowerCase()))];
+  if (unique.length === 0) return unique;
+  const found = await Module.distinct("key", { projectId, key: { $in: unique }, isActive: true });
+  if (found.length !== unique.length) throw httpError(400, "INVALID_MODULES", "One or more modules do not exist in this project");
+  return unique;
+}
 
 export async function createRole(
   projectId: string,
