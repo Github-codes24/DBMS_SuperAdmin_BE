@@ -39,6 +39,7 @@ const projectSchema = new Schema(
     },
     type: { type: String, enum: ["platform", "tenant"], default: "tenant" },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: false },
+    adminId: { type: Schema.Types.ObjectId, ref: "User", required: false, default: null },
     panelLinks: { type: [panelLinkSchema], default: [] },
     userTypes: { type: [userTypeSchema], default: [] },
   },

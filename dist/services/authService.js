@@ -116,7 +116,7 @@ exports.changePassword = changePassword;
 //   if (!accessSecret || accessSecret.length < 32) {
 //     throw new Error("JWT_ACCESS_SECRET is not configured correctly");
 //   }
-//   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+//   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "7d";
 //   const accessToken = jwt.sign(
 //     {
 //       role: user.role,
@@ -168,7 +168,7 @@ exports.changePassword = changePassword;
 //       "JWT_ACCESS_SECRET must be configured with at least 32 characters",
 //     );
 //   }
-//   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+//   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "7d";
 //   const tokenOptions: SignOptions = {
 //     subject: user._id.toString(),
 //     expiresIn: expiresIn as SignOptions["expiresIn"],
@@ -318,14 +318,27 @@ class AuthServiceError extends Error {
 exports.AuthServiceError = AuthServiceError;
 const ISSUER = "dbms-superadmin-api";
 const AUDIENCE = "dbms-superadmin";
-const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+function getRefreshTtlMs() {
+    const envVal = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
+    const match = envVal.match(/^(\d+)([smhd])$/);
+    if (!match)
+        return 7 * 24 * 60 * 60 * 1000;
+    const num = parseInt(match[1], 10);
+    switch (match[2]) {
+        case "s": return num * 1000;
+        case "m": return num * 60 * 1000;
+        case "h": return num * 60 * 60 * 1000;
+        case "d": return num * 24 * 60 * 60 * 1000;
+        default: return 7 * 24 * 60 * 60 * 1000;
+    }
+}
 /** CHANGED: one place that signs access tokens. Payload is now sub + role + tv. */
 function signAccessToken(user) {
     const secret = process.env.JWT_ACCESS_SECRET;
     if (!secret || secret.length < 32) {
         throw new Error("JWT_ACCESS_SECRET must be configured with at least 32 characters");
     }
-    const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+    const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "7d";
     const token = jsonwebtoken_1.default.sign({ role: user.role, tv: user.tokenVersion ?? 0 }, // informational only: the server re-reads the user on every request
     secret, {
         subject: user._id.toString(),
@@ -382,7 +395,7 @@ async function refreshUserTokens(refreshToken) {
     }, {
         $set: {
             tokenHash: newTokenHash,
-            expiresAt: new Date(now.getTime() + REFRESH_TTL_MS),
+            expiresAt: new Date(now.getTime() + getRefreshTtlMs()),
         },
     }, {
         new: true,
@@ -403,7 +416,7 @@ async function loginUser(email, password) {
     const user = await User_js_1.User.findOne({
         email: email.trim().toLowerCase(),
     }).select("+passwordHash");
-    if (!user) {
+    if (!user || !user.passwordHash) {
         throw new AuthServiceError("Invalid email or password", 401, "INVALID_CREDENTIALS");
     }
     const passwordMatches = await (0, password_js_1.verifyPassword)(password, user.passwordHash);
@@ -415,7 +428,7 @@ async function loginUser(email, password) {
     await User_js_1.RefreshSession.create({
         userId: user._id,
         tokenHash: (0, password_js_1.hashRefreshToken)(refreshToken),
-        expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
+        expiresAt: new Date(Date.now() + getRefreshTtlMs()),
     });
     user.lastLoginAt = new Date();
     await user.save();
@@ -469,10 +482,10 @@ async function changePassword(userId, currentPassword, newPassword) {
     if (!user || !user.isActive) {
         throw new AuthServiceError("Account is unavailable", 401, "ACCOUNT_UNAVAILABLE");
     }
-    if (!(await bcryptjs_1.default.compare(currentPassword, user.passwordHash))) {
+    if (!user.passwordHash || !(await bcryptjs_1.default.compare(currentPassword, user.passwordHash))) {
         throw new AuthServiceError("Current password is incorrect", 401, "INVALID_CURRENT_PASSWORD");
     }
-    if (await bcryptjs_1.default.compare(newPassword, user.passwordHash)) {
+    if (user.passwordHash && (await bcryptjs_1.default.compare(newPassword, user.passwordHash))) {
         throw new AuthServiceError("New password must differ from the current password", 400, "SAME_PASSWORD");
     }
     user.passwordHash = await bcryptjs_1.default.hash(newPassword, 12);

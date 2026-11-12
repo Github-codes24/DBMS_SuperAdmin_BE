@@ -15,6 +15,9 @@ platform.use(authenticate, requireSuperAdmin);
 
 // ── PROJECT MANAGEMENT ──────────────────────────────────────────────────────
 
+/** Summary metrics across all projects (for dashboard metric cards) */
+platform.get("/projects/stats", project.getProjectStats);
+
 /** List all tenant projects */
 platform.get("/projects", project.getProjects);
 
@@ -25,6 +28,13 @@ platform.post("/projects", validate(v.createProjectDto), project.createProject);
 platform.get("/projects-with-roles", project.getProjectsWithRoles);
 // fetch role from the projects 
 platform.get("/projects/:projectId/roles", getRolesByProject);
+
+/** Get single tenant project details */
+platform.get(
+  "/projects/:projectId",
+  objectIdParams("projectId"),
+  project.getProjectById,
+);
 
 /** Update a project's details / status */
 platform.patch(
@@ -40,6 +50,24 @@ platform.delete(
   objectIdParams("projectId"),
   project.deleteProject,
 );
+
+// ── PROJECT ADMIN MANAGEMENT ──────────────────────────────────────────────────
+
+/** List all Project Admins (for dropdowns and admin management) */
+platform.get("/project-admins", pu.listProjectAdmins);
+platform.get("/admins", pu.listProjectAdmins);
+
+/** Create a new Project Admin */
+platform.post("/project-admins", pu.createProjectAdmin);
+platform.post("/admins", pu.createProjectAdmin);
+
+/** Update a Project Admin */
+platform.patch("/project-admins/:adminId", objectIdParams("adminId"), pu.updateProjectAdmin);
+platform.patch("/admins/:adminId", objectIdParams("adminId"), pu.updateProjectAdmin);
+
+/** Delete a Project Admin */
+platform.delete("/project-admins/:adminId", objectIdParams("adminId"), pu.deleteProjectAdmin);
+platform.delete("/admins/:adminId", objectIdParams("adminId"), pu.deleteProjectAdmin);
 
 // ── GLOBAL ACTION MANAGEMENT ─────────────────────────────────────────────────
 
@@ -113,6 +141,11 @@ platform.put(
 
 // ── PROJECT USER MANAGEMENT ──────────────────────────────────────────────────
 
+platform.get(
+  `${p}/users`,
+  objectIdParams("projectId"),
+  pu.getProjectUsers,
+);
 platform.post(
   `${p}/users`,
   objectIdParams("projectId"),

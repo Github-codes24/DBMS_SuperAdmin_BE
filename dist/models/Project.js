@@ -65,6 +65,7 @@ const projectSchema = new mongoose_1.Schema({
     },
     type: { type: String, enum: ["platform", "tenant"], default: "tenant" },
     createdBy: { type: mongoose_1.Schema.Types.ObjectId, ref: "User", required: false },
+    adminId: { type: mongoose_1.Schema.Types.ObjectId, ref: "User", required: false, default: null },
     panelLinks: { type: [panelLinkSchema], default: [] },
     userTypes: { type: [userTypeSchema], default: [] },
 }, { timestamps: true, collection: "projects" });

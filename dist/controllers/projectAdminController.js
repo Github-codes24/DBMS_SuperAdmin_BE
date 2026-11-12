@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setUserActive = exports.setProjectAccess = exports.assignRole = exports.createProjectUser = void 0;
+exports.deleteProjectAdmin = exports.updateProjectAdmin = exports.createProjectAdmin = exports.listProjectAdmins = exports.getProjectUsers = exports.setUserActive = exports.setProjectAccess = exports.assignRole = exports.createProjectUser = void 0;
 // controllers/projectUser.controller.ts
 const svc = __importStar(require("../services/projectAdminService"));
 const request_js_1 = require("../utils/request.js");
@@ -42,4 +42,13 @@ exports.createProjectUser = (0, helpers_js_1.wrap)(async (req, res) => (0, helpe
 exports.assignRole = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.assignRoleToUser((0, request_js_1.param)(req, "projectId"), (0, request_js_1.param)(req, "userId"), req.body.roleId, (0, request_js_1.actorId)(req))));
 exports.setProjectAccess = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.setProjectAccess((0, request_js_1.param)(req, "projectId"), (0, request_js_1.param)(req, "userId"), req.body.isActive, (0, request_js_1.actorId)(req))));
 exports.setUserActive = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.setUserActive((0, request_js_1.param)(req, "userId"), req.body.isActive, (0, request_js_1.actorId)(req))));
+exports.getProjectUsers = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.getProjectUsers((0, request_js_1.param)(req, "projectId"))));
+/** GET /api/platform/project-admins */
+exports.listProjectAdmins = (0, helpers_js_1.wrap)(async (_req, res) => (0, helpers_js_1.ok)(res, await svc.listProjectAdmins()));
+/** POST /api/platform/project-admins */
+exports.createProjectAdmin = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.createPlatformAdmin(req.body, (0, request_js_1.actorId)(req)), 201));
+/** PATCH /api/platform/project-admins/:adminId */
+exports.updateProjectAdmin = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.updatePlatformAdmin((0, request_js_1.param)(req, "adminId"), req.body, (0, request_js_1.actorId)(req))));
+/** DELETE /api/platform/project-admins/:adminId */
+exports.deleteProjectAdmin = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.deletePlatformAdmin((0, request_js_1.param)(req, "adminId"), (0, request_js_1.actorId)(req))));
 //# sourceMappingURL=projectAdminController.js.map

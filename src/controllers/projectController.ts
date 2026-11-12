@@ -3,9 +3,17 @@ import * as svc from "../services/projectService.js";
 import { actorId, param } from "../utils/request.js";
 import { ok, wrap } from "./helpers.js";
 
+/** GET /api/platform/projects/stats */
+export const getProjectStats = wrap(async (_req, res) =>
+  ok(res, await svc.getProjectStats()));
+
 /** GET /api/platform/projects */
-export const getProjects = wrap(async (_req, res) =>
-  ok(res, await svc.getProjects()));
+export const getProjects = wrap(async (req, res) =>
+  ok(res, await svc.getProjects(req.query as any)));
+
+/** GET /api/platform/projects/:projectId */
+export const getProjectById = wrap(async (req, res) =>
+  ok(res, await svc.getProjectById(param(req, "projectId"))));
 
 /** GET /api/platform/projects-with-roles */
 export const getProjectsWithRoles = wrap(async (_req, res) =>

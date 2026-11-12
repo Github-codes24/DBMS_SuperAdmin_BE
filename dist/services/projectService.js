@@ -1,11 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createProject = createProject;
+exports.getProjectStats = getProjectStats;
 exports.getProjects = getProjects;
+exports.getProjectById = getProjectById;
 exports.getProjectsWithRoles = getProjectsWithRoles;
 exports.updateProject = updateProject;
 exports.deleteProject = deleteProject;
 exports.getMyProjects = getMyProjects;
+const mongoose_1 = require("mongoose");
 const Project_js_1 = require("../models/Project.js");
 const roles_js_1 = require("../models/roles.js");
 const User_js_1 = require("../models/User.js");
@@ -26,6 +29,9 @@ async function getNextProjectId() {
 }
 async function createProject(input) {
     const projectId = await getNextProjectId();
+    const adminObjectId = input.adminId && mongoose_1.Types.ObjectId.isValid(input.adminId)
+        ? new mongoose_1.Types.ObjectId(input.adminId)
+        : null;
     const project = await Project_js_1.Project.create({
         projectId,
         name: input.name.trim(),
@@ -37,6 +43,7 @@ async function createProject(input) {
         status: input.status ?? "active",
         type: "tenant",
         createdBy: input.createdBy,
+        adminId: adminObjectId,
         panelLinks: input.panelLinks ?? [],
         userTypes: input.userTypes ?? [],
     });
@@ -47,9 +54,59 @@ async function createProject(input) {
     });
     return project;
 }
-/** Project management list: tenant projects only. */
-async function getProjects() {
-    return Project_js_1.Project.find({ type: "tenant" }).sort({ createdAt: -1 }).lean();
+/** Project summary metrics across all projects (for dashboard metric cards). */
+async function getProjectStats() {
+    const [tenantProjects, projectAdminsCount] = await Promise.all([
+        Project_js_1.Project.find({ type: "tenant" }).select("status").lean(),
+        User_js_1.User.countDocuments({
+            $or: [
+                { role: "admin" },
+                { "projectRoles.0": { $exists: true } },
+            ],
+            role: { $ne: "superadmin" },
+        }),
+    ]);
+    return {
+        totalProjects: tenantProjects.length,
+        activeProjects: tenantProjects.filter((p) => p.status === "active").length,
+        completedProjects: tenantProjects.filter((p) => p.status === "completed").length,
+        totalProjectAdmins: projectAdminsCount,
+        onHoldProjects: tenantProjects.filter((p) => p.status === "on_hold").length,
+        upcomingProjects: tenantProjects.filter((p) => p.status === "upcoming").length,
+    };
+}
+/** Project management list: tenant projects only. Supports optional search and status filter. */
+async function getProjects(query) {
+    const filter = { type: "tenant" };
+    if (query?.status && query.status !== "all") {
+        filter.status = query.status;
+    }
+    if (query?.search && query.search.trim()) {
+        const s = query.search.trim();
+        filter.$or = [
+            { name: { $regex: s, $options: "i" } },
+            { description: { $regex: s, $options: "i" } },
+            { projectId: { $regex: s, $options: "i" } },
+        ];
+    }
+    return Project_js_1.Project.find(filter)
+        .populate("adminId", "name email role phone username")
+        .populate("createdBy", "name email")
+        .sort({ createdAt: -1 })
+        .lean();
+}
+/** Get single tenant project details by ID or custom projectId */
+async function getProjectById(projectId) {
+    const query = mongoose_1.Types.ObjectId.isValid(projectId)
+        ? { _id: projectId }
+        : { projectId: projectId };
+    const project = await Project_js_1.Project.findOne(query)
+        .populate("adminId", "name email role phone username")
+        .populate("createdBy", "name email")
+        .lean();
+    if (!project)
+        throw (0, httpError_js_1.httpError)(404, "PROJECT_NOT_FOUND", "Project not found");
+    return project;
 }
 /** Feeds the platform dropdown: every project with its roles. */
 async function getProjectsWithRoles() {
@@ -79,7 +136,10 @@ async function getProjectsWithRoles() {
             : a.name.localeCompare(b.name));
 }
 async function updateProject(projectId, data, actorId) {
-    const project = await Project_js_1.Project.findById(projectId);
+    const query = mongoose_1.Types.ObjectId.isValid(projectId)
+        ? { _id: projectId }
+        : { projectId: projectId };
+    const project = await Project_js_1.Project.findOne(query);
     if (!project)
         throw (0, httpError_js_1.httpError)(404, "PROJECT_NOT_FOUND", "Project not found");
     if (project.type === "platform" && data.status === "inactive")
@@ -102,20 +162,31 @@ async function updateProject(projectId, data, actorId) {
         project.panelLinks = data.panelLinks;
     if (data.userTypes !== undefined)
         project.userTypes = data.userTypes;
+    if (data.adminId !== undefined) {
+        if (data.adminId && mongoose_1.Types.ObjectId.isValid(data.adminId)) {
+            project.adminId = new mongoose_1.Types.ObjectId(data.adminId);
+        }
+        else {
+            project.adminId = null;
+        }
+    }
     await project.save();
-    await (0, audit_service_js_1.audit)("project.updated", { actorId, projectId, after: data });
+    await (0, audit_service_js_1.audit)("project.updated", { actorId, projectId: project._id, after: data });
     return project;
 }
 async function deleteProject(projectId, actorId) {
-    const project = await Project_js_1.Project.findById(projectId);
+    const query = mongoose_1.Types.ObjectId.isValid(projectId)
+        ? { _id: projectId }
+        : { projectId: projectId };
+    const project = await Project_js_1.Project.findOne(query);
     if (!project)
         throw (0, httpError_js_1.httpError)(404, "PROJECT_NOT_FOUND", "Project not found");
     if (project.type === "platform")
         throw (0, httpError_js_1.httpError)(403, "PLATFORM_LOCKED", "The platform project cannot be deleted");
-    await Project_js_1.Project.findByIdAndDelete(projectId);
+    await Project_js_1.Project.deleteOne({ _id: project._id });
     await (0, audit_service_js_1.audit)("project.deleted", {
         actorId,
-        projectId,
+        projectId: project._id,
         after: { name: project.name },
     });
     return { projectId: project.projectId, name: project.name };

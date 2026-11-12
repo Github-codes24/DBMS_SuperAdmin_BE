@@ -25,12 +25,13 @@ export function generateRefreshToken(userId: string): string {
       "JWT_REFRESH_SECRET must be configured with at least 32 characters",
     );
   }
+  const refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
   return jwt.sign(
     { tokenUse: "refresh" },
     secret,
     {
       subject: userId,
-      expiresIn: "7d",
+      expiresIn: refreshExpiresIn as SignOptions["expiresIn"],
       issuer: "dbms-superadmin-api",
       audience: "dbms-superadmin",
     },

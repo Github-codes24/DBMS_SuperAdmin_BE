@@ -33,13 +33,17 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteProject = exports.updateProject = exports.createProject = exports.getProjectsWithRoles = exports.getProjects = void 0;
+exports.deleteProject = exports.updateProject = exports.createProject = exports.getProjectsWithRoles = exports.getProjectById = exports.getProjects = exports.getProjectStats = void 0;
 // controllers/project.controller.ts
 const svc = __importStar(require("../services/projectService.js"));
 const request_js_1 = require("../utils/request.js");
 const helpers_js_1 = require("./helpers.js");
+/** GET /api/platform/projects/stats */
+exports.getProjectStats = (0, helpers_js_1.wrap)(async (_req, res) => (0, helpers_js_1.ok)(res, await svc.getProjectStats()));
 /** GET /api/platform/projects */
-exports.getProjects = (0, helpers_js_1.wrap)(async (_req, res) => (0, helpers_js_1.ok)(res, await svc.getProjects()));
+exports.getProjects = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.getProjects(req.query)));
+/** GET /api/platform/projects/:projectId */
+exports.getProjectById = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.getProjectById((0, request_js_1.param)(req, "projectId"))));
 /** GET /api/platform/projects-with-roles */
 exports.getProjectsWithRoles = (0, helpers_js_1.wrap)(async (_req, res) => (0, helpers_js_1.ok)(res, await svc.getProjectsWithRoles()));
 /** POST /api/platform/projects */

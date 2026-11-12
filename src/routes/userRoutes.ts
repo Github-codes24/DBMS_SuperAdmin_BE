@@ -49,7 +49,7 @@ router.put("/:id", validate(updateUserSchema), updateUser);
 router.patch("/:id/status", validate(updateUserStatusSchema), updateUserStatus);
 
 // Reset user password
-router.post( 
+router.post(
   "/:id/reset-password",
   validate(resetPasswordSchema),
   resetPassword,

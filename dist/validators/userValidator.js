@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteUserSchema = exports.resetPasswordSchema = exports.updateUserStatusSchema = exports.updateUserSchema = exports.getUserSchema = exports.createUserSchema = exports.listUsersSchema = void 0;
+exports.deleteUserSchema = exports.resetPasswordSchema = exports.updateUserStatusSchema = exports.updateUserSchema = exports.getUserSchema = exports.createUserSchema = exports.listUsersSchema = exports.userRoleEnum = void 0;
 const zod_1 = require("zod");
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 // export const listUsersSchema = z.object({
@@ -24,6 +24,23 @@ const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 // });
 const emptyToUndefined = (v) => (v === "" || v === null ? undefined : v);
 const objectId = zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
+const normalizeRole = (val) => {
+    if (typeof val !== "string")
+        return val;
+    const cleaned = val.trim().toLowerCase().replace(/[\s-_]/g, "");
+    if (cleaned === "superadmin")
+        return "superadmin";
+    if (cleaned === "admin")
+        return "admin";
+    if (cleaned === "manager")
+        return "manager";
+    if (cleaned === "user")
+        return "user";
+    return val.trim().toLowerCase();
+};
+exports.userRoleEnum = zod_1.z.preprocess(normalizeRole, zod_1.z.enum(["superadmin", "admin", "manager", "user"], {
+    message: "Role must be one of 'superadmin', 'admin', 'manager', or 'user'",
+}));
 const projectRolesField = zod_1.z
     .array(zod_1.z.object({ projectId: objectId, roleId: objectId }))
     .max(50)
@@ -35,9 +52,9 @@ exports.listUsersSchema = zod_1.z.object({
         page: zod_1.z.coerce.number().int().min(1).default(1),
         limit: zod_1.z.coerce.number().int().min(1).max(100).default(10),
         search: zod_1.z.preprocess(emptyToUndefined, zod_1.z.string().trim().max(100).optional()),
-        role: zod_1.z.preprocess(emptyToUndefined, zod_1.z.enum(["superadmin", "user"]).optional()),
+        role: zod_1.z.preprocess(emptyToUndefined, exports.userRoleEnum.optional()),
         isActive: zod_1.z.preprocess(emptyToUndefined, zod_1.z.enum(["true", "false"]).transform((val) => val === "true").optional()),
-        projectId: zod_1.z.preprocess(emptyToUndefined, objectId.optional()),
+        projectId: zod_1.z.preprocess(emptyToUndefined, zod_1.z.string().trim().optional()),
         sortBy: zod_1.z.enum(["createdAt", "name", "email", "lastLoginAt"]).default("createdAt"),
         sortOrder: zod_1.z.enum(["asc", "desc"]).default("desc"),
     }),
@@ -60,8 +77,10 @@ exports.createUserSchema = zod_1.z.object({
             .string()
             .min(8, "Password must be at least 8 characters")
             .max(128, "Password cannot exceed 128 characters"),
-        role: zod_1.z.enum(["superadmin", "user"]).default("user"),
+        phoneNumber: zod_1.z.string().trim().max(20).optional(),
+        role: exports.userRoleEnum.default("user"),
         projectRoles: projectRolesField,
+        projectIds: zod_1.z.array(zod_1.z.string().trim()).optional(),
         isActive: zod_1.z.boolean().default(true),
     })
         .strict(),
@@ -93,8 +112,10 @@ exports.updateUserSchema = zod_1.z.object({
             .max(254)
             .transform((email) => email.toLowerCase())
             .optional(),
-        role: zod_1.z.enum(["superadmin", "user"]).default("user").optional(),
+        phoneNumber: zod_1.z.string().trim().max(20).optional(),
+        role: exports.userRoleEnum.optional(),
         projectRoles: projectRolesField,
+        projectIds: zod_1.z.array(zod_1.z.string().trim()).optional(),
         isActive: zod_1.z.boolean().optional(),
     })
         .strict(),

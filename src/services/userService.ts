@@ -390,9 +390,10 @@ export interface UserResponse {
   id: string;
   name: string;
   email: string;
+  phoneNumber?: string | null;
   role: string;
   projectRoles: UserProjectRoleResponse[]; // NEW: the source of truth
-  projectIds: string[];                    // kept for the frontend: derived from active projectRoles
+  projectIds: string[];                    // kept for the frontend: derived from active projectRoles & explicit projectIds
   isActive: boolean;
   lastLoginAt: Date | null;
   createdAt: Date;
@@ -420,13 +421,18 @@ function formatUser(doc: any): UserResponse {
     }),
   );
 
+  const derivedProjectIds = projectRoles.filter((p) => p.isActive).map((p) => p.projectId);
+  const explicitProjectIds = Array.isArray(doc.projectIds) ? doc.projectIds.map(String) : [];
+  const projectIds = Array.from(new Set([...derivedProjectIds, ...explicitProjectIds]));
+
   return {
     id: doc._id.toString(),
     name: doc.name,
     email: doc.email,
+    phoneNumber: doc.phoneNumber ?? null,
     role: doc.role,
     projectRoles,
-    projectIds: projectRoles.filter((p) => p.isActive).map((p) => p.projectId),
+    projectIds,
     isActive: doc.isActive ?? true,
     lastLoginAt: doc.lastLoginAt ?? null,
     createdAt: doc.createdAt,
@@ -536,10 +542,14 @@ export async function listUsers(
   }
 
   if (query.projectId) {
-    if (!Types.ObjectId.isValid(query.projectId)) {
-      throw new UserServiceError("Invalid projectId", 400, "INVALID_ID");
+    if (Types.ObjectId.isValid(query.projectId)) {
+      filter.$or = [
+        { "projectRoles.projectId": new Types.ObjectId(query.projectId) },
+        { projectIds: query.projectId },
+      ];
+    } else {
+      filter.projectIds = query.projectId;
     }
-    filter["projectRoles.projectId"] = new Types.ObjectId(query.projectId); // CHANGED from projectIds
   }
 
   if (query.search) {
@@ -627,8 +637,10 @@ export async function createUser(
     name: input.name,
     email: input.email,
     passwordHash,
+    phoneNumber: input.phoneNumber ?? null,
     role,
-    projectRoles: await buildProjectRoles(input.projectRoles ?? [], currentAuth), // CHANGED from projectIds
+    projectIds: input.projectIds ?? [],
+    projectRoles: await buildProjectRoles(input.projectRoles ?? [], currentAuth),
     isActive: input.isActive,
   });
 
@@ -698,6 +710,14 @@ export async function updateUser(
 
   if (input.name !== undefined) {
     user.name = input.name;
+  }
+
+  if (input.phoneNumber !== undefined) {
+    user.set("phoneNumber", input.phoneNumber);
+  }
+
+  if (input.projectIds !== undefined) {
+    user.set("projectIds", input.projectIds);
   }
 
   let mustRevoke = false;
