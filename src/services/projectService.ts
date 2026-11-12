@@ -165,7 +165,19 @@ export async function getProjectsWithRoles() {
           : a.name.localeCompare(b.name),
     );
 }
+/*  get role for the particular project*/
+export async function getRolesByProject(projectId: string) {
+  if (!Types.ObjectId.isValid(projectId)) {
+    throw new Error("Invalid projectId");
+  }
 
+  const roles = await Role.find({ projectId })
+    .select("name description moduleKeys isSystem isActive")
+    .sort({ name: 1 })
+    .lean();
+
+  return roles;
+}
 export async function updateProject(
   projectId: string,
   data: ProjectUpdate,

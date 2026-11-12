@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "bootstrap:superadmin": "tsx src/scripts/bootstrapSuperAdmin.ts",
-    "seed": "tsx src/scripts/seedFakeUsers.ts"
+    "seed": "tsx src/scripts/seedFakeUsers.ts",
+    "seed:modules": "tsx src/scripts/modules.Seed.ts"
   },
   "repository": {
     "type": "git",
