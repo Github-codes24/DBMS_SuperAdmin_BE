@@ -25,6 +25,23 @@ const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 const emptyToUndefined = (v: unknown) => (v === "" || v === null ? undefined : v);
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
 
+const normalizeRole = (val: unknown) => {
+  if (typeof val !== "string") return val;
+  const cleaned = val.trim().toLowerCase().replace(/[\s-_]/g, "");
+  if (cleaned === "superadmin") return "superadmin";
+  if (cleaned === "admin") return "admin";
+  if (cleaned === "manager") return "manager";
+  if (cleaned === "user") return "user";
+  return val.trim().toLowerCase();
+};
+
+export const userRoleEnum = z.preprocess(
+  normalizeRole,
+  z.enum(["superadmin", "admin", "manager", "user"], {
+    message: "Role must be one of 'superadmin', 'admin', 'manager', or 'user'",
+  }),
+);
+
 const projectRolesField = z
   .array(z.object({ projectId: objectId, roleId: objectId }))
   .max(50)
@@ -37,12 +54,12 @@ export const listUsersSchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(10),
     search: z.preprocess(emptyToUndefined, z.string().trim().max(100).optional()),
-    role: z.preprocess(emptyToUndefined, z.enum(["superadmin", "user"]).optional()),
+    role: z.preprocess(emptyToUndefined, userRoleEnum.optional()),
     isActive: z.preprocess(
       emptyToUndefined,
       z.enum(["true", "false"]).transform((val) => val === "true").optional(),
     ),
-    projectId: z.preprocess(emptyToUndefined, objectId.optional()),
+    projectId: z.preprocess(emptyToUndefined, z.string().trim().optional()),
     sortBy: z.enum(["createdAt", "name", "email", "lastLoginAt"]).default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
   }),
@@ -65,8 +82,10 @@ export const createUserSchema = z.object({
         .string()
         .min(8, "Password must be at least 8 characters")
         .max(128, "Password cannot exceed 128 characters"),
-        role: z.enum(["superadmin", "user"]).default("user"), 
-      projectRoles: projectRolesField,  
+      phoneNumber: z.string().trim().max(20).optional(),
+      role: userRoleEnum.default("user"),
+      projectRoles: projectRolesField,
+      projectIds: z.array(z.string().trim()).optional(),
       isActive: z.boolean().default(true),
     })
     .strict(),
@@ -100,8 +119,10 @@ export const updateUserSchema = z.object({
         .max(254)
         .transform((email) => email.toLowerCase())
         .optional(),
-        role: z.enum(["superadmin", "user"]).default("user").optional(),
+      phoneNumber: z.string().trim().max(20).optional(),
+      role: userRoleEnum.optional(),
       projectRoles: projectRolesField,
+      projectIds: z.array(z.string().trim()).optional(),
       isActive: z.boolean().optional(),
     })
     .strict(),

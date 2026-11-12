@@ -4,6 +4,7 @@ import { z } from "zod";
 const key = z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]{1,47}$/);
 const permKey = z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]{1,47}:[a-z][a-z0-9_-]{1,47}$/);
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/);
+const projectIdParam = z.string().regex(/^[0-9a-fA-F]{24}$|^PID-\d+$/i, "Invalid project ID");
 
 const panelLinkDto = z.object({
   name: z.string().trim().min(1).max(100),
@@ -100,7 +101,7 @@ export const updateProjectDto = z.object({
     panelLinks:  z.array(panelLinkDto).max(100).optional(),
     userTypes:   z.array(userTypeDto).max(100).optional(),
   }).passthrough(),
-  params: z.object({ projectId: objectId }).passthrough(),
+  params: z.object({ projectId: projectIdParam }).passthrough(),
   query:  z.object({}).passthrough(),
 });
 

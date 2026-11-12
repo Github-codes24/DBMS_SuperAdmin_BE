@@ -33,7 +33,8 @@ const objectIdParams = (...paramNames) => {
     return (req, _res, next) => {
         for (const name of paramNames) {
             const val = req.params[name];
-            if (typeof val !== "string" || !mongoose_1.Types.ObjectId.isValid(val)) {
+            const isCustomProjectId = name === "projectId" && typeof val === "string" && /^PID-\d+$/i.test(val);
+            if (typeof val !== "string" || (!mongoose_1.Types.ObjectId.isValid(val) && !isCustomProjectId)) {
                 return next((0, httpError_js_1.httpError)(400, "INVALID_ID", `Invalid ${name} parameter`));
             }
         }

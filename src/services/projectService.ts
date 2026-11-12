@@ -51,6 +51,11 @@ async function getNextProjectId(): Promise<string> {
 
 export async function createProject(input: ProjectInput) {
   const projectId = await getNextProjectId();
+  const adminObjectId =
+    input.adminId && Types.ObjectId.isValid(input.adminId)
+      ? new Types.ObjectId(input.adminId)
+      : null;
+
   const project = await Project.create({
     projectId,
     name: input.name.trim(),
@@ -62,6 +67,7 @@ export async function createProject(input: ProjectInput) {
     status: input.status ?? "active",
     type: "tenant",
     createdBy: input.createdBy,
+    adminId: adminObjectId,
     panelLinks: input.panelLinks ?? [],
     userTypes: input.userTypes ?? [],
   });
@@ -73,9 +79,61 @@ export async function createProject(input: ProjectInput) {
   return project;
 }
 
-/** Project management list: tenant projects only. */
-export async function getProjects() {
-  return Project.find({ type: "tenant" }).sort({ createdAt: -1 }).lean();
+/** Project summary metrics across all projects (for dashboard metric cards). */
+export async function getProjectStats() {
+  const [tenantProjects, projectAdminsCount] = await Promise.all([
+    Project.find({ type: "tenant" }).select("status").lean(),
+    User.countDocuments({
+      $or: [
+        { role: "admin" },
+        { "projectRoles.0": { $exists: true } },
+      ],
+      role: { $ne: "superadmin" },
+    }),
+  ]);
+
+  return {
+    totalProjects: tenantProjects.length,
+    activeProjects: tenantProjects.filter((p) => p.status === "active").length,
+    completedProjects: tenantProjects.filter((p) => p.status === "completed").length,
+    totalProjectAdmins: projectAdminsCount,
+    onHoldProjects: tenantProjects.filter((p) => p.status === "on_hold").length,
+    upcomingProjects: tenantProjects.filter((p) => p.status === "upcoming").length,
+  };
+}
+
+/** Project management list: tenant projects only. Supports optional search and status filter. */
+export async function getProjects(query?: { search?: string; status?: string }) {
+  const filter: Record<string, any> = { type: "tenant" };
+  if (query?.status && query.status !== "all") {
+    filter.status = query.status;
+  }
+  if (query?.search && query.search.trim()) {
+    const s = query.search.trim();
+    filter.$or = [
+      { name: { $regex: s, $options: "i" } },
+      { description: { $regex: s, $options: "i" } },
+      { projectId: { $regex: s, $options: "i" } },
+    ];
+  }
+  return Project.find(filter)
+    .populate("adminId", "name email role phone username")
+    .populate("createdBy", "name email")
+    .sort({ createdAt: -1 })
+    .lean();
+}
+
+/** Get single tenant project details by ID or custom projectId */
+export async function getProjectById(projectId: string) {
+  const query = Types.ObjectId.isValid(projectId)
+    ? { _id: projectId }
+    : { projectId: projectId };
+  const project = await Project.findOne(query)
+    .populate("adminId", "name email role phone username")
+    .populate("createdBy", "name email")
+    .lean();
+  if (!project) throw httpError(404, "PROJECT_NOT_FOUND", "Project not found");
+  return project;
 }
 
 /** Feeds the platform dropdown: every project with its roles. */
@@ -113,7 +171,10 @@ export async function updateProject(
   data: ProjectUpdate,
   actorId: string,
 ) {
-  const project = await Project.findById(projectId);
+  const query = Types.ObjectId.isValid(projectId)
+    ? { _id: projectId }
+    : { projectId: projectId };
+  const project = await Project.findOne(query);
   if (!project) throw httpError(404, "PROJECT_NOT_FOUND", "Project not found");
   if (project.type === "platform" && data.status === "inactive")
     throw httpError(
@@ -133,14 +194,24 @@ export async function updateProject(
   if (data.panelLinks !== undefined)
     project.panelLinks = data.panelLinks as any;
   if (data.userTypes !== undefined) project.userTypes = data.userTypes as any;
+  if (data.adminId !== undefined) {
+    if (data.adminId && Types.ObjectId.isValid(data.adminId)) {
+      project.adminId = new Types.ObjectId(data.adminId) as any;
+    } else {
+      project.adminId = null as any;
+    }
+  }
 
   await project.save();
-  await audit("project.updated", { actorId, projectId, after: data });
+  await audit("project.updated", { actorId, projectId: project._id, after: data });
   return project;
 }
 
 export async function deleteProject(projectId: string, actorId: string) {
-  const project = await Project.findById(projectId);
+  const query = Types.ObjectId.isValid(projectId)
+    ? { _id: projectId }
+    : { projectId: projectId };
+  const project = await Project.findOne(query);
   if (!project) throw httpError(404, "PROJECT_NOT_FOUND", "Project not found");
   if (project.type === "platform")
     throw httpError(
@@ -149,10 +220,10 @@ export async function deleteProject(projectId: string, actorId: string) {
       "The platform project cannot be deleted",
     );
 
-  await Project.findByIdAndDelete(projectId);
+  await Project.deleteOne({ _id: project._id });
   await audit("project.deleted", {
     actorId,
-    projectId,
+    projectId: project._id,
     after: { name: project.name },
   });
   return { projectId: project.projectId, name: project.name };
