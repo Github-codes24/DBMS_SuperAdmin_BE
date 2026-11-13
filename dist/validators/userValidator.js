@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteUserSchema = exports.resetPasswordSchema = exports.updateUserStatusSchema = exports.updateUserSchema = exports.getUserSchema = exports.createUserSchema = exports.listUsersSchema = exports.userRoleEnum = void 0;
+exports.deleteUserSchema = exports.resetPasswordSchema = exports.updateUserStatusSchema = exports.updateUserSchema = exports.getUserSchema = exports.createUserSchema = exports.listUsersSchema = exports.userRoleEnum = exports.userRoleSchema = void 0;
 const zod_1 = require("zod");
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 // export const listUsersSchema = z.object({
@@ -24,23 +24,8 @@ const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 // });
 const emptyToUndefined = (v) => (v === "" || v === null ? undefined : v);
 const objectId = zod_1.z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
-const normalizeRole = (val) => {
-    if (typeof val !== "string")
-        return val;
-    const cleaned = val.trim().toLowerCase().replace(/[\s-_]/g, "");
-    if (cleaned === "superadmin")
-        return "superadmin";
-    if (cleaned === "admin")
-        return "admin";
-    if (cleaned === "manager")
-        return "manager";
-    if (cleaned === "user")
-        return "user";
-    return val.trim().toLowerCase();
-};
-exports.userRoleEnum = zod_1.z.preprocess(normalizeRole, zod_1.z.enum(["superadmin", "admin", "manager", "user"], {
-    message: "Role must be one of 'superadmin', 'admin', 'manager', or 'user'",
-}));
+exports.userRoleSchema = zod_1.z.string().trim().min(1, "Role cannot be empty");
+exports.userRoleEnum = exports.userRoleSchema;
 const projectRolesField = zod_1.z
     .array(zod_1.z.object({ projectId: objectId, roleId: objectId }))
     .max(50)

@@ -1,0 +1,315 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Mock test payloads and parameters for every endpoint in the DBMS Super Admin API",
+  "baseUrl": "http://localhost:3007",
+  "endpoints": {
+    "auth": {
+      "login": {
+        "method": "POST",
+        "url": "/api/auth/login",
+        "headers": {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        "samplePayloads": {
+          "superadminLogin": {
+            "description": "Login as default Super Admin (after running npm run bootstrap:superadmin)",
+            "body": {
+              "email": "superadmin@example.com",
+              "password": "SuperAdminPassword123!"
+            }
+          },
+          "adminLogin": {
+            "description": "Login as an Admin user",
+            "body": {
+              "email": "sarah.admin@enterprise.io",
+              "password": "AdminSecure2026!#"
+            }
+          },
+          "managerLogin": {
+            "description": "Login as a Project Manager",
+            "body": {
+              "email": "david.manager@cloudcorp.com",
+              "password": "ManagerPass987$!"
+            }
+          },
+          "standardUserLogin": {
+            "description": "Login as a Regular User",
+            "body": {
+              "email": "emily.dev@technocrate.io",
+              "password": "DevUserSecret#2026"
+            }
+          },
+          "invalidCredentials": {
+            "description": "Should fail with 401 INVALID_CREDENTIALS",
+            "body": {
+              "email": "nonexistent.user@example.com",
+              "password": "WrongPassword123!"
+            }
+          },
+          "invalidEmailValidation": {
+            "description": "Should fail with 400 VALIDATION_ERROR",
+            "body": {
+              "email": "not-an-email",
+              "password": "ValidPassword123!"
+            }
+          }
+        }
+      }
+    },
+    "test": {
+      "protectedRoute": {
+        "method": "GET",
+        "url": "/api/test/protected",
+        "headers": {
+          "Authorization": "Bearer <PASTE_YOUR_ACCESS_TOKEN_HERE>",
+          "Accept": "application/json"
+        },
+        "description": "Verifies token validity and returns userId, role, and assigned projectIds"
+      }
+    },
+    "users": {
+      "listUsers": {
+        "method": "GET",
+        "url": "/api/users",
+        "headers": {
+          "Authorization": "Bearer <PASTE_YOUR_ACCESS_TOKEN_HERE>",
+          "Accept": "application/json"
+        },
+        "queryScenarios": {
+          "defaultFirstPage": {
+            "query": "?page=1&limit=10",
+            "description": "Default page 1 with 10 records sorted by createdAt desc"
+          },
+          "filterByRoleAdmin": {
+            "query": "?role=admin&page=1&limit=10",
+            "description": "Filter users who have admin role"
+          },
+          "filterByActiveOnly": {
+            "query": "?isActive=true&page=1&limit=20",
+            "description": "Fetch only active accounts"
+          },
+          "filterByInactiveOnly": {
+            "query": "?isActive=false&page=1&limit=20",
+            "description": "Fetch deactivated accounts"
+          },
+          "searchByNameOrEmail": {
+            "query": "?search=sarah&page=1&limit=10",
+            "description": "Search matching name or email contains 'sarah'"
+          },
+          "filterByProjectId": {
+            "query": "?projectId=PRJ-DATABASE-MIGRATION&page=1&limit=10",
+            "description": "Filter users assigned to specific project"
+          },
+          "sortedByNameAscending": {
+            "query": "?sortBy=name&sortOrder=asc&page=1&limit=25",
+            "description": "Sort alphabetically by name (A to Z)"
+          },
+          "sortedByLastLogin": {
+            "query": "?sortBy=lastLoginAt&sortOrder=desc&page=1&limit=10",
+            "description": "Sort by recent activity"
+          }
+        }
+      },
+      "createUser": {
+        "method": "POST",
+        "url": "/api/users",
+        "headers": {
+          "Authorization": "Bearer <PASTE_YOUR_ACCESS_TOKEN_HERE>",
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        "samplePayloads": {
+          "createAdminUser": {
+            "description": "Create a new secondary Admin",
+            "body": {
+              "name": "Sarah Connor",
+              "email": "sarah.admin@enterprise.io",
+              "password": "AdminSecure2026!#",
+              "role": "admin",
+              "projectIds": [
+                "PRJ-DATABASE-MIGRATION",
+                "PRJ-SECURITY-COMPLIANCE"
+              ],
+              "isActive": true
+            }
+          },
+          "createProjectManager": {
+            "description": "Create a Manager for internal projects",
+            "body": {
+              "name": "David Miller",
+              "email": "david.manager@cloudcorp.com",
+              "password": "ManagerPass987$!",
+              "role": "manager",
+              "projectIds": [
+                "PRJ-DATABASE-MIGRATION",
+                "PRJ-BILLING-V2"
+              ],
+              "isActive": true
+            }
+          },
+          "createDeveloperUser": {
+            "description": "Create a standard team developer",
+            "body": {
+              "name": "Emily Watson",
+              "email": "emily.dev@technocrate.io",
+              "password": "DevUserSecret#2026",
+              "role": "user",
+              "projectIds": [
+                "PRJ-DATABASE-MIGRATION"
+              ],
+              "isActive": true
+            }
+          },
+          "createAuditorUser": {
+            "description": "Create an inactive user for testing status workflows",
+            "body": {
+              "name": "Robert Vance",
+              "email": "robert.vance@auditors.org",
+              "password": "AuditorPassword!2026",
+              "role": "user",
+              "projectIds": [
+                "PRJ-FINANCIAL-AUDIT"
+              ],
+              "isActive": false
+            }
+          },
+          "createSuperAdmin": {
+            "description": "Create another Super Admin (NOTE: Only accessible if caller is superadmin)",
+            "body": {
+              "name": "Alexander Pierce",
+              "email": "alex.pierce@shield-ops.gov",
+              "password": "SuperAdminTierZero#2026",
+              "role": "superadmin",
+              "projectIds": [
+                "PRJ-ALL-ACCESS"
+              ],
+              "isActive": true
+            }
+          },
+          "validationFailureShortPassword": {
+            "description": "Validation test: Password < 8 characters triggers 400 VALIDATION_ERROR",
+            "body": {
+              "name": "Test User",
+              "email": "test.short@example.com",
+              "password": "123",
+              "role": "user",
+              "projectIds": [],
+              "isActive": true
+            }
+          }
+        }
+      },
+      "getUserById": {
+        "method": "GET",
+        "url": "/api/users/:id",
+        "headers": {
+          "Authorization": "Bearer <PASTE_YOUR_ACCESS_TOKEN_HERE>",
+          "Accept": "application/json"
+        },
+        "sampleId": "671cd93e2b3c4d5e6f7a8c90",
+        "description": "Replace :id with any valid 24-character hexadecimal MongoDB ObjectId"
+      },
+      "updateUser": {
+        "method": "PUT",
+        "url": "/api/users/:id",
+        "headers": {
+          "Authorization": "Bearer <PASTE_YOUR_ACCESS_TOKEN_HERE>",
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        "sampleId": "671cd93e2b3c4d5e6f7a8c90",
+        "samplePayloads": {
+          "updateProfileAndRole": {
+            "description": "Update user display name, role and assigned projects",
+            "body": {
+              "name": "Sarah Connor-Reese",
+              "role": "admin",
+              "projectIds": [
+                "PRJ-DATABASE-MIGRATION",
+                "PRJ-SECURITY-COMPLIANCE",
+                "PRJ-INCIDENT-RESPONSE"
+              ]
+            }
+          },
+          "updateEmailOnly": {
+            "description": "Update user email address",
+            "body": {
+              "email": "sarah.newemail@enterprise.io"
+            }
+          },
+          "fullUpdate": {
+            "description": "Update all mutable user properties",
+            "body": {
+              "name": "Sarah Connor",
+              "email": "sarah.connor@cyberdyne.net",
+              "role": "manager",
+              "projectIds": [
+                "PRJ-AI-DEFENSE"
+              ],
+              "isActive": true
+            }
+          }
+        }
+      },
+      "updateUserStatus": {
+        "method": "PATCH",
+        "url": "/api/users/:id/status",
+        "headers": {
+          "Authorization": "Bearer <PASTE_YOUR_ACCESS_TOKEN_HERE>",
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        "sampleId": "671cd93e2b3c4d5e6f7a8c90",
+        "samplePayloads": {
+          "deactivateUser": {
+            "description": "Deactivate an active user account",
+            "body": {
+              "isActive": false
+            }
+          },
+          "reactivateUser": {
+            "description": "Reactivate a suspended/deactivated account",
+            "body": {
+              "isActive": true
+            }
+          }
+        }
+      },
+      "resetPassword": {
+        "method": "POST",
+        "url": "/api/users/:id/reset-password",
+        "headers": {
+          "Authorization": "Bearer <PASTE_YOUR_ACCESS_TOKEN_HERE>",
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        "sampleId": "671cd93e2b3c4d5e6f7a8c90",
+        "samplePayloads": {
+          "newStrongPassword": {
+            "description": "Reset target user password (min 8 chars)",
+            "body": {
+              "password": "BrandNewSecurePassword#2026!"
+            }
+          },
+          "validationFailurePassword": {
+            "description": "Too short (< 8 chars) - will fail with 400 VALIDATION_ERROR",
+            "body": {
+              "password": "short"
+            }
+          }
+        }
+      },
+      "deleteUser": {
+        "method": "DELETE",
+        "url": "/api/users/:id",
+        "headers": {
+          "Authorization": "Bearer <PASTE_SUPERADMIN_ACCESS_TOKEN_HERE>",
+          "Accept": "application/json"
+        },
+        "sampleId": "671cd93e2b3c4d5e6f7a8c90",
+        "description": "Permanently deletes user. Requires 'superadmin' role. Cannot delete self or last superadmin."
+      }
+    }
+  }
+}
