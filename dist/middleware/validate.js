@@ -12,16 +12,6 @@ const validate = (schema) => {
             query: req.query ?? {},
         });
         if (!result.success) {
-<<<<<<< HEAD
-            // Helpful for debugging in your terminal:
-            console.error("Zod Validation Error:", result.error.format());
-            const details = result.error.issues.map((issue) => ({
-                field: issue.path.length > 1 ? issue.path.slice(1).join(".") : issue.path.join("."),
-                message: issue.message,
-                code: issue.code,
-            }));
-            return apiManager_js_1.apiManager.failure(res, "Request validation failed", 400, "VALIDATION_ERROR", details);
-=======
             const issueSummary = result.error.issues
                 .map((i) => `${i.path.join(".") || "field"}: ${i.message}`)
                 .join("; ");
@@ -33,7 +23,6 @@ const validate = (schema) => {
             if (typed.body !== undefined) {
                 req.body = typed.body;
             }
->>>>>>> develop
         }
         res.locals.validated = result.data;
         next();

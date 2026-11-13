@@ -565,12 +565,12 @@ async function updateUser(id, input, currentAuth) {
     if (input.phoneNumber !== undefined) {
         user.set("phoneNumber", input.phoneNumber);
     }
-<<<<<<< HEAD
-=======
     if (input.projectIds !== undefined) {
         user.set("projectIds", input.projectIds);
     }
->>>>>>> develop
+    if (input.phoneNumber !== undefined) {
+        user.set("phoneNumber", input.phoneNumber);
+    }
     let mustRevoke = false;
     if (validatedRole !== undefined && validatedRole !== user.role) {
         user.role = validatedRole;

@@ -103,11 +103,6 @@ const userSchema = new mongoose_1.Schema({
         unique: true,
         index: true
     },
-<<<<<<< HEAD
-    passwordHash: { type: String, required: true, select: false },
-    phoneNumber: { type: String, trim: true, default: null },
-    role: { type: String, enum: ["superadmin", "user"], default: "user", required: true },
-=======
     passwordHash: { type: String, required: false, select: false },
     phone: { type: String, trim: true, default: "" },
     phoneNumber: { type: String, trim: true, default: null },
@@ -122,7 +117,6 @@ const userSchema = new mongoose_1.Schema({
         type: [String],
         default: [],
     },
->>>>>>> develop
     projectRoles: [
         {
             _id: false,

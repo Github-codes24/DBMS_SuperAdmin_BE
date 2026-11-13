@@ -16,14 +16,10 @@ exports.apiManager = {
         return res.status(statusCode).json({
             success: false,
             message,
-<<<<<<< HEAD
             error: {
                 code,
                 ...(details !== undefined ? { details } : {}),
             },
-=======
-            error: { code, ...(details !== undefined ? { details } : {}) },
->>>>>>> develop
             ...(res.locals.requestId
                 ? { requestId: res.locals.requestId }
                 : {}),
