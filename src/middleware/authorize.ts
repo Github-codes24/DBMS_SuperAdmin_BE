@@ -16,7 +16,10 @@ export const authorize = (...allowedRoles: string[]): RequestHandler => {
       );
     }
 
-    if (!allowedRoles.includes(auth.role)) {
+    const cleanAuthRole = auth.role.trim().toLowerCase().replace(/[\s-_]/g, "");
+    const cleanAllowed = allowedRoles.map((r) => r.trim().toLowerCase().replace(/[\s-_]/g, ""));
+
+    if (!cleanAllowed.includes(cleanAuthRole) && !allowedRoles.includes(auth.role)) {
       return apiManager.failure(
         res,
         "You do not have permission to access this resource",

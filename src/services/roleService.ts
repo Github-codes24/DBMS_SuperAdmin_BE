@@ -110,11 +110,43 @@ export async function deleteRole(projectId: string, roleId: string, actorId: str
 export async function getMatrix(projectId: string, roleId: string) {
   const role = await findRole(projectId, roleId);
 
-  const [actions, modules, perms] = await Promise.all([
+  const platform = await Project.findOne({ type: "platform" }).select("_id").lean();
+  const searchProjectIds = [new Types.ObjectId(projectId)];
+  if (platform && String(platform._id) !== String(projectId)) {
+    searchProjectIds.push(platform._id as Types.ObjectId);
+  }
+
+  const tenantPermsCount = await Permission.countDocuments({ projectId, isActive: true });
+  const effectiveProjectIds =
+    tenantPermsCount > 0 ? [new Types.ObjectId(projectId)] : searchProjectIds;
+
+  const moduleFilter: Record<string, any> = { projectId: { $in: effectiveProjectIds }, isActive: true };
+  const permFilter: Record<string, any> = { projectId: { $in: effectiveProjectIds }, isActive: true };
+
+  if (role.moduleKeys && role.moduleKeys.length > 0) {
+    moduleFilter.key = { $in: role.moduleKeys };
+    permFilter.moduleKey = { $in: role.moduleKeys };
+  }
+
+  const [actions, rawModules, perms] = await Promise.all([
     Action.find({ isActive: true }).sort({ sortOrder: 1 }).lean(),
-    Module.find({ projectId, isActive: true, key: { $in: role.moduleKeys } }).sort({ sortOrder: 1 }).lean(),
-    Permission.find({ projectId, isActive: true, moduleKey: { $in: role.moduleKeys } }).lean(),
+    Module.find(moduleFilter).sort({ sortOrder: 1 }).lean(),
+    Permission.find(permFilter).lean(),
   ]);
+
+  let modules = rawModules;
+  if (modules.length === 0 && perms.length > 0) {
+    const distinctModules = [...new Set(perms.map((p) => p.moduleKey))];
+    modules = distinctModules.map((k) => ({
+      _id: new Types.ObjectId(),
+      projectId: effectiveProjectIds[0],
+      key: k,
+      name: k.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      description: "",
+      sortOrder: 0,
+      isActive: true,
+    } as any));
+  }
 
   const granted = new Set(role.permissions);
   const usedActions = new Set(perms.map((p) => p.actionKey));
@@ -150,9 +182,22 @@ export async function savePermissions(
   if (role.isSystem) throw httpError(403, "ROLE_LOCKED", "System role cannot be modified");
   if (role.version !== expectedVersion) throw httpError(409, "VERSION_CONFLICT", "This role was changed elsewhere. Reload and try again.");
 
-  // Everything grantable for this role: active permissions of the modules it may use
-  const grantable = await Permission.find({ projectId, isActive: true, moduleKey: { $in: role.moduleKeys } }).select("key").lean();
-  const valid = new Set(grantable.map((p) => p.key));
+  const platform = await Project.findOne({ type: "platform" }).select("_id").lean();
+  const searchProjectIds = [new Types.ObjectId(projectId)];
+  if (platform && String(platform._id) !== String(projectId)) {
+    searchProjectIds.push(platform._id as Types.ObjectId);
+  }
+
+  // Everything grantable: active permissions for this project, platform fallback, or global
+  const grantable = await Permission.find({
+    $or: [
+      { projectId: { $in: searchProjectIds } },
+      { projectId: { $exists: false } },
+    ],
+    isActive: true,
+  }).select("key moduleKey").lean();
+
+  const valid = new Set(grantable.map((p) => p.key.toLowerCase()));
 
   const wanted = new Set(keys.map((k) => k.toLowerCase()));
   const invalid = [...wanted].filter((k) => !valid.has(k));
@@ -164,9 +209,13 @@ export async function savePermissions(
   }
   const final = [...wanted].sort();
 
+  // Derive and sync moduleKeys from granted permissions so role.moduleKeys reflects granted access
+  const grantedModuleKeys = [...new Set(final.map((k) => k.split(":")[0]))];
+  const updatedModuleKeys = [...new Set([...(role.moduleKeys ?? []), ...grantedModuleKeys])];
+
   const res = await Role.updateOne(
     { _id: roleId, projectId, version: expectedVersion },
-    { $set: { permissions: final }, $inc: { version: 1 } },
+    { $set: { permissions: final, moduleKeys: updatedModuleKeys }, $inc: { version: 1 } },
   );
   if (res.matchedCount === 0) throw httpError(409, "VERSION_CONFLICT", "This role was changed elsewhere. Reload and try again.");
 
