@@ -11,6 +11,8 @@ import testRoutes from "./routes/testRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
 import platformRoutes from "./routes/platformRoutes.js";
+import settingsRouter from "../src/routes/settingRoutes.js"
+
 
 const app = express();
 
@@ -100,6 +102,7 @@ app.use("/api/test", testRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/platform", platformRoutes);
+app.use("/api/settings", settingsRouter);
 
 // Register feature routes above these two handlers.
 app.use(notFound);

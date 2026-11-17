@@ -54,7 +54,7 @@ export async function createProject(input: ProjectInput) {
   const adminObjectId =
     input.adminId && Types.ObjectId.isValid(input.adminId)
       ? new Types.ObjectId(input.adminId)
-      : null;
+      : undefined;
 
   const project = await Project.create({
     projectId,
