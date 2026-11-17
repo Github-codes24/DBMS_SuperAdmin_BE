@@ -9,6 +9,7 @@ import * as role from "../controllers/roleController.js";
 import * as mod from "../controllers/module.controller.js";
 import * as pu from "../controllers/projectAdminController.js";
 import { getRolesByProject } from "../controllers/projectController.js";
+import { getAllRoles } from "../services/roleService.js";
 
 const platform = Router();
 platform.use(authenticate, requireSuperAdmin);
@@ -28,6 +29,15 @@ platform.post("/projects", validate(v.createProjectDto), project.createProject);
 platform.get("/projects-with-roles", project.getProjectsWithRoles);
 // fetch role from the projects 
 platform.get("/projects/:projectId/roles", getRolesByProject);
+
+// Get all the roles 
+platform.get("/roles", async (_req, res, next) => {
+  try {
+    res.json({ success: true, data: await getAllRoles() });
+  } catch (e) {
+    next(e);
+  }
+});
 
 /** Get single tenant project details */
 platform.get(
