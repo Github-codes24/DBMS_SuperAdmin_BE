@@ -627,18 +627,46 @@ export async function listUsers(
       .lean(),
   ]);
 
-  return {
-    users: docs.map(formatUser),
-    pagination: {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit) || 1,
-      hasNextPage: page * limit < total,
-      hasPrevPage: page > 1,
-    },
-  };
+//   return {
+//     users: docs.map(formatUser),
+//     pagination: {
+//       total,
+//       page,
+//       limit,
+//       totalPages: Math.ceil(total / limit) || 1,
+//       hasNextPage: page * limit < total,
+//       hasPrevPage: page > 1,
+//     },
+//   };
+// }
+
+const roleIds = docs.flatMap((d: any) => (d.projectRoles ?? []).map((pr: any) => pr.roleId));
+const roles = await Role.find({ _id: { $in: roleIds } }).select("name").lean();
+const roleMap = new Map(roles.map((r: any) => [String(r._id), r.name]));
+
+return {
+  users: docs.map((d: any) => {
+    const u: any = formatUser(d);
+    u.projectRoles = u.projectRoles.map((pr: any) => ({
+      ...pr,
+      roleName: roleMap.get(pr.roleId) ?? null,
+    }));
+    return u;
+  }),
+  pagination: {
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit) || 1,
+    hasNextPage: page * limit < total,
+    hasPrevPage: page > 1,
+  },
+};
 }
+
+
+
+
 
 export async function getUserById(id: string): Promise<UserResponse> {
   const user = await User.findById(id).lean();

@@ -50,6 +50,13 @@ export async function createRole(
   }
 }
 
+//
+export async function getAllRoles() {
+  return Role.find({ isActive: true })
+    .select("name projectId isSystem")
+    .sort({ name: 1 })
+    .lean();
+}
 export async function getRolesByProject(projectId: string) {
   await assertProject(projectId);
   return Role.find({ projectId }).sort({ name: 1 }).lean();
