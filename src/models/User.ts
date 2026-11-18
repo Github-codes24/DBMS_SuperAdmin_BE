@@ -56,21 +56,21 @@ import mongoose, { Schema, type InferSchemaType } from "mongoose";
 
 const userSchema = new Schema(
   {
-    name: { 
+    name: {
       type: String,
-       required: true,
-        trim: true,
-         minlength: 2,
-          maxlength: 100 
-        },
+      required: true,
+      trim: true,
+      minlength: 2,
+      maxlength: 100
+    },
     email: {
-       type: String,
-        required: true,
-         lowercase: true,
-          trim: true,
-           unique: true, 
-           index: true 
-          },
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+      unique: true,
+      index: true
+    },
     passwordHash: { type: String, required: false, select: false },
     phone: { type: String, trim: true, default: "" },
     phoneNumber: { type: String, trim: true, default: null },
@@ -78,9 +78,9 @@ const userSchema = new Schema(
 
     role: {
       type: String,
-      enum: ["superadmin", "admin", "manager", "user"],
       default: "user",
       required: true,
+      trim: true,
     },
 
     projectIds: {

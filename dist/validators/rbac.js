@@ -118,9 +118,12 @@ exports.bulkModulesDto = zod_1.z.object({
             name: zod_1.z.string().trim().min(2).max(80),
             description: zod_1.z.string().trim().max(300).optional(),
             actions: zod_1.z.array(key).optional(),
+            panel: zod_1.z.string().trim().min(2).max(80),
         }).strict()).min(1).max(100),
     }).strict(),
-    params: zod_1.z.object({ projectId: objectId }).strict(),
+    params: zod_1.z.object({
+        projectId: objectId,
+    }).strict(),
     query: zod_1.z.object({}).strict(),
 });
 exports.updateModuleDto = zod_1.z.object({
@@ -167,6 +170,15 @@ exports.createProjectUserDto = zod_1.z.object({
     params: zod_1.z.object({ projectId: objectId }).strict(),
     query: zod_1.z.object({}).strict(),
 });
-exports.assignRoleDto = zod_1.z.object({ roleId: objectId }).strict();
+exports.assignRoleDto = zod_1.z.object({
+    body: zod_1.z.object({
+        roleId: objectId,
+    }).strict(),
+    params: zod_1.z.object({
+        projectId: objectId,
+        userId: objectId,
+    }).strict(),
+    query: zod_1.z.object({}).strict(),
+});
 exports.activeDto = zod_1.z.object({ isActive: zod_1.z.boolean() }).strict();
 //# sourceMappingURL=rbac.js.map

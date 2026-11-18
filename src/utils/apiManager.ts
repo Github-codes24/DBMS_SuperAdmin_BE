@@ -28,7 +28,10 @@ export const apiManager = {
     return res.status(statusCode).json({
       success: false,
       message,
-      error: { code, ...(details !== undefined ? { details } : {}) },
+      error: {
+        code,
+        ...(details !== undefined ? { details } : {}),
+      },
       ...(res.locals.requestId
         ? { requestId: res.locals.requestId as string }
         : {}),

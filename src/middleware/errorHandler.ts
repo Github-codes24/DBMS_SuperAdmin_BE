@@ -13,15 +13,15 @@ export const errorHandler: ErrorRequestHandler = (
     typeof (err as { statusCode?: unknown })?.statusCode === "number"
       ? (err as { statusCode: number }).statusCode
       : typeof (err as { status?: unknown })?.status === "number"
-      ? (err as { status: number }).status
-      : 500;
+        ? (err as { status: number }).status
+        : 500;
 
   const code =
     typeof (err as { code?: unknown })?.code === "string"
       ? (err as { code: string }).code
       : statusCode === 500
-      ? "INTERNAL_SERVER_ERROR"
-      : "REQUEST_ERROR";
+        ? "INTERNAL_SERVER_ERROR"
+        : "REQUEST_ERROR";
 
   // Log internal error details on the server.
   console.error("[API Error]", {
@@ -40,10 +40,12 @@ export const errorHandler: ErrorRequestHandler = (
     return;
   }
 
-  const clientMessage = error.message || "An unexpected error occurred";
-
-  return apiManager.failure(res, clientMessage, statusCode, code, {
-    details: error.message,
-    name: error.name,
-  });
+  const message =
+    statusCode >= 500 ? "An unexpected error occurred" : error.message;
+  return apiManager.failure(
+    res,
+    message,
+    statusCode,
+    code,
+  );
 };

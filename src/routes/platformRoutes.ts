@@ -12,6 +12,16 @@ import { getRolesByProject } from "../controllers/projectController.js";
 import { getAllRoles } from "../services/roleService.js";
 
 const platform = Router();
+
+// Get all the roles (for user dropdowns & platform role listings)
+platform.get("/roles", async (_req, res, next) => {
+  try {
+    res.json({ success: true, data: await getAllRoles() });
+  } catch (e) {
+    next(e);
+  }
+});
+
 platform.use(authenticate, requireSuperAdmin);
 
 // ── PROJECT MANAGEMENT ──────────────────────────────────────────────────────
@@ -29,15 +39,6 @@ platform.post("/projects", validate(v.createProjectDto), project.createProject);
 platform.get("/projects-with-roles", project.getProjectsWithRoles);
 // fetch role from the projects 
 platform.get("/projects/:projectId/roles", getRolesByProject);
-
-// Get all the roles 
-platform.get("/roles", async (_req, res, next) => {
-  try {
-    res.json({ success: true, data: await getAllRoles() });
-  } catch (e) {
-    next(e);
-  }
-});
 
 /** Get single tenant project details */
 platform.get(

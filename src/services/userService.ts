@@ -589,15 +589,8 @@ export async function listUsers(
   //   filter.role = { $regex: new RegExp(`^${escapedRole}$`, "i") };
   // }
   if (query.role) {
-    const roleValue = query.role.trim();
-    if (/^[0-9a-fA-F]{24}$/.test(roleValue)) {
-      // Role document ID: users holding that role in any project
-      filter["projectRoles.roleId"] = new Types.ObjectId(roleValue);
-    } else {
-      // legacy values: superadmin / admin / manager / user
-      const escapedRole = roleValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      filter.role = { $regex: new RegExp(`^${escapedRole}$`, "i") };
-    }
+    const escapedRole = query.role.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    filter.role = { $regex: new RegExp(`^${escapedRole}$`, "i") };
   }
 
   if (query.isActive !== undefined) {

@@ -11,8 +11,8 @@ import testRoutes from "./routes/testRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
 import platformRoutes from "./routes/platformRoutes.js";
-import settingsRouter from "../src/routes/settingRoutes.js"
-import reportRouter from "../src/routes/reportRoutes.js"
+import settingsRouter from "./routes/settingRoutes.js";
+import reportRouter from "./routes/reportRoutes.js";
 
 
 const app = express();
@@ -94,7 +94,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 app.get("/api/health", (_req, res) => {
-  return apiManager.success(res, "DBMS Super Admin API is running", {
+  return apiManager.success(res, "DBMS Super Admin API is running.....", {
     service: "dbms-superadmin-api",
     timestamp: new Date().toISOString(),
   });

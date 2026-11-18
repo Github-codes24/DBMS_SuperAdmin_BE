@@ -43,7 +43,18 @@ const project = __importStar(require("../controllers/projectController.js"));
 const role = __importStar(require("../controllers/roleController.js"));
 const mod = __importStar(require("../controllers/module.controller.js"));
 const pu = __importStar(require("../controllers/projectAdminController.js"));
+const projectController_js_1 = require("../controllers/projectController.js");
+const roleService_js_1 = require("../services/roleService.js");
 const platform = (0, express_1.Router)();
+// Get all the roles (for user dropdowns & platform role listings)
+platform.get("/roles", async (_req, res, next) => {
+    try {
+        res.json({ success: true, data: await (0, roleService_js_1.getAllRoles)() });
+    }
+    catch (e) {
+        next(e);
+    }
+});
 platform.use(authenticate_js_1.authenticate, requireSuperAdmin_js_1.requireSuperAdmin);
 // ── PROJECT MANAGEMENT ──────────────────────────────────────────────────────
 /** Summary metrics across all projects (for dashboard metric cards) */
@@ -54,6 +65,8 @@ platform.get("/projects", project.getProjects);
 platform.post("/projects", (0, validate_js_1.validate)(v.createProjectDto), project.createProject);
 /** Projects with their roles (for dropdowns) */
 platform.get("/projects-with-roles", project.getProjectsWithRoles);
+// fetch role from the projects 
+platform.get("/projects/:projectId/roles", projectController_js_1.getRolesByProject);
 /** Get single tenant project details */
 platform.get("/projects/:projectId", (0, validate_js_1.objectIdParams)("projectId"), project.getProjectById);
 /** Update a project's details / status */

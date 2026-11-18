@@ -339,6 +339,7 @@ function signAccessToken(user) {
         throw new Error("JWT_ACCESS_SECRET must be configured with at least 32 characters");
     }
     const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "7d";
+    console.log("expiresIn", expiresIn);
     const token = jsonwebtoken_1.default.sign({ role: user.role, tv: user.tokenVersion ?? 0 }, // informational only: the server re-reads the user on every request
     secret, {
         subject: user._id.toString(),

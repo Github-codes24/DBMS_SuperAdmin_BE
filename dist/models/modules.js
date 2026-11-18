@@ -35,37 +35,52 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Module = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
+// 
+//     {
+//       projectId: { 
+//         type: Schema.Types.ObjectId,
+//         ref: "Project",
+//          required: true 
+//         },
+//       key: { 
+//         type: String,
+//          required: true,
+//           lowercase: true,
+//            trim: true 
+//         },
+//       name: {
+//          type: String,
+//           required: true,
+//            trim: true
+//          },
+//       description: {
+//          type: String,
+//           trim: true,
+//            default: ""
+//          },
+//       sortOrder: {
+//          type: Number,
+//           default: 0 
+//         },
+//       isActive: {
+//          type: Boolean, 
+//          default: true
+//          },
+//     },
+//     { timestamps: true, collection: "modules" },
+//   );
+//   moduleSchema.index({ projectId: 1, key: 1 }, { unique: true });
 const moduleSchema = new mongoose_1.Schema({
-    projectId: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: "Project",
-        required: true
-    },
-    key: {
-        type: String,
-        required: true,
-        lowercase: true,
-        trim: true
-    },
-    name: {
-        type: String,
-        required: true,
-        trim: true
-    },
-    description: {
-        type: String,
-        trim: true,
-        default: ""
-    },
-    sortOrder: {
-        type: Number,
-        default: 0
-    },
-    isActive: {
-        type: Boolean,
-        default: true
-    },
+    projectId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Project", required: true },
+    projectName: { type: String, required: true, trim: true },
+    panel: { type: String, required: true, lowercase: true, trim: true },
+    key: { type: String, required: true, lowercase: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    description: { type: String, trim: true, default: "" },
+    sortOrder: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: true },
 }, { timestamps: true, collection: "modules" });
-moduleSchema.index({ projectId: 1, key: 1 }, { unique: true });
+// key is unique per project AND panel
+moduleSchema.index({ projectId: 1, panel: 1, key: 1 }, { unique: true });
 exports.Module = mongoose_1.default.model("Module", moduleSchema);
 //# sourceMappingURL=modules.js.map

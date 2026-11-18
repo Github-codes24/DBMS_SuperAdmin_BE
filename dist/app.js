@@ -15,6 +15,8 @@ const testRoutes_js_1 = __importDefault(require("./routes/testRoutes.js"));
 const userRoutes_js_1 = __importDefault(require("./routes/userRoutes.js"));
 const permissionRoutes_js_1 = __importDefault(require("./routes/permissionRoutes.js"));
 const platformRoutes_js_1 = __importDefault(require("./routes/platformRoutes.js"));
+const settingRoutes_js_1 = __importDefault(require("./routes/settingRoutes.js"));
+const reportRoutes_js_1 = __importDefault(require("./routes/reportRoutes.js"));
 const app = (0, express_1.default)();
 app.disable("x-powered-by");
 app.use((0, helmet_1.default)());
@@ -57,28 +59,29 @@ app.use((0, cors_1.default)({
     ],
     exposedHeaders: ["X-Request-ID"],
 }));
-app.use((req, res, next) => {
-    console.log("[REQUEST START]", {
-        requestId: res.locals.requestId,
-        method: req.method,
-        url: req.originalUrl,
-    });
-    const originalJson = res.json.bind(res);
-    res.json = ((...args) => {
-        console.trace("[RESPONSE SENT]", {
-            requestId: res.locals.requestId,
-            method: req.method,
-            url: req.originalUrl,
-        });
-        return originalJson(...args);
-    });
-    next();
-});
+// for debugging purpose 
+// app.use((req, res, next) => {
+//   console.log("[REQUEST START]", {
+//     requestId: res.locals.requestId,
+//     method: req.method,
+//     url: req.originalUrl,
+//   });
+//   const originalJson = res.json.bind(res);
+//   res.json = ((...args: any[]) => {
+//     console.trace("[RESPONSE SENT]", {
+//       requestId: res.locals.requestId,
+//       method: req.method,
+//       url: req.originalUrl,
+//     });
+//     return originalJson(...args);
+//   }) as typeof res.json;
+//   next();
+// });
 app.use(requestContext_js_1.requestContext);
 app.use(express_1.default.json({ limit: "10mb" }));
 app.use(express_1.default.urlencoded({ limit: "10mb", extended: true }));
 app.get("/api/health", (_req, res) => {
-    return apiManager_js_1.apiManager.success(res, "DBMS Super Admin API is running", {
+    return apiManager_js_1.apiManager.success(res, "DBMS Super Admin API is running.....", {
         service: "dbms-superadmin-api",
         timestamp: new Date().toISOString(),
     });
@@ -88,6 +91,8 @@ app.use("/api/test", testRoutes_js_1.default);
 app.use("/api/users", userRoutes_js_1.default);
 app.use("/api/permissions", permissionRoutes_js_1.default);
 app.use("/api/platform", platformRoutes_js_1.default);
+app.use("/api/settings", settingRoutes_js_1.default);
+app.use("/api/reports", reportRoutes_js_1.default);
 // Register feature routes above these two handlers.
 app.use(notFound_js_1.notFound);
 app.use(errorHandler_js_1.errorHandler);
