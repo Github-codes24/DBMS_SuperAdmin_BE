@@ -5,6 +5,7 @@ exports.getProjectStats = getProjectStats;
 exports.getProjects = getProjects;
 exports.getProjectById = getProjectById;
 exports.getProjectsWithRoles = getProjectsWithRoles;
+exports.getRolesByProject = getRolesByProject;
 exports.updateProject = updateProject;
 exports.deleteProject = deleteProject;
 exports.getMyProjects = getMyProjects;
@@ -31,7 +32,7 @@ async function createProject(input) {
     const projectId = await getNextProjectId();
     const adminObjectId = input.adminId && mongoose_1.Types.ObjectId.isValid(input.adminId)
         ? new mongoose_1.Types.ObjectId(input.adminId)
-        : null;
+        : undefined;
     const project = await Project_js_1.Project.create({
         projectId,
         name: input.name.trim(),
@@ -134,6 +135,17 @@ async function getProjectsWithRoles() {
         : b.type === "platform"
             ? 1
             : a.name.localeCompare(b.name));
+}
+/*  get role for the particular project*/
+async function getRolesByProject(projectId) {
+    if (!mongoose_1.Types.ObjectId.isValid(projectId)) {
+        throw new Error("Invalid projectId");
+    }
+    const roles = await roles_js_1.Role.find({ projectId })
+        .select("name description moduleKeys isSystem isActive")
+        .sort({ name: 1 })
+        .lean();
+    return roles;
 }
 async function updateProject(projectId, data, actorId) {
     const query = mongoose_1.Types.ObjectId.isValid(projectId)

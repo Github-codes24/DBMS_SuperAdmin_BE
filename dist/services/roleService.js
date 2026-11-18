@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createRole = createRole;
+exports.getAllRoles = getAllRoles;
 exports.getRolesByProject = getRolesByProject;
 exports.getRoleById = getRoleById;
 exports.updateRole = updateRole;
@@ -26,12 +27,19 @@ async function findRole(projectId, roleId) {
         throw (0, httpError_js_1.httpError)(404, "ROLE_NOT_FOUND", "Role not found");
     return role;
 }
+// async function normaliseModuleKeys(projectId: string, keys: string[]) {
+//   const unique = [...new Set(keys.map((k) => k.toLowerCase()))];
+//   if (unique.length === 0) return unique;
+//   const n = await Module.countDocuments({ projectId, key: { $in: unique }, isActive: true });
+//   if (n !== unique.length) throw httpError(400, "INVALID_MODULES", "One or more modules do not exist in this project");
+//   return unique;
+// }
 async function normaliseModuleKeys(projectId, keys) {
     const unique = [...new Set(keys.map((k) => k.toLowerCase()))];
     if (unique.length === 0)
         return unique;
-    const n = await modules_js_1.Module.countDocuments({ projectId, key: { $in: unique }, isActive: true });
-    if (n !== unique.length)
+    const found = await modules_js_1.Module.distinct("key", { projectId, key: { $in: unique }, isActive: true });
+    if (found.length !== unique.length)
         throw (0, httpError_js_1.httpError)(400, "INVALID_MODULES", "One or more modules do not exist in this project");
     return unique;
 }
@@ -55,6 +63,13 @@ async function createRole(projectId, input, actorId) {
             throw (0, httpError_js_1.httpError)(409, "ROLE_NAME_EXISTS", "A role with this name already exists in this project");
         throw e;
     }
+}
+//
+async function getAllRoles() {
+    return roles_js_1.Role.find({ isActive: true })
+        .select("name projectId isSystem")
+        .sort({ name: 1 })
+        .lean();
 }
 async function getRolesByProject(projectId) {
     await assertProject(projectId);

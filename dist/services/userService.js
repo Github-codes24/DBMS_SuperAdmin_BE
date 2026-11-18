@@ -476,8 +476,30 @@ async function listUsers(query, _currentAuth) {
             .limit(limit)
             .lean(),
     ]);
+    //   return {
+    //     users: docs.map(formatUser),
+    //     pagination: {
+    //       total,
+    //       page,
+    //       limit,
+    //       totalPages: Math.ceil(total / limit) || 1,
+    //       hasNextPage: page * limit < total,
+    //       hasPrevPage: page > 1,
+    //     },
+    //   };
+    // }
+    const roleIds = docs.flatMap((d) => (d.projectRoles ?? []).map((pr) => pr.roleId));
+    const roles = await roles_js_1.Role.find({ _id: { $in: roleIds } }).select("name").lean();
+    const roleMap = new Map(roles.map((r) => [String(r._id), r.name]));
     return {
-        users: docs.map(formatUser),
+        users: docs.map((d) => {
+            const u = formatUser(d);
+            u.projectRoles = u.projectRoles.map((pr) => ({
+                ...pr,
+                roleName: roleMap.get(pr.roleId) ?? null,
+            }));
+            return u;
+        }),
         pagination: {
             total,
             page,

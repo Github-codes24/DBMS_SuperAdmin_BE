@@ -19,8 +19,11 @@ const Project_js_1 = require("../models/Project.js");
 const httpError_js_1 = require("../utils/httpError.js");
 const audit_service_js_1 = require("./audit.service.js");
 async function assertProject(projectId) {
-    if (!(await Project_js_1.Project.exists({ _id: projectId })))
+    const project = await Project_js_1.Project.findById(projectId).lean();
+    if (!project) {
         throw (0, httpError_js_1.httpError)(404, "PROJECT_NOT_FOUND", "Project not found");
+    }
+    return project;
 }
 /** Remove permission keys from every role in the project and bump versions (instant revocation). */
 async function revokeKeys(projectId, keys) {
@@ -38,36 +41,61 @@ async function listModules(projectId) {
 }
 /** One module or many: POST .../modules/bulk. Each module gets its Permission docs in one transaction. */
 async function createModules(projectId, items, actorId) {
-    await assertProject(projectId);
-    if (new Set(items.map((i) => i.key)).size !== items.length)
+    const project = await assertProject(projectId);
+    if (new Set(items.map((i) => i.key)).size !== items.length) {
         throw (0, httpError_js_1.httpError)(400, "DUPLICATE_KEYS", "Duplicate module keys in request");
-    const catalog = await action_1.Action.find({ isActive: true }).sort({ sortOrder: 1 });
+    }
+    const catalog = await action_1.Action.find({ isActive: true }).sort({
+        sortOrder: 1,
+    });
     const byKey = new Map(catalog.map((a) => [a.key, a]));
-    const session = await mongoose_1.default.startSession(); // needs a replica set (Atlas has one)
+    const session = await mongoose_1.default.startSession();
     try {
         await session.withTransaction(async () => {
             const base = await modules_1.Module.countDocuments({ projectId }).session(session);
             for (const [i, m] of items.entries()) {
                 const acts = (m.actions ?? catalog.map((a) => a.key)).map((k) => {
                     const a = byKey.get(k);
-                    if (!a)
+                    if (!a) {
                         throw (0, httpError_js_1.httpError)(400, "INVALID_ACTION", `Unknown action: ${k}`);
+                    }
                     return a;
                 });
-                await modules_1.Module.create([{ projectId, key: m.key, name: m.name.trim(), description: m.description?.trim() ?? "", sortOrder: base + i }], { session });
-                await permission_js_1.Permission.insertMany(acts.map((a) => ({ projectId, moduleKey: m.key, actionKey: a.key, key: `${m.key}:${a.key}`, name: `${m.name.trim()}: ${a.label}` })), { session });
+                await modules_1.Module.create([
+                    {
+                        projectId,
+                        projectName: project.name,
+                        panel: m.panel.trim().toLowerCase(),
+                        key: m.key,
+                        name: m.name.trim(),
+                        description: m.description?.trim() ?? "",
+                        sortOrder: base + i,
+                    },
+                ], { session });
+                await permission_js_1.Permission.insertMany(acts.map((a) => ({
+                    projectId,
+                    moduleKey: m.key,
+                    actionKey: a.key,
+                    key: `${m.key}:${a.key}`,
+                    name: `${m.name.trim()}: ${a.label}`,
+                })), { session });
             }
         });
     }
     catch (e) {
-        if ((0, httpError_js_1.isDuplicateKey)(e))
+        if ((0, httpError_js_1.isDuplicateKey)(e)) {
             throw (0, httpError_js_1.httpError)(409, "MODULE_EXISTS", "A module with this key already exists in this project");
+        }
         throw e;
     }
     finally {
         await session.endSession();
     }
-    await (0, audit_service_js_1.audit)("module.created", { actorId, projectId, after: items.map((i) => i.key) });
+    await (0, audit_service_js_1.audit)("module.created", {
+        actorId,
+        projectId,
+        after: items.map((i) => i.key),
+    });
     return listModules(projectId);
 }
 async function updateModule(projectId, moduleId, data, actorId) {
