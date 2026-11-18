@@ -81,7 +81,7 @@ app.use(requestContext_js_1.requestContext);
 app.use(express_1.default.json({ limit: "10mb" }));
 app.use(express_1.default.urlencoded({ limit: "10mb", extended: true }));
 app.get("/api/health", (_req, res) => {
-    return apiManager_js_1.apiManager.success(res, "DBMS Super Admin API is running", {
+    return apiManager_js_1.apiManager.success(res, "DBMS Super Admin API is running.....", {
         service: "dbms-superadmin-api",
         timestamp: new Date().toISOString(),
     });
