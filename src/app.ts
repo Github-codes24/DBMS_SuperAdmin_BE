@@ -11,8 +11,8 @@ import testRoutes from "./routes/testRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
 import platformRoutes from "./routes/platformRoutes.js";
-import settingsRouter from "../src/routes/settingRoutes.js"
-import reportRouter from "../src/routes/reportRoutes.js"
+import settingsRouter from "./routes/settingRoutes.js";
+import reportRouter from "./routes/reportRoutes.js";
 
 
 const app = express();
