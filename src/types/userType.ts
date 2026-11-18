@@ -5,7 +5,7 @@ interface CreateUserInput {
   email: string;
   password: string;
   phoneNumber?: string;
-  role?: "superadmin" | "admin" | "manager" | "user";
+  role?: string;
   isActive?: boolean;
   projectRoles?: ProjectRoleInput[];
   projectIds?: string[];
@@ -16,7 +16,7 @@ interface UpdateUserInput {
   email?: string;
   password?: string;
   phoneNumber?: string;
-  role?: "superadmin" | "admin" | "manager" | "user";
+  role?: string;
   isActive?: boolean;
   projectRoles?: ProjectRoleInput[];
   projectIds?: string[];

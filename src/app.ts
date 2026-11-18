@@ -11,6 +11,9 @@ import testRoutes from "./routes/testRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
 import platformRoutes from "./routes/platformRoutes.js";
+import settingsRouter from "../src/routes/settingRoutes.js"
+import reportRouter from "../src/routes/reportRoutes.js"
+
 
 const app = express();
 
@@ -63,27 +66,29 @@ app.use(
   }),
 );
 
-app.use((req, res, next) => {
-  console.log("[REQUEST START]", {
-    requestId: res.locals.requestId,
-    method: req.method,
-    url: req.originalUrl,
-  });
+// for debugging purpose 
 
-  const originalJson = res.json.bind(res);
+// app.use((req, res, next) => {
+//   console.log("[REQUEST START]", {
+//     requestId: res.locals.requestId,
+//     method: req.method,
+//     url: req.originalUrl,
+//   });
 
-  res.json = ((...args: any[]) => {
-    console.trace("[RESPONSE SENT]", {
-      requestId: res.locals.requestId,
-      method: req.method,
-      url: req.originalUrl,
-    });
+//   const originalJson = res.json.bind(res);
 
-    return originalJson(...args);
-  }) as typeof res.json;
+//   res.json = ((...args: any[]) => {
+//     console.trace("[RESPONSE SENT]", {
+//       requestId: res.locals.requestId,
+//       method: req.method,
+//       url: req.originalUrl,
+//     });
 
-  next();
-});
+//     return originalJson(...args);
+//   }) as typeof res.json;
+
+//   next();
+// });
 app.use(requestContext);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
@@ -100,6 +105,8 @@ app.use("/api/test", testRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/platform", platformRoutes);
+app.use("/api/settings", settingsRouter);
+app.use("/api/reports",reportRouter)
 
 // Register feature routes above these two handlers.
 app.use(notFound);
