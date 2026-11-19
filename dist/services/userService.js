@@ -438,9 +438,77 @@ async function revokeSessions(userId) {
 /* ------------------------------ queries ------------------------------ */
 async function listUsers(query, _currentAuth) {
     const filter = {};
+    // if (query.role) {
+    //   const escapedRole = query.role.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    //   filter.role = { $regex: new RegExp(`^${escapedRole}$`, "i") };
+    // }
+    // if (query.role) {
+    //   const roleValue = query.role.trim();
+    //   if (/^[0-9a-fA-F]{24}$/.test(roleValue)) {
+    //     // Role document ID: users holding that role in any project
+    //     filter["projectRoles.roleId"] = new Types.ObjectId(roleValue);
+    //   } else {
+    //     // legacy values: superadmin / admin / manager / user
+    //     const escapedRole = roleValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    //     filter.role = { $regex: new RegExp(`^${escapedRole}$`, "i") };
+    //   }
+    // }
+    // if (query.role) {
+    //   const roleValue = query.role.trim();
+    //   console.log("ROLE FILTER RECEIVED:", roleValue);
+    //   console.log("IS OBJECT ID:", Types.ObjectId.isValid(roleValue));
+    //   if (Types.ObjectId.isValid(roleValue)) {
+    //     const role = await Role.findById(roleValue)
+    //       .select("name isSystem")
+    //       .lean();
+    //     if (role?.isSystem) {
+    //       // System roles are stored in the user's legacy `role` field.
+    //       const escapedRole = role.name
+    //         .trim()
+    //         .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    //       filter.role = {
+    //         $regex: new RegExp(`^${escapedRole}$`, "i"),
+    //       };
+    //     } else {
+    //       // Project-scoped roles are stored in projectRoles.roleId.
+    //       filter["projectRoles.roleId"] = new Types.ObjectId(roleValue);
+    //     }
+    //   } else {
+    //     // Legacy role values: superadmin / admin / manager / user
+    //     const escapedRole = roleValue.replace(
+    //       /[.*+?^${}()|[\]\\]/g,
+    //       "\\$&",
+    //     );
+    //     filter.role = {
+    //       $regex: new RegExp(`^${escapedRole}$`, "i"),
+    //     };
+    //   }
+    // }
     if (query.role) {
-        const escapedRole = query.role.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        filter.role = { $regex: new RegExp(`^${escapedRole}$`, "i") };
+        const roleValue = query.role.trim();
+        if (mongoose_1.Types.ObjectId.isValid(roleValue)) {
+            const role = await roles_js_1.Role.findById(roleValue)
+                .select("name isSystem")
+                .lean();
+            if (!role) {
+                // Role ID was supplied but no such role exists.
+                filter._id = { $exists: false };
+            }
+            else if (role.isSystem) {
+                // System roles are stored in User.role.
+                const legacyRole = role.name.trim().toLowerCase();
+                filter.role = legacyRole;
+            }
+            else {
+                // Project roles are stored in User.projectRoles[].roleId.
+                filter["projectRoles.roleId"] = new mongoose_1.Types.ObjectId(roleValue);
+            }
+        }
+        else {
+            // Backward compatibility for direct legacy role values:
+            // superadmin / admin / manager / user
+            filter.role = roleValue.toLowerCase();
+        }
     }
     if (query.isActive !== undefined) {
         filter.isActive = query.isActive;
