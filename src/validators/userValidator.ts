@@ -34,13 +34,19 @@ const projectRolesField = z
   .optional();
 
 export const listUsersSchema = z.object({
-  body: z.any().optional(),          // GET has no body (undefined in Express 5)
+  body: z.any().optional(),          
   params: z.any().optional(),
   query: z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(10),
     search: z.preprocess(emptyToUndefined, z.string().trim().max(100).optional()),
-    role: z.preprocess(emptyToUndefined, userRoleEnum.optional()),
+    role: z.preprocess(
+      emptyToUndefined,
+      z.union([
+        userRoleEnum,
+        z.string().trim().regex(/^[0-9a-fA-F]{24}$/, "Role must be a valid role id or one of 'superadmin', 'admin', 'manager', or 'user'"),
+      ]).optional(),
+    ),
     isActive: z.preprocess(
       emptyToUndefined,
       z.enum(["true", "false"]).transform((val) => val === "true").optional(),

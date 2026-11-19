@@ -584,6 +584,10 @@ export async function listUsers(
 ): Promise<ListUsersResult> {
   const filter: Record<string, unknown> = {};
 
+  // if (query.role) {
+  //   const escapedRole = query.role.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  //   filter.role = { $regex: new RegExp(`^${escapedRole}$`, "i") };
+  // }
   if (query.role) {
     const escapedRole = query.role.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     filter.role = { $regex: new RegExp(`^${escapedRole}$`, "i") };

@@ -58,12 +58,20 @@ export async function createRole(
   }
 }
 
-//
+// get allRoles  -----
 export async function getAllRoles() {
-  return Role.find({ isActive: true })
-    .select("name projectId isSystem")
+  const roles = await Role.find({ isActive: true, isSystem: false })
+    .select("name projectId")
+    .populate("projectId", "name")
     .sort({ name: 1 })
     .lean();
+
+  return roles.map((r: any) => ({
+    id: String(r._id),
+    name: r.name,
+    projectId: String(r.projectId?._id ?? r.projectId),
+    projectName: r.projectId?.name ?? null,
+  }));
 }
 export async function getRolesByProject(projectId: string) {
   await assertProject(projectId);
