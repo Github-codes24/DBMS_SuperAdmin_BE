@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getUsersReport = getUsersReport;
 exports.exportUsersReport = exportUsersReport;
+exports.getRolesReport = getRolesReport;
 const mongoose_1 = require("mongoose");
 const User_1 = require("../models/User");
 const roles_1 = require("../models/roles");
@@ -159,5 +160,98 @@ async function exportUsersReport(q) {
         ],
     });
     return parser.parse(rows);
+}
+async function getRolesReport(q) {
+    const { projectId, range, status } = q;
+    const userMatch = [];
+    const days = RANGE_DAYS[range];
+    if (days) {
+        userMatch.push({
+            createdAt: {
+                $gte: new Date(Date.now() - days * 86400000),
+            },
+        });
+    }
+    if (status === "active") {
+        userMatch.push({ isActive: true });
+    }
+    if (status === "inactive" || status === "blocked") {
+        userMatch.push({ isActive: false });
+    }
+    const userFilter = userMatch.length
+        ? { $and: userMatch }
+        : {};
+    const pipeline = [
+        { $match: userFilter },
+        { $unwind: "$projectRoles" },
+        ...(projectId
+            ? [
+                {
+                    $match: {
+                        "projectRoles.projectId": new mongoose_1.Types.ObjectId(projectId),
+                        "projectRoles.isActive": true,
+                    },
+                },
+            ]
+            : [
+                {
+                    $match: {
+                        "projectRoles.isActive": true,
+                    },
+                },
+            ]),
+        {
+            $lookup: {
+                from: "roles",
+                localField: "projectRoles.roleId",
+                foreignField: "_id",
+                as: "role",
+            },
+        },
+        {
+            $unwind: {
+                path: "$role",
+                preserveNullAndEmptyArrays: false,
+            },
+        },
+        {
+            $group: {
+                _id: {
+                    roleId: "$role._id",
+                    roleName: "$role.name",
+                },
+                userCount: {
+                    $sum: 1,
+                },
+                activeUsers: {
+                    $sum: {
+                        $cond: [{ $eq: ["$isActive", true] }, 1, 0],
+                    },
+                },
+                blockedUsers: {
+                    $sum: {
+                        $cond: [{ $eq: ["$isActive", false] }, 1, 0],
+                    },
+                },
+            },
+        },
+        {
+            $sort: {
+                userCount: -1,
+            },
+        },
+    ];
+    const roles = await User_1.User.aggregate(pipeline);
+    const totalUsers = roles.reduce((sum, role) => sum + role.userCount, 0);
+    return {
+        totalUsers,
+        roles: roles.map((role) => ({
+            roleId: String(role._id.roleId),
+            roleName: role._id.roleName,
+            userCount: role.userCount,
+            activeUsers: role.activeUsers,
+            blockedUsers: role.blockedUsers,
+        })),
+    };
 }
 //# sourceMappingURL=reportService.js.map

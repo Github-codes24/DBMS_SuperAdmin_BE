@@ -183,3 +183,118 @@ export async function exportUsersReport(q: ReportQuery) {
 
   return parser.parse(rows);
 }
+
+export async function getRolesReport(q: ReportQuery) {
+  const { projectId, range, status } = q;
+
+  const userMatch: Record<string, unknown>[] = [];
+
+  const days = RANGE_DAYS[range];
+  if (days) {
+    userMatch.push({
+      createdAt: {
+        $gte: new Date(Date.now() - days * 86400000),
+      },
+    });
+  }
+
+  if (status === "active") {
+    userMatch.push({ isActive: true });
+  }
+
+  if (status === "inactive" || status === "blocked") {
+    userMatch.push({ isActive: false });
+  }
+
+  const userFilter = userMatch.length
+    ? { $and: userMatch }
+    : {};
+
+  const pipeline: any[] = [
+    { $match: userFilter },
+
+    { $unwind: "$projectRoles" },
+
+    ...(projectId
+      ? [
+          {
+            $match: {
+              "projectRoles.projectId": new Types.ObjectId(projectId),
+              "projectRoles.isActive": true,
+            },
+          },
+        ]
+      : [
+          {
+            $match: {
+              "projectRoles.isActive": true,
+            },
+          },
+        ]),
+
+    {
+      $lookup: {
+        from: "roles",
+        localField: "projectRoles.roleId",
+        foreignField: "_id",
+        as: "role",
+      },
+    },
+
+    {
+      $unwind: {
+        path: "$role",
+        preserveNullAndEmptyArrays: false,
+      },
+    },
+
+    {
+      $group: {
+        _id: {
+          roleId: "$role._id",
+          roleName: "$role.name",
+        },
+
+        userCount: {
+          $sum: 1,
+        },
+
+        activeUsers: {
+          $sum: {
+            $cond: [{ $eq: ["$isActive", true] }, 1, 0],
+          },
+        },
+
+        blockedUsers: {
+          $sum: {
+            $cond: [{ $eq: ["$isActive", false] }, 1, 0],
+          },
+        },
+      },
+    },
+
+    {
+      $sort: {
+        userCount: -1,
+      },
+    },
+  ];
+
+  const roles = await User.aggregate(pipeline);
+
+  const totalUsers = roles.reduce(
+    (sum, role) => sum + role.userCount,
+    0
+  );
+
+  return {
+    totalUsers,
+    roles: roles.map((role) => ({
+      roleId: String(role._id.roleId),
+      roleName: role._id.roleName,
+      userCount: role.userCount,
+      activeUsers: role.activeUsers,
+      blockedUsers: role.blockedUsers,
+    })),
+  };
+}
