@@ -1,9 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getUsersReport = getUsersReport;
+exports.exportUsersReport = exportUsersReport;
 const mongoose_1 = require("mongoose");
 const User_1 = require("../models/User");
 const roles_1 = require("../models/roles");
+const json2csv_1 = require("json2csv");
 const RANGE_DAYS = { "7d": 7, "30d": 30, "90d": 90, "1y": 365 };
 async function getUsersReport(q) {
     const { projectId, range, status, page, limit } = q;
@@ -89,5 +91,73 @@ async function getUsersReport(q) {
             hasPrevPage: page > 1,
         },
     };
+}
+async function exportUsersReport(q) {
+    const { projectId, range, status } = q;
+    const and = [];
+    if (projectId) {
+        and.push({
+            $or: [
+                { "projectRoles.projectId": new mongoose_1.Types.ObjectId(projectId) },
+                { projectIds: projectId },
+            ],
+        });
+    }
+    const days = RANGE_DAYS[range];
+    if (days) {
+        and.push({
+            createdAt: {
+                $gte: new Date(Date.now() - days * 86400000),
+            },
+        });
+    }
+    if (status === "active") {
+        and.push({ isActive: true });
+    }
+    if (status === "inactive" || status === "blocked") {
+        and.push({ isActive: false });
+    }
+    const filter = and.length ? { $and: and } : {};
+    const docs = await User_1.User.find(filter)
+        .select("name email role projectRoles isActive lastLoginAt createdAt")
+        .sort({ createdAt: -1 })
+        .lean();
+    const roleIds = docs.flatMap((d) => (d.projectRoles ?? []).map((pr) => pr.roleId));
+    const roles = roleIds.length
+        ? await roles_1.Role.find({ _id: { $in: roleIds } })
+            .select("name")
+            .lean()
+        : [];
+    const roleMap = new Map(roles.map((r) => [String(r._id), r.name]));
+    const rows = docs.map((d) => {
+        const names = (d.projectRoles ?? [])
+            .map((pr) => roleMap.get(String(pr.roleId)))
+            .filter(Boolean);
+        return {
+            ID: String(d._id),
+            Name: d.name,
+            Email: d.email,
+            Roles: names.length ? names.join(", ") : d.role,
+            Status: d.isActive ?? true ? "Active" : "Blocked",
+            "Last Login": d.lastLoginAt
+                ? new Date(d.lastLoginAt).toISOString()
+                : "",
+            "Created At": d.createdAt
+                ? new Date(d.createdAt).toISOString()
+                : "",
+        };
+    });
+    const parser = new json2csv_1.Parser({
+        fields: [
+            "ID",
+            "Name",
+            "Email",
+            "Roles",
+            "Status",
+            "Last Login",
+            "Created At",
+        ],
+    });
+    return parser.parse(rows);
 }
 //# sourceMappingURL=reportService.js.map
