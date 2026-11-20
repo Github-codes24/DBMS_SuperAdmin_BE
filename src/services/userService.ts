@@ -739,10 +739,6 @@ return {
 };
 }
 
-
-
-
-
 export async function getUserById(id: string): Promise<UserResponse> {
   const user = await User.findById(id).lean();
 
