@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { reportQuerySchema } from "../validators/reportValidator";
-import { getUsersReport,  exportUsersReport } from "../services/reportService";
+import { getUsersReport,  exportUsersReport, getRolesReport, } from "../services/reportService";
 
 export async function getReport(req: Request, res: Response, next: NextFunction) {
   try {
@@ -61,6 +61,36 @@ export async function exportReport(
     );
 
     return res.send(csv);
+  } catch (err) {
+    next(err);
+  }
+}
+export async function getRolesReportController(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const parsed = reportQuerySchema.safeParse(req.query);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid report filters",
+        errors: parsed.error.issues.map((i) => ({
+          field: i.path.join("."),
+          message: i.message,
+        })),
+      });
+    }
+
+    const data = await getRolesReport(parsed.data);
+
+    return res.json({
+      success: true,
+      message: "Role-wise user report generated successfully",
+      data,
+    });
   } catch (err) {
     next(err);
   }
