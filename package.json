@@ -34,11 +34,14 @@
     "dotenv": "^18.0.9",
     "express": "^5.3.0",
     "helmet": "^8.3.0",
+    "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.11.3",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "zod": "^4.6.7"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/json2csv": "^5.0.7"
+  }
 }
