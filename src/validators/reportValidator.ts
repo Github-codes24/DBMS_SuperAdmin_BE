@@ -10,8 +10,10 @@ export const reportQuerySchema = z.object({
     .or(z.literal(""))
     .optional()
     .transform((v) => v || undefined),
-  range: z.enum(["7d", "30d", "90d", "1y", "all"]).default("30d"),
+  range: z.enum(["7d", "30d", "90d", "1y","custom", "all"]).default("30d"),
   status: z.enum(["all", "active", "inactive", "blocked"]).default("all"),
+  from: z.string().optional(),
+  to: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(500).default(10),
 });

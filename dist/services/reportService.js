@@ -9,7 +9,7 @@ const roles_1 = require("../models/roles");
 const json2csv_1 = require("json2csv");
 const RANGE_DAYS = { "7d": 7, "30d": 30, "90d": 90, "1y": 365 };
 async function getUsersReport(q) {
-    const { projectId, range, status, page, limit } = q;
+    const { projectId, range, status, page, limit, from, to } = q;
     const and = [];
     if (projectId) {
         and.push({
@@ -19,13 +19,35 @@ async function getUsersReport(q) {
             ],
         });
     }
-    const days = RANGE_DAYS[range];
-    if (days)
-        and.push({ createdAt: { $gte: new Date(Date.now() - days * 86400000) } });
+    if (range === "custom") {
+        if (from && to) {
+            const fromDate = new Date(from);
+            const toDate = new Date(to);
+            // Include the complete "to" date
+            toDate.setHours(23, 59, 59, 999);
+            and.push({
+                createdAt: {
+                    $gte: fromDate,
+                    $lte: toDate,
+                },
+            });
+        }
+    }
+    else {
+        const days = RANGE_DAYS[range];
+        if (days) {
+            and.push({
+                createdAt: {
+                    $gte: new Date(Date.now() - days * 86400000),
+                },
+            });
+        }
+    }
     if (status === "active")
         and.push({ isActive: true });
-    if (status === "inactive" || status === "blocked")
+    if (status === "inactive" || status === "blocked") {
         and.push({ isActive: false });
+    }
     const filter = and.length ? { $and: and } : {};
     const roleStage = [
         { $unwind: { path: "$projectRoles", preserveNullAndEmptyArrays: true } },
