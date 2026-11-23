@@ -90,8 +90,14 @@ platform.patch("/actions/:key", validate(v.updateActionDto), mod.updateAction);
 
 const p = "/projects/:projectId";
 
-platform.get(`${p}/modules`, objectIdParams("projectId"), mod.listModules);
+platform.get(`${p}/modules`,
+ objectIdParams("projectId"),
+  mod.listModules);
 
+platform.get(`${p}/modules/by-panel`,
+ objectIdParams("projectId"),
+  mod.listModulesByPanel);
+  
 platform.post(
   `${p}/modules/bulk`,
   objectIdParams("projectId"),

@@ -10,7 +10,7 @@ import { audit } from "./audit.service.js";
 // interface ModuleInput { key: string; name: string; description?: string; actions?: string[] }
 
 
-interface ModuleInput {
+export interface ModuleInput {
   key: string;
   name: string;
   description?: string;
@@ -42,6 +42,29 @@ export async function listModules(projectId: string) {
     Permission.find({ projectId, isActive: true }).select("moduleKey actionKey").lean(),
   ]);
   return modules.map((m) => ({ ...m, allowedActions: perms.filter((p) => p.moduleKey === m.key).map((p) => p.actionKey) }));
+}
+
+// list modules by pannel 
+
+export async function listModulesByPanel(projectId: string, panel?: string) {
+  await assertProject(projectId); // 404 if the project doesn't exist
+
+  const filter: Record<string, unknown> = { projectId };
+  if (panel) filter.panel = panel.trim().toLowerCase(); // panels are stored lowercased
+
+  const modules = await Module.find(filter).sort({ sortOrder: 1 }).lean();
+
+  // group: { admin: [...], manager: [...], user: [...] }
+  const grouped: Record<string, typeof modules> = {};
+  for (const m of modules) (grouped[m.panel] ??= []).push(m);
+
+  return {
+    panels: Object.entries(grouped).map(([name, mods]) => ({
+      name,
+      count: mods.length,
+      modules: mods,
+    })),
+  };
 }
 
 /** One module or many: POST .../modules/bulk. Each module gets its Permission docs in one transaction. */

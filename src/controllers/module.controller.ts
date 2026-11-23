@@ -6,6 +6,13 @@ import { ok, wrap } from "./helpers.js";
 export const listModules = wrap(async (req, res) =>
   ok(res, await svc.listModules(param(req, "projectId"))));
 
+// Retrive modules with pannel filter 
+
+export const listModulesByPanel = wrap(async (req, res) => {
+  const projectId = String(req.params.projectId);
+  const panel = typeof req.query.panel === "string" ? req.query.panel : undefined;
+  return ok(res, await svc.listModulesByPanel(projectId, panel));
+});
 // Create multiple modules under a specific project.
 export const createModules = wrap(async (req, res) =>
   ok(res, await svc.createModules(param(req, "projectId"),

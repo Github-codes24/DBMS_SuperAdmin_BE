@@ -93,6 +93,7 @@ platform.patch("/actions/:key", (0, validate_js_1.validate)(v.updateActionDto), 
 // ── PROJECT MODULE MANAGEMENT ────────────────────────────────────────────────
 const p = "/projects/:projectId";
 platform.get(`${p}/modules`, (0, validate_js_1.objectIdParams)("projectId"), mod.listModules);
+platform.get(`${p}/modules/by-panel`, (0, validate_js_1.objectIdParams)("projectId"), mod.listModulesByPanel);
 platform.post(`${p}/modules/bulk`, (0, validate_js_1.objectIdParams)("projectId"), (0, validate_js_1.validate)(v.bulkModulesDto), mod.createModules);
 platform.patch(`${p}/modules/:moduleId`, (0, validate_js_1.objectIdParams)("projectId", "moduleId"), (0, validate_js_1.validate)(v.updateModuleDto), mod.updateModule);
 platform.put(`${p}/modules/:moduleId/actions`, (0, validate_js_1.objectIdParams)("projectId", "moduleId"), (0, validate_js_1.validate)(v.moduleActionsDto), mod.setModuleActions);
