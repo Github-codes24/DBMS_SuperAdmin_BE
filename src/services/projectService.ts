@@ -5,9 +5,14 @@ import { User } from "../models/User.js";
 import { Counter } from "../models/counter.js";
 import { httpError } from "../utils/httpError.js";
 import { audit } from "./audit.service.js";
+import {ModuleInput, createModules} from "../services/module.service.js"
 
 type PanelLink = { name: string; url: string };
 type UserType = { role: string; count: number };
+type PanelInput = {
+  name: string;
+  modules: Omit<ModuleInput, "panel">[];
+};
 
 type ProjectInput = {
   name: string;
@@ -18,6 +23,7 @@ type ProjectInput = {
   endDate?: string;
   status?: "active" | "inactive" | "upcoming" | "completed" | "on_hold";
   adminId?: string;
+  panels?: PanelInput[],
   panelLinks?: PanelLink[];
   userTypes?: UserType[];
   createdBy: string;
@@ -71,6 +77,21 @@ export async function createProject(input: ProjectInput) {
     panelLinks: input.panelLinks ?? [],
     userTypes: input.userTypes ?? [],
   });
+
+  // NEW: create modules (and their permissions) for every panel
+  const items: ModuleInput[] = (input.panels ?? []).flatMap((p) =>
+    p.modules.map((m) => ({ ...m, panel: p.name }))
+  );
+
+  if (items.length) {
+    try {
+      await createModules(String(project._id), items, input.createdBy);
+    } catch (e) {
+      await Project.deleteOne({ _id: project._id }); // createModules is transactional, so only the project needs removing
+      throw e;
+    }
+  }
+  
   await audit("project.created", {
     actorId: input.createdBy,
     projectId: project._id,

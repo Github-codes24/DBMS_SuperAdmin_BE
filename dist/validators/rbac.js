@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.activeDto = exports.assignRoleDto = exports.createProjectUserDto = exports.updateActionDto = exports.createActionDto = exports.moduleActionsDto = exports.updateModuleDto = exports.bulkModulesDto = exports.savePermissionsDto = exports.updateRoleDto = exports.createRoleDto = exports.updateProjectDto = exports.createProjectDto = void 0;
+exports.activeDto = exports.assignRoleDto = exports.createProjectUserDto = exports.updateActionDto = exports.createActionDto = exports.moduleActionsDto = exports.updateModuleDto = exports.listModulesByPanelDto = exports.bulkModulesDto = exports.savePermissionsDto = exports.updateRoleDto = exports.createRoleDto = exports.updateProjectDto = exports.createProjectDto = void 0;
 // validators/rbac.ts
 const zod_1 = require("zod");
 const key = zod_1.z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]{1,47}$/);
@@ -52,8 +52,39 @@ const optionalStringField = (max = 1000) => zod_1.z.preprocess((val) => (typeof 
 ])
     .optional()
     .transform((val) => (val ? String(val).trim() : "")));
+// export const createProjectDto = z.object({
+//   body: z.object({
+//     name:        z.string().trim().min(2).max(100),
+//     description: optionalStringField(1000),
+//     logo:        optionalLogoField,
+//     theme:       optionalThemeField,
+//     startDate:   optionalDateField,
+//     endDate:     optionalDateField,
+//     status:      projectStatusEnum.optional().default("active"),
+//     adminId:     optionalStringField(200),
+//     panelLinks:  z.array(panelLinkDto).max(100).optional().default([]),
+//     userTypes:   z.array(userTypeDto).max(100).optional().default([]),
+//   }).passthrough(),
+//   params: z.object({}).passthrough(),
+//   query:  z.object({}).passthrough(),
+// });
+const projectModuleDto = zod_1.z
+    .object({
+    key,
+    name: zod_1.z.string().trim().min(2).max(80),
+    description: zod_1.z.string().trim().max(300).optional(),
+    actions: zod_1.z.array(key).optional(),
+})
+    .strict();
+const panelDto = zod_1.z
+    .object({
+    name: zod_1.z.string().trim().min(2).max(80),
+    modules: zod_1.z.array(projectModuleDto).min(1).max(100),
+})
+    .strict();
 exports.createProjectDto = zod_1.z.object({
-    body: zod_1.z.object({
+    body: zod_1.z
+        .object({
         name: zod_1.z.string().trim().min(2).max(100),
         description: optionalStringField(1000),
         logo: optionalLogoField,
@@ -64,7 +95,24 @@ exports.createProjectDto = zod_1.z.object({
         adminId: optionalStringField(200),
         panelLinks: zod_1.z.array(panelLinkDto).max(100).optional().default([]),
         userTypes: zod_1.z.array(userTypeDto).max(100).optional().default([]),
-    }).passthrough(),
+        panels: zod_1.z.array(panelDto).max(20).optional().default([]),
+    })
+        .passthrough()
+        .superRefine((b, ctx) => {
+        const panelNames = new Set();
+        const keys = new Set();
+        b.panels.forEach((p, pi) => {
+            const pn = p.name.toLowerCase(); // createModules lowercases the panel name
+            if (panelNames.has(pn))
+                ctx.addIssue({ code: "custom", path: ["panels", pi, "name"], message: "Duplicate panel name" });
+            panelNames.add(pn);
+            p.modules.forEach((m, mi) => {
+                if (keys.has(m.key))
+                    ctx.addIssue({ code: "custom", path: ["panels", pi, "modules", mi, "key"], message: `Duplicate module key: ${m.key}` });
+                keys.add(m.key);
+            });
+        });
+    }),
     params: zod_1.z.object({}).passthrough(),
     query: zod_1.z.object({}).passthrough(),
 });
@@ -125,6 +173,11 @@ exports.bulkModulesDto = zod_1.z.object({
         projectId: objectId,
     }).strict(),
     query: zod_1.z.object({}).strict(),
+});
+exports.listModulesByPanelDto = zod_1.z.object({
+    body: zod_1.z.object({}).passthrough(),
+    params: zod_1.z.object({ projectId: objectId }).strict(),
+    query: zod_1.z.object({ panel: zod_1.z.string().trim().min(2).max(80).optional() }).strict(),
 });
 exports.updateModuleDto = zod_1.z.object({
     body: zod_1.z.object({

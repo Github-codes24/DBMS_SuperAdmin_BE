@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.listModules = listModules;
+exports.listModulesByPanel = listModulesByPanel;
 exports.createModules = createModules;
 exports.updateModule = updateModule;
 exports.setModuleActions = setModuleActions;
@@ -38,6 +39,25 @@ async function listModules(projectId) {
         permission_js_1.Permission.find({ projectId, isActive: true }).select("moduleKey actionKey").lean(),
     ]);
     return modules.map((m) => ({ ...m, allowedActions: perms.filter((p) => p.moduleKey === m.key).map((p) => p.actionKey) }));
+}
+// list modules by pannel 
+async function listModulesByPanel(projectId, panel) {
+    await assertProject(projectId); // 404 if the project doesn't exist
+    const filter = { projectId };
+    if (panel)
+        filter.panel = panel.trim().toLowerCase(); // panels are stored lowercased
+    const modules = await modules_1.Module.find(filter).sort({ sortOrder: 1 }).lean();
+    // group: { admin: [...], manager: [...], user: [...] }
+    const grouped = {};
+    for (const m of modules)
+        (grouped[m.panel] ??= []).push(m);
+    return {
+        panels: Object.entries(grouped).map(([name, mods]) => ({
+            name,
+            count: mods.length,
+            modules: mods,
+        })),
+    };
 }
 /** One module or many: POST .../modules/bulk. Each module gets its Permission docs in one transaction. */
 async function createModules(projectId, items, actorId) {

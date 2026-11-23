@@ -71,22 +71,74 @@ const optionalStringField = (max = 1000) =>
       .transform((val) => (val ? String(val).trim() : ""))
   );
 
+// export const createProjectDto = z.object({
+//   body: z.object({
+//     name:        z.string().trim().min(2).max(100),
+//     description: optionalStringField(1000),
+//     logo:        optionalLogoField,
+//     theme:       optionalThemeField,
+//     startDate:   optionalDateField,
+//     endDate:     optionalDateField,
+//     status:      projectStatusEnum.optional().default("active"),
+//     adminId:     optionalStringField(200),
+//     panelLinks:  z.array(panelLinkDto).max(100).optional().default([]),
+//     userTypes:   z.array(userTypeDto).max(100).optional().default([]),
+//   }).passthrough(),
+//   params: z.object({}).passthrough(),
+//   query:  z.object({}).passthrough(),
+// });
+
+const projectModuleDto = z
+  .object({
+    key,
+    name: z.string().trim().min(2).max(80),
+    description: z.string().trim().max(300).optional(),
+    actions: z.array(key).optional(),
+  })
+  .strict();
+
+const panelDto = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    modules: z.array(projectModuleDto).min(1).max(100),
+  })
+  .strict();
+
 export const createProjectDto = z.object({
-  body: z.object({
-    name:        z.string().trim().min(2).max(100),
-    description: optionalStringField(1000),
-    logo:        optionalLogoField,
-    theme:       optionalThemeField,
-    startDate:   optionalDateField,
-    endDate:     optionalDateField,
-    status:      projectStatusEnum.optional().default("active"),
-    adminId:     optionalStringField(200),
-    panelLinks:  z.array(panelLinkDto).max(100).optional().default([]),
-    userTypes:   z.array(userTypeDto).max(100).optional().default([]),
-  }).passthrough(),
+  body: z
+    .object({
+      name:        z.string().trim().min(2).max(100),
+      description: optionalStringField(1000),
+      logo:        optionalLogoField,
+      theme:       optionalThemeField,
+      startDate:   optionalDateField,
+      endDate:     optionalDateField,
+      status:      projectStatusEnum.optional().default("active"),
+      adminId:     optionalStringField(200),
+      panelLinks:  z.array(panelLinkDto).max(100).optional().default([]),
+      userTypes:   z.array(userTypeDto).max(100).optional().default([]),
+      panels:      z.array(panelDto).max(20).optional().default([]),
+    })
+    .passthrough()
+    .superRefine((b, ctx) => {
+      const panelNames = new Set<string>();
+      const keys = new Set<string>();
+      b.panels.forEach((p, pi) => {
+        const pn = p.name.toLowerCase(); // createModules lowercases the panel name
+        if (panelNames.has(pn))
+          ctx.addIssue({ code: "custom", path: ["panels", pi, "name"], message: "Duplicate panel name" });
+        panelNames.add(pn);
+        p.modules.forEach((m, mi) => {
+          if (keys.has(m.key))
+            ctx.addIssue({ code: "custom", path: ["panels", pi, "modules", mi, "key"], message: `Duplicate module key: ${m.key}` });
+          keys.add(m.key);
+        });
+      });
+    }),
   params: z.object({}).passthrough(),
   query:  z.object({}).passthrough(),
 });
+
 
 export const updateProjectDto = z.object({
   body: z.object({
@@ -153,6 +205,12 @@ export const bulkModulesDto = z.object({
   }).strict(),
 
   query: z.object({}).strict(),
+});
+
+export const listModulesByPanelDto = z.object({
+  body: z.object({}).passthrough(),
+  params: z.object({ projectId: objectId }).strict(),
+  query: z.object({ panel: z.string().trim().min(2).max(80).optional() }).strict(),
 });
 
 export const updateModuleDto = z.object({

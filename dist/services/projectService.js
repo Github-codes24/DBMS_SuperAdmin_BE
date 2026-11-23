@@ -16,6 +16,7 @@ const User_js_1 = require("../models/User.js");
 const counter_js_1 = require("../models/counter.js");
 const httpError_js_1 = require("../utils/httpError.js");
 const audit_service_js_1 = require("./audit.service.js");
+const module_service_js_1 = require("../services/module.service.js");
 async function getNextProjectId() {
     const exists = await counter_js_1.Counter.exists({ _id: "project" });
     if (!exists) {
@@ -48,6 +49,17 @@ async function createProject(input) {
         panelLinks: input.panelLinks ?? [],
         userTypes: input.userTypes ?? [],
     });
+    // NEW: create modules (and their permissions) for every panel
+    const items = (input.panels ?? []).flatMap((p) => p.modules.map((m) => ({ ...m, panel: p.name })));
+    if (items.length) {
+        try {
+            await (0, module_service_js_1.createModules)(String(project._id), items, input.createdBy);
+        }
+        catch (e) {
+            await Project_js_1.Project.deleteOne({ _id: project._id }); // createModules is transactional, so only the project needs removing
+            throw e;
+        }
+    }
     await (0, audit_service_js_1.audit)("project.created", {
         actorId: input.createdBy,
         projectId: project._id,

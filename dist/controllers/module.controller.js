@@ -33,12 +33,18 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAction = exports.createAction = exports.listActions = exports.setModuleActions = exports.updateModule = exports.createModules = exports.listModules = void 0;
+exports.updateAction = exports.createAction = exports.listActions = exports.setModuleActions = exports.updateModule = exports.createModules = exports.listModulesByPanel = exports.listModules = void 0;
 const svc = __importStar(require("../services/module.service.js"));
 const request_js_1 = require("../utils/request.js");
 const helpers_js_1 = require("./helpers.js");
 // Retrieve all modules configured for a specific project.
 exports.listModules = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.listModules((0, request_js_1.param)(req, "projectId"))));
+// Retrive modules with pannel filter 
+exports.listModulesByPanel = (0, helpers_js_1.wrap)(async (req, res) => {
+    const projectId = String(req.params.projectId);
+    const panel = typeof req.query.panel === "string" ? req.query.panel : undefined;
+    return (0, helpers_js_1.ok)(res, await svc.listModulesByPanel(projectId, panel));
+});
 // Create multiple modules under a specific project.
 exports.createModules = (0, helpers_js_1.wrap)(async (req, res) => (0, helpers_js_1.ok)(res, await svc.createModules((0, request_js_1.param)(req, "projectId"), req.body.modules, (0, request_js_1.actorId)(req)), 201));
 // Update a project's module details or active status.
